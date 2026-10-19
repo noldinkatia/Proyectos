@@ -1090,14 +1090,23 @@ test('sin sesión con PostgreSQL: pendientes, rechazados y pistas no validadas n
   try {
     await initializeDatabase(db);
     databaseInitialized = true;
+    // contacto_reportante no es una columna de casos: las rutas de admin lo leen
+    // como u.correo del usuario en reportado_por_usr_id. Por eso el valor secreto
+    // va en el correo de un reportante, y la consulta pública no debe mostrarlo.
+    const { rows: [reporter] } = await db.query(`
+      INSERT INTO usuarios (nombre_completo, correo, contrasena_hash, verificado)
+      VALUES ('Reportante de prueba', $1, 'x', TRUE)
+      ON CONFLICT (correo) DO UPDATE SET correo = EXCLUDED.correo
+      RETURNING id
+    `, [INTERNAL_VALUES[1]]);
     for (const [state, id] of Object.entries(ids)) {
       await db.query(`
         INSERT INTO casos (id, nombre_completo, edad, sexo, ciudad, departamento, descripcion_fisica,
           vestimenta, fecha_hora_desaparicion, foto, latitud, longitud, estado, numero_denuncia,
-          contacto_reportante, creado_en)
+          reportado_por_usr_id, creado_en)
         VALUES ($1, $2, 30, 'Femenino', 'Asunción', 'Capital', 'Descripción', 'Ropa',
           CURRENT_TIMESTAMP, 'data:image/png;base64,iVBORw0KGgo=', -25.3, -57.6, $3, $4, $5, CURRENT_TIMESTAMP)
-      `, [id, `Persona ${marker} ${state}`, state, INTERNAL_VALUES[0], INTERNAL_VALUES[1]]);
+      `, [id, `Persona ${marker} ${state}`, state, INTERNAL_VALUES[0], reporter.id]);
     }
     for (const [state, id] of Object.entries(clueIds)) {
       await db.query(`
@@ -1132,6 +1141,7 @@ test('sin sesión con PostgreSQL: pendientes, rechazados y pistas no validadas n
     if (databaseInitialized) {
       await db.query('DELETE FROM pistas WHERE id = ANY($1)', [Object.values(clueIds)]);
       await db.query('DELETE FROM casos WHERE id = ANY($1)', [Object.values(ids)]);
+      await db.query('DELETE FROM usuarios WHERE correo = $1 AND NOT EXISTS (SELECT 1 FROM casos WHERE reportado_por_usr_id = usuarios.id)', [INTERNAL_VALUES[1]]);
     }
     await db.end();
   }
