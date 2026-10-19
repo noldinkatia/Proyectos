@@ -246,7 +246,7 @@ HTTPS**; Render ya lo da.
 
 **Qué revisar en los dos:** que el ícono sea el de Rastreo PY, que se pueda iniciar
 sesión, ver el mapa y los casos, y que al poner el celular en modo avión la app
-muestre la pantalla sin conexión en vez de un error del navegador.
+siga abriendo (o muestre su pantalla sin conexión) en vez de un error del navegador.
 
 Para el Workshop, el código QR tiene que apuntar a `APP_URL/app/`.
 
@@ -259,13 +259,13 @@ la versión nueva**:
 git push origin frontend-pwa
 ```
 
-En **Events** se ve el avance. Mientras se construye, la versión anterior sigue
-funcionando; Render cambia a la nueva recién cuando arrancó bien. Las tablas nuevas
+En **Events** se ve el avance; en **Logs**, el arranque. Las tablas nuevas
 (migraciones en `backend/migrations/`) se aplican solas al arrancar.
 
 Si se cambia algo en `render.yaml` (por ejemplo una variable con valor fijo), Render
-lo aplica al sincronizar el Blueprint (**Blueprints → rastreo-py → Sync**). Los
-valores secretos cargados en el panel no se pierden.
+lo toma del Blueprint al hacer push; en **Blueprints → rastreo-py** se ve si quedó
+sincronizado y se puede sincronizar a mano. Los valores secretos cargados en el
+panel no se pierden.
 
 ## 10. Evitar que Render esté dormido al empezar el Workshop
 
@@ -310,7 +310,7 @@ evento (por ejemplo si hay pausas largas):
 
 Ver el consumo:
 
-- **Render:** **Billing** (arriba a la derecha) → horas de instancia usadas.
+- **Render:** configuración de la cuenta → facturación/uso (horas de instancia gratuitas usadas).
 - **Neon:** página del proyecto → **Usage** (cómputo y transferencia del mes).
 
 ---
