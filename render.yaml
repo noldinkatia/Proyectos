@@ -1,0 +1,49 @@
+# Blueprint de Render para Rastreo PY (ver DESPLIEGUE.md).
+# Render lee este archivo al crear el servicio desde "New > Blueprint".
+# Acá NO va ningún secreto: las variables con "sync: false" se cargan a mano
+# en el panel de Render la primera vez (Render las pide al crear el Blueprint).
+services:
+  - type: web
+    name: rastreo-py
+    # Usa el Dockerfile de la raíz, el mismo que docker-compose.yml.
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    # Virginia (EE. UU. Este): la región gratuita de Render más cercana a
+    # Paraguay. La base de Neon tiene que estar en AWS us-east-1 (N. Virginia)
+    # para que cada consulta app -> base no cruce el continente.
+    region: virginia
+    # "/" sirve la página estática y no consulta la base: así el chequeo de
+    # salud de Render no mantiene despierta a Neon ni gasta sus horas de cómputo.
+    healthCheckPath: /
+    # Cada git push a la rama del Blueprint vuelve a construir y publicar.
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render pone un proxy delante de la app: 1 salto para que req.ip sea la
+      # IP real del cliente. Verificar con /api/admin/diagnostico-red.
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      # En el Workshop muchos celulares comparten la IP del wifi.
+      - key: LIMITE_LECTURA_PUBLICA_POR_MINUTO
+        value: "3000"
+      # Neon exige conexiones cifradas.
+      - key: DATABASE_SSL
+        value: "true"
+      # Secretos: se cargan en el panel de Render, nunca en este archivo.
+      - key: DATABASE_URL
+        sync: false
+      - key: MAIL_USER
+        sync: false
+      - key: MAIL_PASS
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_IDENTIFICADOR
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: APP_URL
+        sync: false
