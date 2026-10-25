@@ -11,7 +11,7 @@ import { showToast } from '/js/ui.js';
 const CLAVE_BIENVENIDA = 'rastreo_bienvenida_vista';
 let eventoInstalacion = null;
 
-function esIos() {
+export function esIos() {
   // iPadOS se presenta como "MacIntel", pero con pantalla táctil.
   return /iphone|ipad|ipod/i.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -25,7 +25,7 @@ function esCelular() {
     || window.matchMedia('(pointer: coarse)').matches;
 }
 
-function yaInstalada() {
+export function yaInstalada() {
   return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 }
 

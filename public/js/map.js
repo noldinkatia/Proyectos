@@ -41,14 +41,14 @@ export function initMainLeafletMap() {
           let geofence = null;
           estado.activeMarkers.push({ id: c.id, caseId: c.id, marker, geofence, lat: c.ubicacion.lat, lng: c.ubicacion.lng });
 
-          // DIBUJAR GEOCERCA REAL DE 60 KM (60,000 METROS)
+          // GEOCERCA DE 160 KM (160.000 METROS): el radio de las alertas de zona
           if (c.estado === 'VALIDADO' || c.estado === 'EN_SEGUIMIENTO') {
             geofence = L.circle([c.ubicacion.lat, c.ubicacion.lng], {
               color: '#B3261E',
               weight: 1,
               fillColor: '#B3261E',
               fillOpacity: 0.12,
-              radius: 60000
+              radius: 160000
             }).addTo(map);
             estado.activeMarkers.at(-1).geofence = geofence;
           }

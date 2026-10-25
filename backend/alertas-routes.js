@@ -102,7 +102,11 @@ export function createAlertRouter({ db, requireCitizen, requireUser, push }) {
       estado: 'PENDIENTE',
       etiqueta: ETIQUETA_NO_VERIFICADA,
       distanciaKm,
-      campos: { departamento: alerta.departamento, ciudad: alerta.ciudad, barrio: alerta.barrio || '' }
+      datos: [
+        { etiqueta: 'Departamento', valor: alerta.departamento },
+        { etiqueta: 'Ciudad', valor: alerta.ciudad },
+        { etiqueta: 'Zona / barrio aproximado', valor: alerta.barrio }
+      ].filter(item => item.valor)
     });
   }));
 

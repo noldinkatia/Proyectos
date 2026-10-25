@@ -1,6 +1,6 @@
 // Un solo service worker en /sw.js (scope "/") para la web (/) y la app (/app/).
 // Al activarse borra los cachés rastreopy-shell-* anteriores (v6, v7, v8...).
-const CACHE_NAME = 'rastreopy-shell-v9';
+const CACHE_NAME = 'rastreopy-shell-v10';
 const OFFLINE_PAGE = '/offline.html';
 const APP_SHELL = [
   '/',
@@ -12,6 +12,7 @@ const APP_SHELL = [
   '/app/manifest.webmanifest',
   '/app/app-movil.js',
   '/app/pwa.js',
+  '/app/zona.js',
   '/icons/rastreopy.svg',
   '/icons/rastreopy-192.png',
   '/icons/rastreopy-512.png',
@@ -36,6 +37,7 @@ const APP_SHELL = [
   '/js/my-cases.js',
   '/js/admin.js',
   '/js/notifications.js',
+  '/js/alerta.js',
   '/js/eventos.js',
   '/js/tema-inicial.js',
   '/js/app.js',
@@ -105,11 +107,37 @@ self.addEventListener('fetch', event => {
   })());
 });
 
+// Web Push (backend/push.js). El servidor manda solo un texto genérico, la
+// dirección del caso en la app y un tag por caso: un aviso nuevo del mismo caso
+// reemplaza al anterior. Las alertas tempranas llegan sin sonido ni vibración.
+self.addEventListener('push', event => {
+  let datos = {};
+  try {
+    datos = event.data ? event.data.json() : {};
+  } catch {
+    datos = {};
+  }
+  const texto = valor => (typeof valor === 'string' ? valor.slice(0, 200) : '');
+  const url = texto(datos.url).startsWith('/') ? texto(datos.url) : '/app/';
+  event.waitUntil(self.registration.showNotification(texto(datos.titulo) || 'Rastreo PY', {
+    body: texto(datos.cuerpo) || 'Tenés una novedad en Rastreo PY.',
+    icon: '/icons/rastreopy-192.png',
+    badge: '/icons/rastreopy-192.png',
+    tag: texto(datos.tag) || 'rastreo-py',
+    renotify: false,
+    silent: datos.discreta !== false,
+    data: { url }
+  }));
+});
+
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   const target = new URL(event.notification.data?.url || '/', self.location.origin).href;
   event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
-    const existing = clients.find(client => client.url.startsWith(self.location.origin));
+    // Si el aviso es de la app (/app/...), se prefiere una ventana de la app.
+    const appPath = new URL(target).pathname.startsWith('/app/') ? `${self.location.origin}/app/` : self.location.origin;
+    const existing = clients.find(client => client.url.startsWith(appPath))
+      || clients.find(client => client.url.startsWith(self.location.origin));
     if (existing) return existing.navigate(target).then(() => existing.focus());
     return self.clients.openWindow(target);
   }));

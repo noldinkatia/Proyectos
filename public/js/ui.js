@@ -72,7 +72,13 @@ export const NOTICE_TONES = {
   CASO_LOCALIZADO: 'success',
   PISTA_VALIDADA: 'success',
   CASO_VALIDADO: 'success',
-  CASO_RECHAZADO: 'danger'
+  CASO_RECHAZADO: 'danger',
+  CASO_POSIBLE_DUPLICADO: 'warning',
+  ALERTA_TEMPRANA: 'warning',
+  ALERTA_OFICIAL: 'danger',
+  ALERTA_RETRACTADA: 'info',
+  ALERTA_LOCALIZADO: 'success',
+  ALERTA_CERRADO: 'info'
 };
 
 const relativeTimeFormatter = new Intl.RelativeTimeFormat('es', { numeric: 'auto' });

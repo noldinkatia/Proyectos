@@ -1,5 +1,6 @@
 // Punto de entrada: inicialización, eventos de navegación, puente window y service worker.
 // Los demás módulos solo declaran; todo lo que se ejecuta al cargar está acá.
+import { abrirAlerta } from './alerta.js';
 import { adminAccept, adminCloseCase, adminMarkLocated, adminModerateClue, adminOpenCase, adminReject, adminReopenCase, adminReturnToReview, closeReviewChecklist, loadAdminHistory, loadAdminHistoryPhotos, runTimeFastForward, searchAdminHistory, selectAdminTab, submitCaseReview } from './admin.js';
 import { apiRequest, avisarServidor } from './api.js';
 import { acceptTerms, changeRegistrationEmail, handleForgotPassword, handleLogin, handleRegister, logout, rejectTerms, resendVerificationCode, retryTermsAcceptance, togglePass, updatePasswordStrength, verifyEmailCode } from './auth.js';
@@ -47,6 +48,7 @@ export const acciones = {
   toggleNotificationsModal,
   enableSystemNotifications,
   clearNotifs,
+  abrirAlerta,
   runTimeFastForward,
   closeCaseDetail,
   openCaseDetail,
