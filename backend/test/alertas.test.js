@@ -60,7 +60,7 @@ test('alerta temprana: solo campos permitidos, foto bloqueada para menores y tex
 
   const caso = { nombreCompleto: 'María José Benítez', edad: 16, sexo: 'Femenino', departamento: 'Central', ciudad: 'Luque', barrio: 'Centro', descripcionFisica: 'Alta', vestimenta: 'Remera roja' };
   const texto = textoAlertaTemprana(caso, ['ciudad', 'iniciales', 'rangoEdad']);
-  assert.equal(texto, 'Pendiente / En revisión – No verificada. Ciudad: Luque. Rango de edad: 15 a 19 años. Iniciales: M. J. B.');
+  assert.equal(texto, 'Pendiente / En revisión – No verificada. Ciudad: Luque. Edad aproximada: entre 15 y 19 años. Iniciales: M. J. B.');
   assert.doesNotMatch(texto, /María|Benítez|Remera/);
   assert.equal(textoAlertaTemprana(caso, []), 'Pendiente / En revisión – No verificada.');
   assert.equal(cuerpoPushAlertaTemprana(caso, ['ciudad', 'primerNombre']), 'Alerta en tu zona (Luque): caso en revisión, aún no verificado');

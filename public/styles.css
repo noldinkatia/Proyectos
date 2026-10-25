@@ -1007,14 +1007,26 @@ form.card { width: 100%; }
 .form-control[aria-invalid="true"] { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
 input[type="checkbox"][aria-invalid="true"] { outline: 2px solid var(--red); outline-offset: 2px; }
 .check-fila input[type="checkbox"][aria-invalid="true"] { border-color: var(--red) !important; outline: none; }
-.alert-preview { display: grid; gap: .75rem; margin: 1rem 0; padding: 1rem; border: 1px solid var(--amber-border); border-radius: var(--radius); background: var(--surface-2); }
-.alert-preview h2 { margin: 0; font-size: 1.05rem; }
+.alert-preview { display: grid; gap: .9rem; margin: 1rem 0; padding: 1rem; border: 1px solid var(--amber-border); border-radius: var(--radius); background: var(--surface-2); font-size: 1rem; line-height: 1.5; overflow-wrap: anywhere; }
+.alert-preview h2 { margin: 0; font-size: 1.2rem; line-height: 1.3; }
+.alert-preview h3 { margin: 0; font-size: 1.05rem; }
 .alert-preview p { margin: 0; }
-.alert-preview-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .35rem .75rem; }
-.alert-preview-fields label { display: flex; align-items: center; gap: .4rem; font-size: .88rem; }
-.alert-preview-push { display: grid; gap: .15rem; padding: .65rem .8rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); font-size: .85rem; }
-.alert-preview-card { display: grid; gap: .4rem; padding: .8rem; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); }
+.alert-preview-intro { display: grid; gap: .35rem; }
+.alert-preview-seguro { padding: .7rem .85rem; border-left: 4px solid var(--green, var(--accent)); border-radius: var(--radius-sm); background: var(--surface); font-weight: 600; }
+.alert-preview-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 .75rem; margin: 0; padding: 0; border: 0; }
+.alert-preview-fields legend { margin-bottom: .25rem; padding: 0; font-weight: 700; }
+.alert-preview-fields .check-fila { margin: .3rem 0; }
+.check-fila-texto small { color: var(--muted); font-size: .85rem; line-height: 1.4; }
+.alert-preview-continuar { color: var(--text-2); }
+.alert-preview-ejemplo { display: grid; gap: .55rem; padding: .9rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
+.alert-preview-paso { color: var(--text-2); font-size: .92rem; }
+.alert-preview-push { display: flex; align-items: center; gap: .7rem; padding: .7rem .85rem; border: 1px solid var(--border-strong); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-overlay); font-size: .92rem; }
+.alert-preview-push img { flex: 0 0 36px; border-radius: 8px; }
+.alert-preview-push div { display: grid; gap: .1rem; min-width: 0; }
+.alert-preview-card { display: grid; gap: .45rem; padding: .85rem; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); }
 .alert-preview-card img { width: min(100%, 240px); border-radius: var(--radius-sm); }
+/* La etiqueta de estado se lee en un celular: sin mayúsculas forzadas y a 14 px. */
+.alert-preview-card .status-tag, .alerta-zona .status-tag { justify-self: start; font-size: .875rem; text-transform: none; letter-spacing: 0; white-space: normal; }
 .lead-photo-previews, .moderation-photos { display: flex; flex-wrap: wrap; gap: .45rem; }
 .lead-photo-previews img, .moderation-photos img { width: 76px; height: 76px; border: 1px solid var(--border); border-radius: var(--radius-sm); object-fit: cover; }
 

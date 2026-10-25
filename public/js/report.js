@@ -127,21 +127,32 @@ export function renderReportView() {
           <span class="check-fila-texto">Acepto el aviso de privacidad y el uso de estos datos únicamente para la búsqueda y gestión de este reporte.</span>
         </label>
 
-        <!-- Paso previo al envío: el reportante elige qué ve la zona en la alerta temprana -->
+        <!-- Paso previo al envío: quien reporta elige qué ven las personas cercanas en
+             la alerta temprana. Textos simples, pensados para cualquier persona. -->
         <section id="alertPreviewSection" class="alert-preview hidden" aria-labelledby="alertPreviewTitle">
-          <h2 id="alertPreviewTitle">Vista previa de la alerta temprana</h2>
-          <p>Al publicar, se envía una alerta temprana a quienes tienen activadas las alertas a 160 km o menos, antes de que la administración verifique el caso. <strong>Lo que tildes acá lo van a ver los usuarios de la zona.</strong> El texto "${ETIQUETA_NO_VERIFICADA}" se muestra siempre.</p>
-          <fieldset class="form-group alert-preview-fields">
-            <legend>Datos que se muestran en la alerta</legend>
-            ${CAMPOS_ALERTA.map(campo => `<label><input type="checkbox" name="alertaCampo" value="${campo.clave}"${campo.porDefecto ? ' checked' : ''}${campo.clave === 'foto' ? ' id="alertaCampoFoto"' : ''}> ${escapeHtml(campo.etiqueta)}</label>`).join('')}
-          </fieldset>
-          <p id="alertaFotoAviso" class="muted"></p>
-          <p class="notice-info">Nunca se muestran: datos de contacto, número de denuncia, documento, dirección exacta ni ubicación exacta. Una vez validado, el caso se publica completo como siempre.</p>
-          <div class="alert-preview-push" aria-label="Así llega el aviso al celular">
-            <strong>Rastreo PY</strong>
-            <span id="alertPreviewPush"></span>
+          <h2 id="alertPreviewTitle">¿Qué datos verán las personas cercanas?</h2>
+          <div class="alert-preview-intro">
+            <p>Cuando publiques el reporte, avisamos a quienes estén a menos de 160 km para que estén atentos.</p>
+            <p>El aviso sale antes de que la administración revise el caso, por eso dice «${ETIQUETA_NO_VERIFICADA}».</p>
+            <p>Vos decidís qué datos se muestran.</p>
           </div>
-          <div id="alertPreviewCard" class="alert-preview-card"></div>
+          <p class="alert-preview-seguro">Tu número de contacto y el número de denuncia nunca se muestran en la alerta. Tampoco la dirección exacta.</p>
+          <fieldset class="alert-preview-fields">
+            <legend>Marcá lo que querés mostrar</legend>
+            ${CAMPOS_ALERTA.map(campo => `<label class="check-fila"><input type="checkbox" name="alertaCampo" value="${campo.clave}"${campo.porDefecto ? ' checked' : ''}${campo.clave === 'foto' ? ' id="alertaCampoFoto"' : ''}><span class="check-fila-texto"><strong>${escapeHtml(campo.texto)}</strong>${campo.ayuda || campo.clave === 'foto' ? `<small${campo.clave === 'foto' ? ' id="alertaFotoAviso"' : ''}>${escapeHtml(campo.ayuda)}</small>` : ''}</span></label>`).join('')}
+          </fieldset>
+          <p class="alert-preview-continuar">Podés seguir sin cambiar nada: ya dejamos marcados solo los datos de la zona.</p>
+          <div class="alert-preview-ejemplo">
+            <h3>Así lo verá una persona de tu zona</h3>
+            <p class="alert-preview-paso">1. Le llega este aviso al celular:</p>
+            <div class="alert-preview-push">
+              <img src="/icons/rastreopy-192.png" alt="" width="36" height="36">
+              <div><strong>Rastreo PY</strong><span id="alertPreviewPush"></span></div>
+            </div>
+            <p class="alert-preview-paso">2. Si lo abre, ve esto:</p>
+            <div id="alertPreviewCard" class="alert-preview-card"></div>
+            <p class="alert-preview-paso">Cuando la administración verifique el caso, se publica la ficha completa.</p>
+          </div>
         </section>
 
         <p id="reportFormError" class="notice notice-warning hidden" role="alert"></p>
@@ -378,8 +389,10 @@ export function actualizarVistaPreviaAlerta() {
   foto.disabled = !fotoHabilitada;
   if (!fotoHabilitada) foto.checked = false;
   document.getElementById('alertaFotoAviso').textContent = edadCargada && edad < 18
-    ? 'La fotografía no se puede mostrar en la alerta temprana porque la persona es menor de 18 años.'
-    : !estado.selectedReportPhoto ? 'Para mostrar una fotografía, primero cargala en el formulario.' : '';
+    ? 'Es una persona menor de edad: la foto no se mostrará.'
+    : !estado.selectedReportPhoto
+      ? 'Si se trata de una persona menor de edad, la foto no se mostrará. Para mostrarla, primero cargá una foto más arriba.'
+      : 'Si se trata de una persona menor de edad, la foto no se mostrará.';
 
   const campos = camposElegidos();
   const caso = {
@@ -400,7 +413,7 @@ export function actualizarVistaPreviaAlerta() {
   document.getElementById('alertPreviewCard').innerHTML = `
     <span class="status-tag status-PENDIENTE">${escapeHtml(ETIQUETA_NO_VERIFICADA)}</span>
     <strong>Alerta en tu zona</strong>
-    ${imagen}${filas || '<p class="muted">Solo se mostrará el aviso de caso en revisión.</p>'}`;
+    ${imagen}${filas || '<p class="muted">Solo verá que hay un caso en revisión cerca.</p>'}`;
 }
 
 // Nombre corto de un campo para el mensaje de error: data-etiqueta o su <label>.

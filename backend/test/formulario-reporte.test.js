@@ -223,3 +223,31 @@ test('casilla obligatoria sin marcar: fila en rojo, aviso "Marcá esta casilla p
     assert.equal(agregados.filter(nodo => !nodo.quitado).length, 0);
   });
 });
+
+test('paso de la alerta temprana: lenguaje simple, valores privados por defecto y avisos en los datos sensibles', async () => {
+  const { renderReportView } = await import(new URL('js/report.js', publicDir));
+  const { CAMPOS_ALERTA, CAMPOS_POR_DEFECTO } = await import(new URL('js/alerta-campos.js', publicDir));
+  const html = renderReportView();
+  const seccion = html.slice(html.indexOf('id="alertPreviewSection"'), html.indexOf('</section>', html.indexOf('id="alertPreviewSection"')));
+  const texto = seccion.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  for (const frase of [
+    '¿Qué datos verán las personas cercanas?',
+    'avisamos a quienes estén a menos de 160 km para que estén atentos',
+    'antes de que la administración revise el caso',
+    'Vos decidís qué datos se muestran',
+    'Tu número de contacto y el número de denuncia nunca se muestran en la alerta',
+    'Podés seguir sin cambiar nada',
+    'Así lo verá una persona de tu zona'
+  ]) assert.ok(texto.includes(frase), `falta: ${frase}`);
+  for (const jerga of [/\bpush\b/i, /geocerca/i, /\busuarios\b/i, /\bvalidad[oa]\b/i, /alerta temprana/i, /endpoint/i, /\bradio\b/i]) {
+    assert.doesNotMatch(texto, jerga, `jerga en el texto: ${jerga}`);
+  }
+  // Por defecto, solo la zona: nada que identifique a la persona.
+  assert.deepEqual(CAMPOS_POR_DEFECTO, ['departamento', 'ciudad', 'barrio']);
+  const ayuda = clave => CAMPOS_ALERTA.find(campo => campo.clave === clave).ayuda;
+  assert.equal(ayuda('foto'), 'Si se trata de una persona menor de edad, la foto no se mostrará.');
+  assert.match(ayuda('primerNombre'), /nunca el apellido/);
+  assert.match(ayuda('iniciales'), /Solo las iniciales/);
+  assert.match(ayuda('barrio'), /nunca la dirección/);
+  for (const campo of CAMPOS_ALERTA) assert.ok(texto.includes(campo.texto), `falta la casilla ${campo.texto}`);
+});

@@ -7,17 +7,30 @@
 
 export const ETIQUETA_NO_VERIFICADA = 'Pendiente / En revisión – No verificada';
 
+// etiqueta: cómo se titula el dato en la alerta. texto y ayuda: lo que lee quien
+// reporta al elegir (frases simples, sin palabras técnicas). Por defecto solo la
+// zona, que es lo más privado.
 export const CAMPOS_ALERTA = [
-  { clave: 'departamento', etiqueta: 'Departamento', porDefecto: true },
-  { clave: 'ciudad', etiqueta: 'Ciudad', porDefecto: true },
-  { clave: 'barrio', etiqueta: 'Zona / barrio aproximado', porDefecto: true },
-  { clave: 'rangoEdad', etiqueta: 'Rango de edad', porDefecto: false },
-  { clave: 'sexo', etiqueta: 'Sexo', porDefecto: false },
-  { clave: 'descripcionFisica', etiqueta: 'Descripción física', porDefecto: false },
-  { clave: 'vestimenta', etiqueta: 'Vestimenta', porDefecto: false },
-  { clave: 'primerNombre', etiqueta: 'Primer nombre', porDefecto: false },
-  { clave: 'iniciales', etiqueta: 'Iniciales', porDefecto: false },
-  { clave: 'foto', etiqueta: 'Fotografía', porDefecto: false }
+  { clave: 'departamento', etiqueta: 'Departamento', porDefecto: true,
+    texto: 'Departamento', ayuda: 'Por ejemplo: Central.' },
+  { clave: 'ciudad', etiqueta: 'Ciudad', porDefecto: true,
+    texto: 'Ciudad', ayuda: 'Por ejemplo: Luque.' },
+  { clave: 'barrio', etiqueta: 'Barrio o zona', porDefecto: true,
+    texto: 'Barrio o zona', ayuda: 'Solo el nombre del barrio, nunca la dirección.' },
+  { clave: 'rangoEdad', etiqueta: 'Edad aproximada', porDefecto: false,
+    texto: 'Edad aproximada', ayuda: 'No se muestra la edad exacta, sino un rango. Por ejemplo: entre 15 y 19 años.' },
+  { clave: 'sexo', etiqueta: 'Sexo', porDefecto: false,
+    texto: 'Sexo', ayuda: '' },
+  { clave: 'descripcionFisica', etiqueta: 'Cómo es', porDefecto: false,
+    texto: 'Cómo es físicamente', ayuda: 'Lo que escribiste en «Descripción física».' },
+  { clave: 'vestimenta', etiqueta: 'Ropa que llevaba', porDefecto: false,
+    texto: 'Ropa que llevaba', ayuda: 'Lo que escribiste en «Vestimenta».' },
+  { clave: 'primerNombre', etiqueta: 'Primer nombre', porDefecto: false,
+    texto: 'Primer nombre', ayuda: 'Solo se muestra el primer nombre, nunca el apellido.' },
+  { clave: 'iniciales', etiqueta: 'Iniciales', porDefecto: false,
+    texto: 'Iniciales del nombre', ayuda: 'Solo las iniciales. Por ejemplo: M. J. B.' },
+  { clave: 'foto', etiqueta: 'Fotografía', porDefecto: false,
+    texto: 'Foto', ayuda: 'Si se trata de una persona menor de edad, la foto no se mostrará.' }
 ];
 
 export const CAMPOS_POR_DEFECTO = CAMPOS_ALERTA.filter(campo => campo.porDefecto).map(campo => campo.clave);
@@ -39,7 +52,7 @@ export function normalizarCamposAlerta(valor, { edad, tieneFoto } = {}) {
 
 export function rangoEdad(edad) {
   const desde = Math.floor(Number(edad) / 5) * 5;
-  return `${desde} a ${desde + 4} años`;
+  return `entre ${desde} y ${desde + 4} años`;
 }
 
 export function primerNombre(nombre) {
