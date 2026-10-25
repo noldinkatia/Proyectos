@@ -2,6 +2,8 @@ import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { rateLimit } from 'express-rate-limit';
 import { createAdminRouter } from './admin-routes.js';
+import { createAlertRouter } from './alertas-routes.js';
+import { enviarAlertaTemprana } from './alertas.js';
 import { asyncRoute, authenticate, isAdministrator, requireAdministrator } from './auth-routes.js';
 import {
   caseListColumns,
@@ -156,6 +158,7 @@ export function createCaseRouter({ db, jwtSecret }) {
         SELECT id, $1, 'Nuevo reporte para validar', $2, 'CASO_PENDIENTE'
         FROM usuarios WHERE rol = 'administrador'
       `, [id, `Se recibió un reporte de ${body.nombreCompleto.trim()} y espera validación.`]);
+      await enviarAlertaTemprana(client, rows[0]);
       return rows[0];
     });
     res.status(201).json({ caso: toOwnerCase(created) });
@@ -217,6 +220,7 @@ export function createCaseRouter({ db, jwtSecret }) {
   const shared = { db, requireUser, requireAdmin, requireCitizen, publicReadLimiter };
   router.use(createClueRouter(shared));
   router.use(createNotificationRouter(shared));
+  router.use(createAlertRouter(shared));
   router.use(createStatsRouter(shared));
   router.use(createAdminRouter(shared));
 
