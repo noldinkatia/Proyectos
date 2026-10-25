@@ -29,6 +29,9 @@ services:
       # En el Workshop muchos celulares comparten la IP del wifi.
       - key: LIMITE_LECTURA_PUBLICA_POR_MINUTO
         value: "3000"
+      # Alertas de zona: una alerta temprana por reportante cada 24 h (0 = sin límite).
+      - key: LIMITE_ALERTA_TEMPRANA_HORAS
+        value: "24"
       # Neon exige conexiones cifradas.
       - key: DATABASE_SSL
         value: "true"
@@ -53,4 +56,13 @@ services:
       - key: ADMIN_PASSWORD
         sync: false
       - key: APP_URL
+        sync: false
+      # Notificaciones Web Push (ver DESPLIEGUE.md, "Notificaciones push").
+      # Sin estas tres la app funciona igual: las alertas quedan solo en el
+      # centro de notificaciones.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
         sync: false

@@ -64,6 +64,9 @@ Antes de ir a Render, tené a mano estos valores:
 | `ADMIN_IDENTIFICADOR` | El correo de la cuenta administradora. |
 | `ADMIN_PASSWORD` | Una contraseña segura para el administrador (mínimo 8 caracteres). |
 | `APP_URL` | La dirección pública de la app en Render (ver paso 5). Para empezar: `https://rastreo-py.onrender.com` |
+| `VAPID_PUBLIC_KEY` | Clave pública de las notificaciones push (ver [Notificaciones push](#notificaciones-push-vapid)). Opcional. |
+| `VAPID_PRIVATE_KEY` | Clave privada del mismo par. **Es un secreto.** Opcional. |
+| `VAPID_SUBJECT` | Contacto del responsable: `mailto:` + el correo del proyecto. Opcional. |
 
 **Cómo generar `JWT_SECRET`** (en PowerShell, con Node instalado):
 
@@ -78,7 +81,50 @@ cambia este valor, todas las sesiones abiertas se cierran (hay que volver a entr
 después se cambia la contraseña desde la app, reiniciar Render no la pisa.
 
 Las otras variables (`NODE_ENV`, `TRUST_PROXY_HOPS`, `LIMITE_LECTURA_PUBLICA_POR_MINUTO`,
-`DATABASE_SSL`) ya vienen escritas en `render.yaml`: no hay que cargarlas.
+`LIMITE_ALERTA_TEMPRANA_HORAS`, `DATABASE_SSL`) ya vienen escritas en `render.yaml`:
+no hay que cargarlas.
+
+### Notificaciones push (VAPID)
+
+Las **alertas de zona** avisan a quienes las activaron en la app de los casos a
+160 km o menos. Siempre quedan en el centro de notificaciones de la web y de la app;
+con las claves VAPID además llegan como notificación al celular (Web Push).
+
+**Generar el par de claves** (una sola vez, en PowerShell, desde `backend/`):
+
+```powershell
+cd backend
+npx web-push generate-vapid-keys
+```
+
+Muestra una *Public Key* y una *Private Key*. Cargalas en `VAPID_PUBLIC_KEY` y
+`VAPID_PRIVATE_KEY`, y en `VAPID_SUBJECT` poné `mailto:` seguido del correo del
+proyecto (por ejemplo `mailto:rastreopy@gmail.com`). La privada es un secreto: no
+la pegues en el código, en `render.yaml` ni en un chat.
+
+- **No las cambies después del Workshop si no hace falta:** con un par nuevo, las
+  suscripciones de los celulares dejan de servir y cada persona tiene que volver a
+  tocar "Activar alertas de mi zona".
+- **Sin las tres variables** la app funciona igual; en los **Logs** de Render el
+  arranque dice `Notificaciones push: desactivadas`. Con ellas dice `activadas`.
+- `LIMITE_ALERTA_TEMPRANA_HORAS` (24 por defecto, en `render.yaml`): un mismo
+  reportante genera como máximo una alerta temprana en ese lapso; los reportes
+  siguientes llegan igual a la administración. `0` quita el límite.
+
+**Qué recibe cada uno y cuándo:**
+
+| Momento | A quién | Por dónde |
+|---|---|---|
+| Se registra un reporte (sin duplicado) | Alertas activas a 160 km o menos, salvo quien reportó | Centro + push discreto ("caso en revisión, aún no verificado") |
+| La administración lo valida | La zona y quienes recibieron la alerta temprana | Centro + push |
+| La administración lo rechaza | Solo quienes recibieron la alerta | **Solo el centro** (retractación, sin push) |
+| Se localiza a la persona | Quienes recibieron la alerta | Centro + push |
+| Se cierra el caso | Suscritos al caso y alertados | Solo el centro |
+
+El push nunca lleva nombre, edad, foto ni ubicación exacta (a lo sumo la ciudad, si
+quien reportó la eligió); los detalles se ven al abrir la app. En la tabla
+`notificaciones` queda la distancia (`distancia_km`), el canal (`app` o `push`)
+y el resultado del envío (`push_resultado`) de cada aviso.
 
 ### Correo: API de Brevo
 
@@ -288,6 +334,13 @@ HTTPS**; Render ya lo da.
 **Qué revisar en los dos:** que el ícono sea el de Rastreo PY, que se pueda iniciar
 sesión, ver el mapa y los casos, y que al poner el celular en modo avión la app
 siga abriendo (o muestre su pantalla sin conexión) en vez de un error del navegador.
+
+**Alertas de zona (si cargaste las claves VAPID):** con una cuenta de ciudadano,
+abrí el menú → **Activar alertas de mi zona**, aceptá el consentimiento y los
+permisos de notificaciones y de ubicación. Desde otra cuenta, cargá un reporte cerca:
+al primer celular le tiene que llegar "Alerta en tu zona: caso en revisión, aún no
+verificado", sin sonido. En iPhone solo funciona con la app **instalada** en la
+pantalla de inicio (iOS 16.4 o posterior); en Safari sin instalar, la app lo explica.
 
 Para el Workshop, el código QR tiene que apuntar a `APP_URL/app/`.
 
