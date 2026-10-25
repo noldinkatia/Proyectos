@@ -154,8 +154,8 @@ export function createAuthRouter({ db, mailer, jwtSecret }) {
       ? 'Código de verificación - Rastreo PY'
       : 'Código para restablecer la contraseña - Rastreo PY';
     const greeting = nombre ? `Estimado/a ${nombre},` : 'Estimado/a usuario/a,';
+    // El remitente lo pone mailer.js (MAIL_FROM o MAIL_USER).
     await mailer.sendMail({
-      from: `"Rastreo PY" <${process.env.MAIL_USER}>`,
       to: correo,
       subject,
       text: `${greeting}\n\nSu código de verificación es: ${code}\n\nEste código vence en 10 minutos. Si usted no solicitó esta operación, ignore este mensaje.`,

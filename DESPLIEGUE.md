@@ -51,13 +51,15 @@ Render (**Settings → Build & Deploy → Branch**).
 
 ## 3. Preparar los valores de las variables
 
-Antes de ir a Render, tené a mano estos siete valores:
+Antes de ir a Render, tené a mano estos valores:
 
 | Variable | Qué poner |
 |---|---|
 | `DATABASE_URL` | La cadena de Neon del paso 1 (con `?sslmode=require`). |
-| `MAIL_USER` | La cuenta de Gmail que manda los correos (códigos, avisos). |
-| `MAIL_PASS` | La **contraseña de aplicación** de esa cuenta de Gmail (16 letras), no la contraseña normal. Se crea en: Cuenta de Google → Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones. |
+| `BREVO_API_KEY` | La clave de API de Brevo (ver [Correo: API de Brevo](#correo-api-de-brevo)). **En Render es obligatoria**: sin ella los códigos de verificación no llegan. |
+| `MAIL_FROM` | El correo remitente que verificaste en Brevo. |
+| `MAIL_USER` | La cuenta de Gmail del proyecto. Con Brevo solo se usa como remitente si `MAIL_FROM` queda vacío. |
+| `MAIL_PASS` | Solo para SMTP (Docker local y plan B): la **contraseña de aplicación** de esa cuenta de Gmail (16 letras), no la contraseña normal. Se crea en: Cuenta de Google → Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones. Con `BREVO_API_KEY` no se usa y puede quedar vacía. |
 | `JWT_SECRET` | Un texto aleatorio largo (ver abajo cómo generarlo). |
 | `ADMIN_IDENTIFICADOR` | El correo de la cuenta administradora. |
 | `ADMIN_PASSWORD` | Una contraseña segura para el administrador (mínimo 8 caracteres). |
@@ -78,6 +80,42 @@ después se cambia la contraseña desde la app, reiniciar Render no la pisa.
 Las otras variables (`NODE_ENV`, `TRUST_PROXY_HOPS`, `LIMITE_LECTURA_PUBLICA_POR_MINUTO`,
 `DATABASE_SSL`) ya vienen escritas en `render.yaml`: no hay que cargarlas.
 
+### Correo: API de Brevo
+
+La app manda correos con los códigos de verificación (registro y "olvidé mi
+contraseña"). Hay dos formas de mandarlos, y la app elige sola:
+
+| Si... | El correo sale por... | Dónde se usa |
+|---|---|---|
+| `BREVO_API_KEY` tiene valor | La **API HTTPS de Brevo** | Render |
+| `BREVO_API_KEY` está vacía | **SMTP de Gmail** con `MAIL_USER` y `MAIL_PASS` | Docker local y plan B |
+
+**Por qué en Render hace falta la API:** el plan gratuito de Render bloquea los
+puertos SMTP, que son los que usa Gmail para recibir correos de programas. Con SMTP
+la app arranca, pero los códigos nunca llegan. La API de Brevo usa HTTPS (el mismo
+puerto que una página web), que Render no bloquea.
+
+**Cómo obtener la clave:**
+
+1. Creá una cuenta gratuita en <https://www.brevo.com>.
+2. Agregá y verificá el remitente: en el menú de **Senders** (remitentes), agregá el
+   correo que va a aparecer como remitente (por ejemplo el Gmail del proyecto).
+   Brevo manda un correo de confirmación a esa dirección: abrilo y confirmá. Ese
+   correo es el valor de `MAIL_FROM`.
+3. En **SMTP & API → API Keys**, generá una clave nueva (empieza con `xkeysib-`).
+   Copiala: es el valor de `BREVO_API_KEY`. Tratala como una contraseña.
+
+**Si los códigos no llegan:**
+
+- Revisá la carpeta **Spam** del destinatario. Un remitente `@gmail.com` enviado
+  desde Brevo tiene más chance de ir a Spam que uno con dominio propio.
+- En los **Logs** de Render buscá `Brevo no envió el correo: ...`. El mensaje trae el
+  código HTTP de la respuesta de Brevo (nunca la clave ni el destinatario):
+  - `HTTP 401 (unauthorized)`: la clave está mal copiada, o Brevo bloqueó la IP de
+    Render. Si en Brevo está activa la restricción de **IPs autorizadas** (en la
+    configuración de seguridad de la cuenta), desactivala: las IPs de Render cambian.
+  - `HTTP 400`: casi siempre el remitente (`MAIL_FROM`) no está verificado en Brevo.
+
 ## 4. Crear el servicio en Render desde el Blueprint
 
 1. Entrá a <https://render.com> y creá una cuenta **con GitHub**.
@@ -87,7 +125,7 @@ Las otras variables (`NODE_ENV`, `TRUST_PROXY_HOPS`, `LIMITE_LECTURA_PUBLICA_POR
 4. Elegí la rama `frontend-pwa`. Render encuentra `render.yaml` y muestra un servicio
    llamado `rastreo-py`.
 5. Render pide los valores de las variables marcadas como secretas (`sync: false`).
-   Pegá los siete valores del paso 3.
+   Pegá los valores del paso 3.
 6. Tocá **Apply** (o **Deploy Blueprint**). Render construye la imagen de Docker;
    la primera vez tarda varios minutos.
 7. Abrí el servicio `rastreo-py` → pestaña **Logs**. Cuando todo está bien aparece:
@@ -115,6 +153,9 @@ Los más comunes:
 - `Faltan variables ...`: alguna variable quedó vacía (paso 3).
 - `JWT_SECRET debe tener al menos 32 caracteres.`
 - `password authentication failed`: `DATABASE_URL` mal copiada.
+
+En los logs también aparece `Envío de correos: API de Brevo.` Si dice
+`SMTP de Gmail`, falta `BREVO_API_KEY` y los correos no van a salir.
 
 Las variables se corrigen en **Environment** (menú del servicio) → **Save Changes**.
 Render vuelve a arrancar la app solo.
@@ -376,3 +417,6 @@ notebook** y publicarla por HTTPS con un túnel gratuito de Cloudflare (sin cuen
 - Los túneles rápidos de Cloudflare (`trycloudflare.com`) son para pruebas: no tienen
   garantía de disponibilidad. Por eso es el plan B y no el A.
 - Los datos quedan en la notebook (en el volumen de Docker), no en Neon.
+- El correo sale por SMTP de Gmail con `MAIL_USER` y `MAIL_PASS` de `backend/.env`
+  (con `BREVO_API_KEY` vacía): desde la notebook SMTP no está bloqueado. Si se
+  prefiere, poner ahí `BREVO_API_KEY` y `MAIL_FROM` también funciona.

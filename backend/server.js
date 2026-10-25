@@ -2,7 +2,6 @@ import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
-import nodemailer from 'nodemailer';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -13,6 +12,7 @@ import {
 } from './db.js';
 import { asyncRoute, authenticate, createAuthRouter, requireAdministrator } from './auth-routes.js';
 import { createCaseRouter, processDueFollowups } from './case-routes.js';
+import { enviarCorreo, modoCorreo } from './mailer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
@@ -167,10 +167,14 @@ export function createApp({ db, mailer, jwtSecret, appUrl = process.env.APP_URL 
 }
 
 function requiredEnvironment() {
+  // Con BREVO_API_KEY el correo sale por la API (MAIL_PASS no se usa, pero hace
+  // falta un remitente); sin ella, por SMTP con MAIL_USER y MAIL_PASS.
+  const mailKeys = process.env.BREVO_API_KEY
+    ? (process.env.MAIL_FROM ? [] : ['MAIL_USER'])
+    : ['MAIL_USER', 'MAIL_PASS'];
   const missing = [
     'DATABASE_URL',
-    'MAIL_USER',
-    'MAIL_PASS',
+    ...mailKeys,
     'JWT_SECRET',
     'ADMIN_IDENTIFICADOR',
     'ADMIN_PASSWORD',
@@ -194,12 +198,8 @@ async function start() {
   const db = createDatabase(process.env.DATABASE_URL);
   await initializeDatabase(db);
   await ensureAdministrator(db, normalizeEmail(process.env.ADMIN_IDENTIFICADOR), process.env.ADMIN_PASSWORD);
-  const mailer = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_PASS }
-  });
+  // Los tests inyectan su propio mailer.sendMail; acá va el envío real.
+  const mailer = { sendMail: enviarCorreo };
   const app = createApp({
     db,
     mailer,
@@ -214,6 +214,7 @@ async function start() {
   const port = Number(process.env.PORT) || 3000;
   app.listen(port, '0.0.0.0', () => {
     console.log(`Servidor Rastreo PY disponible en el puerto ${port}.`);
+    console.log(`Envío de correos: ${modoCorreo()}.`);
     console.log(`Proxies de confianza (TRUST_PROXY_HOPS): ${trustProxyHops()}. Para verificar que se ve la IP real de cada cliente, abrí ${process.env.APP_URL.replace(/\/$/, '')}/api/admin/diagnostico-red con sesión de administrador.`);
   });
 }
