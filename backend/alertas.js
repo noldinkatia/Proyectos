@@ -84,3 +84,107 @@ export async function enviarAlertaTemprana(client, caso) {
   await client.query('UPDATE casos SET alerta_temprana_en = CURRENT_TIMESTAMP WHERE id = $1', [caso.id]);
   return { enviada: true, motivo: null, notificaciones: rows };
 }
+
+// Quienes recibieron una alerta (temprana u oficial) de este caso y siguen con las
+// alertas de zona activas: si las desactivaron, no se les manda nada más.
+const ALERTADOS_ACTIVOS = `
+  SELECT n.usuario_id, MIN(n.distancia_km) AS distancia_km
+  FROM notificaciones n JOIN alertas_zona a ON a.usuario_id = n.usuario_id
+  WHERE n.caso_id = $1 AND n.tipo IN ('ALERTA_TEMPRANA', 'ALERTA_OFICIAL')
+  GROUP BY n.usuario_id
+`;
+
+// Al validar: alerta oficial (el caso ya es público) a la zona actual y a quienes
+// recibieron la alerta temprana aunque ya no estén dentro del radio.
+async function alertaOficial(client, caso) {
+  const { rows } = await client.query(`
+    WITH zona AS (${DESTINATARIOS_EN_RADIO})
+    INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo, distancia_km, canal)
+    SELECT z.usuario_id, $4, 'Alerta oficial en tu zona', $5, 'ALERTA_OFICIAL',
+      ROUND(z.distancia::numeric, 1), 'app'
+    FROM zona z
+    WHERE ${dentroDelRadioSql('z.distancia')}
+      OR z.usuario_id IN (SELECT usuario_id FROM notificaciones WHERE caso_id = $4 AND tipo = 'ALERTA_TEMPRANA')
+    ON CONFLICT DO NOTHING
+    RETURNING id, usuario_id, canal
+  `, [caso.latitud, caso.longitud, caso.reportado_por_usr_id, caso.id,
+    `Persona desaparecida en ${caso.ciudad}. El caso fue verificado por la administración: abrí la ficha para ver los datos.`]);
+  return rows;
+}
+
+// Al rechazar: la retractación queda solo en el centro de notificaciones (canal
+// 'app'); nunca sale como push.
+async function retractacion(client, caso) {
+  await client.query(`
+    INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo, distancia_km, canal)
+    SELECT d.usuario_id, $1, 'Alerta retirada', $2, 'ALERTA_RETRACTADA', d.distancia_km, 'app'
+    FROM (${ALERTADOS_ACTIVOS}) d
+    ON CONFLICT DO NOTHING
+  `, [caso.id, 'El caso en revisión de tu zona no fue validado por la administración. No hace falta que hagas nada.']);
+  return [];
+}
+
+// Al localizar: los suscritos al caso ya reciben CASO_LOCALIZADO; acá se avisa
+// al resto de los alertados.
+async function avisoLocalizado(client, caso) {
+  const { rows } = await client.query(`
+    INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo, distancia_km, canal)
+    SELECT d.usuario_id, $1, 'Caso de tu zona resuelto', $2, 'ALERTA_LOCALIZADO', d.distancia_km, 'app'
+    FROM (${ALERTADOS_ACTIVOS}) d
+    WHERE d.usuario_id IS DISTINCT FROM $3::integer
+      AND d.usuario_id NOT IN (SELECT usuario_id FROM suscripciones_caso WHERE caso_id = $1)
+    ON CONFLICT DO NOTHING
+    RETURNING id, usuario_id, canal
+  `, [caso.id, 'La persona del caso de tu zona fue localizada. Gracias por estar atento.', caso.reportado_por_usr_id]);
+  return rows;
+}
+
+// Al cerrar: solo en el centro de notificaciones, a los suscritos al caso y a
+// los alertados (el reportante ya recibe CASO_CERRADO).
+async function avisoCerrado(client, caso) {
+  await client.query(`
+    INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo, distancia_km, canal)
+    SELECT d.usuario_id, $1, 'Caso cerrado', $2, 'ALERTA_CERRADO', MIN(d.distancia_km), 'app'
+    FROM (
+      ${ALERTADOS_ACTIVOS}
+      UNION ALL
+      SELECT usuario_id, NULL FROM suscripciones_caso WHERE caso_id = $1
+    ) d
+    WHERE d.usuario_id IS DISTINCT FROM $3::integer
+    GROUP BY d.usuario_id
+    ON CONFLICT DO NOTHING
+  `, [caso.id, 'Un caso que seguías fue cerrado y ya no está activo en tu zona.', caso.reportado_por_usr_id]);
+  return [];
+}
+
+// Avisos de zona por cambio de estado (administración o seguimiento del
+// reportante). Apaga la geocerca al localizar, cerrar o rechazar, y devuelve las
+// notificaciones creadas que pueden salir por push.
+export async function alertasPorCambioDeEstado(client, caso, estadoNuevo) {
+  await client.query('UPDATE casos SET geocerca_activa = $2 WHERE id = $1',
+    [caso.id, ['PENDIENTE', 'VALIDADO', 'EN_SEGUIMIENTO'].includes(estadoNuevo)]);
+  if (estadoNuevo === 'VALIDADO' && !['VALIDADO', 'EN_SEGUIMIENTO'].includes(caso.estado)) {
+    return alertaOficial(client, caso);
+  }
+  if (estadoNuevo === 'RECHAZADO') return retractacion(client, caso);
+  if (estadoNuevo === 'LOCALIZADO') return avisoLocalizado(client, caso);
+  if (estadoNuevo === 'CERRADO') return avisoCerrado(client, caso);
+  return [];
+}
+
+// Pista nueva: además del aviso a la administración (que ya existe), uno al
+// reportante, sin el contenido de la pista y sin repetirlo mientras no lo lea.
+export async function avisarPistaAlReportante(client, casoId, autorId) {
+  await client.query(`
+    INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo)
+    SELECT c.reportado_por_usr_id, c.id, 'Nueva pista para tu caso', $3, 'PISTA_RECIBIDA_REPORTANTE'
+    FROM casos c
+    WHERE c.id = $1 AND c.reportado_por_usr_id IS NOT NULL
+      AND c.reportado_por_usr_id IS DISTINCT FROM $2::integer
+      AND NOT EXISTS (
+        SELECT 1 FROM notificaciones n
+        WHERE n.usuario_id = c.reportado_por_usr_id AND n.caso_id = c.id
+          AND n.tipo = 'PISTA_RECIBIDA_REPORTANTE' AND NOT n.leida
+      )
+  `, [casoId, autorId, 'Llegó una pista sobre tu caso. La administración la revisa antes de publicarla.']);
+}

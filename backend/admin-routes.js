@@ -1,4 +1,5 @@
 import express from 'express';
+import { alertasPorCambioDeEstado } from './alertas.js';
 import { asyncRoute } from './auth-routes.js';
 import {
   caseListColumns,
@@ -190,6 +191,7 @@ export function createAdminRouter({ db, requireAdmin }) {
         INSERT INTO cambios_estado_caso (caso_id, estado_anterior, estado_nuevo, cambiado_por)
         VALUES ($1, $2, $3, $4)
       `, [req.params.id, current.estado, state, req.auth.id]);
+      await alertasPorCambioDeEstado(client, current, state);
       if (current.reportado_por_usr_id) {
         const caseName = current.nombre_completo;
         const reason = typeof req.body?.motivo === 'string' ? req.body.motivo.trim() : '';

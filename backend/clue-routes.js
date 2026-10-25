@@ -1,6 +1,7 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { rateLimit } from 'express-rate-limit';
+import { avisarPistaAlReportante } from './alertas.js';
 import { asyncRoute } from './auth-routes.js';
 import {
   caseVisibilityParameters,
@@ -157,6 +158,7 @@ export function createClueRouter({ db, requireUser, requireAdmin, publicReadLimi
         SELECT id, $1, 'Nueva pista recibida', $2, 'PISTA_RECIBIDA'
         FROM usuarios WHERE rol = 'administrador'
       `, [req.params.id, 'Se recibió una nueva pista vinculada al caso.']);
+      await avisarPistaAlReportante(client, req.params.id, req.auth.id);
       return id;
     });
     if (!result) return res.status(404).json({ error: 'Caso no disponible' });

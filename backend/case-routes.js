@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { rateLimit } from 'express-rate-limit';
 import { createAdminRouter } from './admin-routes.js';
 import { createAlertRouter } from './alertas-routes.js';
-import { enviarAlertaTemprana } from './alertas.js';
+import { alertasPorCambioDeEstado, enviarAlertaTemprana } from './alertas.js';
 import { asyncRoute, authenticate, isAdministrator, requireAdministrator } from './auth-routes.js';
 import {
   caseListColumns,
@@ -203,6 +203,7 @@ export function createCaseRouter({ db, jwtSecret }) {
           INSERT INTO cambios_estado_caso (caso_id, estado_anterior, estado_nuevo, cambiado_por)
           VALUES ($1, $2, $3, $4)
         `, [req.params.id, current.estado, state, req.auth.id]);
+        await alertasPorCambioDeEstado(client, current, state);
       }
       if (state === 'LOCALIZADO') {
         await client.query(`
