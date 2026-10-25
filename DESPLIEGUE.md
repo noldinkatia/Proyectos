@@ -110,21 +110,41 @@ la pegues en el código, en `render.yaml` ni en un chat.
 - `LIMITE_ALERTA_TEMPRANA_HORAS` (24 por defecto, en `render.yaml`): un mismo
   reportante genera como máximo una alerta temprana en ese lapso; los reportes
   siguientes llegan igual a la administración. `0` quita el límite.
+- `LIMITE_PUSH_TEMPRANAS_POR_HORA` (3 por defecto, en `render.yaml`): si una
+  persona recibiría más alertas tempranas que eso en una hora, las siguientes
+  llegan en un único aviso que se va actualizando ("Hay 4 casos en revisión en tu
+  zona"), en vez de una por una. La alerta oficial nunca se agrupa. `0` no agrupa.
 
 **Qué recibe cada uno y cuándo:**
 
 | Momento | A quién | Por dónde |
 |---|---|---|
-| Se registra un reporte (sin duplicado) | Alertas activas a 160 km o menos, salvo quien reportó | Centro + push discreto ("caso en revisión, aún no verificado") |
-| La administración lo valida | La zona y quienes recibieron la alerta temprana | Centro + push |
+| Se registra un reporte (sin duplicado) | Alertas activas a 160 km o menos, salvo quien reportó | Centro + push discreto, sin sonido ("Alerta en tu zona · Luque": caso en revisión, aún no verificado, a unos 40 km) |
+| La administración lo valida | La zona y quienes recibieron la alerta temprana | Centro + push con sonido y vibración, que queda en pantalla hasta tocarlo ("Alerta oficial · Luque") |
 | La administración lo rechaza | Solo quienes recibieron la alerta | **Solo el centro** (retractación, sin push) |
 | Se localiza a la persona | Quienes recibieron la alerta | Centro + push |
 | Se cierra el caso | Suscritos al caso y alertados | Solo el centro |
 
-El push nunca lleva nombre, edad, foto ni ubicación exacta (a lo sumo la ciudad, si
-quien reportó la eligió); los detalles se ven al abrir la app. En la tabla
+El push nunca lleva nombre, edad, foto ni ubicación exacta (en la alerta temprana,
+a lo sumo la ciudad o el barrio, si quien reportó los eligió, y la distancia
+redondeada); los detalles se ven al abrir la app. En la tabla
 `notificaciones` queda la distancia (`distancia_km`), el canal (`app` o `push`)
 y el resultado del envío (`push_resultado`) de cada aviso.
+
+**Que las notificaciones no lleguen como silenciosas en Chrome (Android):**
+
+- Chrome puede pasar un sitio a **notificaciones silenciosas** (sin sonido, solo un
+  ícono de campana tachada) si mucha gente las bloquea o las descarta. Un
+  **dominio propio** del proyecto da más confianza que una
+  dirección `*.onrender.com`, que comparten miles de sitios: si se consigue uno,
+  conviene usarlo en `APP_URL` antes de que la gente active las alertas, porque las
+  suscripciones quedan atadas al dominio.
+- **Revisarlo en un celular:** abrí la app en Chrome → menú ⋮ → **Configuración** →
+  **Configuración de sitios** → **Notificaciones** y buscá la dirección de la app.
+  Tiene que decir **Permitir**. Si dice "silenciosas" o "bloqueadas", tocá la
+  dirección y elegí **Permitir**. Con la app instalada también se puede revisar en
+  Ajustes de Android → Apps → Rastreo PY → Notificaciones (que el sonido esté
+  activado).
 
 ### Correo: API de Brevo
 
@@ -338,8 +358,9 @@ siga abriendo (o muestre su pantalla sin conexión) en vez de un error del naveg
 **Alertas de zona (si cargaste las claves VAPID):** con una cuenta de ciudadano,
 abrí el menú → **Activar alertas de mi zona**, aceptá el consentimiento y los
 permisos de notificaciones y de ubicación. Desde otra cuenta, cargá un reporte cerca:
-al primer celular le tiene que llegar "Alerta en tu zona: caso en revisión, aún no
-verificado", sin sonido. En iPhone solo funciona con la app **instalada** en la
+al primer celular le tiene que llegar "Alerta en tu zona", con "Caso en revisión, aún
+no verificado", sin sonido y con un botón **Ver**. Al validar el caso desde el panel,
+tiene que llegar "Alerta oficial" con sonido y vibración. En iPhone solo funciona con la app **instalada** en la
 pantalla de inicio (iOS 16.4 o posterior); en Safari sin instalar, la app lo explica.
 
 Para el Workshop, el código QR tiene que apuntar a `APP_URL/app/`.
