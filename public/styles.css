@@ -969,6 +969,10 @@ form.card { width: 100%; }
 .alerta-zona p { margin: 0; }
 .alerta-zona-foto { width: min(100%, 320px); border-radius: var(--radius-sm); }
 /* Vista previa de la alerta temprana en el formulario de reporte (js/report.js) */
+/* Campos que faltan en el formulario de reporte (validarFormularioReporte) */
+#reportFormError { margin: 1rem 0 .75rem; }
+.form-control[aria-invalid="true"] { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
+input[type="checkbox"][aria-invalid="true"] { outline: 2px solid var(--red); outline-offset: 2px; }
 .alert-preview { display: grid; gap: .75rem; margin: 1rem 0; padding: 1rem; border: 1px solid var(--amber-border); border-radius: var(--radius); background: var(--surface-2); }
 .alert-preview h2 { margin: 0; font-size: 1.05rem; }
 .alert-preview p { margin: 0; }

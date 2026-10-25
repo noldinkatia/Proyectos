@@ -12,7 +12,7 @@ import { respondToFollowup } from './my-cases.js';
 import { iniciarConexion } from './conexion.js';
 import { restaurarSesion } from './sesion.js';
 import { clearNotifs, enableSystemNotifications, respondToCaseFollowup, toggleNotificationsModal } from './notifications.js';
-import { actualizarVistaPreviaAlerta, centerReportMapOnSelection, handleReportPhotoSelection, handleReportSubmit, onReportCityChange, onReportDepartmentChange, removeReportPhoto, updateMinorAuthorization, useBrowserLocation } from './report.js';
+import { actualizarVistaPreviaAlerta, centerReportMapOnSelection, desmarcarCampoReporte, handleReportPhotoSelection, handleReportSubmit, onReportCityChange, onReportDepartmentChange, removeReportPhoto, updateMinorAuthorization, useBrowserLocation } from './report.js';
 import { applyCurrentRoute, drawerNavigate, navigateTo } from './router.js';
 import { setStatsView } from './stats.js';
 import { syncOnVisible } from './sync.js';
@@ -81,6 +81,7 @@ export const acciones = {
   onReportCityChange,
   handleReportSubmit,
   actualizarVistaPreviaAlerta,
+  desmarcarCampoReporte,
   handleLeadPhotoSelection,
   clearLeadPhotoSelection,
   filterLeadCases,

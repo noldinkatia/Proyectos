@@ -16,19 +16,22 @@ export function renderReportView() {
         <p>Completá los datos de la persona. El reporte pasa por validación antes de publicarse.</p>
       </header>
 
-      <form data-on-submit="handleReportSubmit(event)" data-on-input="actualizarVistaPreviaAlerta()" data-on-change="actualizarVistaPreviaAlerta()" class="card">
+      <!-- novalidate: la validación la hace validarFormularioReporte, con un mensaje
+           visible y foco en el campo. La del navegador frena el envío sin avisar si
+           un campo obligatorio no se puede enfocar. -->
+      <form novalidate data-on-submit="handleReportSubmit(event)" data-on-input="actualizarVistaPreviaAlerta(); desmarcarCampoReporte(event)" data-on-change="actualizarVistaPreviaAlerta(); desmarcarCampoReporte(event)" class="card">
         <div class="form-group">
-          <label>Nombre Completo *</label>
+          <label for="repNombre">Nombre Completo *</label>
           <input type="text" id="repNombre" required placeholder="Nombre y apellido de la persona" class="form-control">
         </div>
 
         <div class="grid-2">
           <div class="form-group">
-            <label>Edad *</label>
+            <label for="repEdad">Edad *</label>
             <input type="number" id="repEdad" required min="0" max="120" data-on-input="updateMinorAuthorization()" placeholder="Años" class="form-control">
           </div>
           <div class="form-group">
-            <label>Sexo *</label>
+            <label for="repSexo">Sexo *</label>
             <select id="repSexo" class="form-control">
               <option value="Femenino">Femenino</option>
               <option value="Masculino">Masculino</option>
@@ -64,17 +67,17 @@ export function renderReportView() {
         </div>
 
         <div class="form-group">
-          <label>Descripción Física *</label>
+          <label for="repFisica">Descripción Física *</label>
           <textarea id="repFisica" required placeholder="Estatura, tez, tono de cabello..." class="form-control"></textarea>
         </div>
 
         <div class="form-group">
-          <label>Vestimenta al Desaparecer *</label>
+          <label for="repVestimenta">Vestimenta al Desaparecer *</label>
           <input type="text" id="repVestimenta" required placeholder="Prendas y calzados..." class="form-control">
         </div>
 
         <div class="form-group">
-          <label>Señas Particulares</label>
+          <label for="repSenas">Señas Particulares</label>
           <input type="text" id="repSenas" placeholder="Tatuajes, cicatrices o accesorios..." class="form-control">
         </div>
 
@@ -115,11 +118,11 @@ export function renderReportView() {
 
         <fieldset class="form-group consent-group">
           <legend>Verificación de edad y autorización *</legend>
-          <label><input type="checkbox" id="reporterAdult" required> Declaro que soy mayor de 18 años y estoy autorizado a realizar este reporte.</label>
-          <label><input type="checkbox" id="minorAuthorization" data-on-change="updateMinorAuthorization()"> Confirmo que cuento con autorización parental o de tutor legal para reportar a la persona menor de edad.</label>
+          <label><input type="checkbox" id="reporterAdult" required data-etiqueta="Declaración de mayoría de edad"> Declaro que soy mayor de 18 años y estoy autorizado a realizar este reporte.</label>
+          <label><input type="checkbox" id="minorAuthorization" data-etiqueta="Autorización parental o de tutor" data-on-change="updateMinorAuthorization()"> Confirmo que cuento con autorización parental o de tutor legal para reportar a la persona menor de edad.</label>
         </fieldset>
         <label class="privacy-consent">
-          <input type="checkbox" id="privacyConsent" required>
+          <input type="checkbox" id="privacyConsent" required data-etiqueta="Aviso de privacidad">
           Acepto el aviso de privacidad y el uso de estos datos únicamente para la búsqueda y gestión de este reporte.
         </label>
 
@@ -140,6 +143,7 @@ export function renderReportView() {
           <div id="alertPreviewCard" class="alert-preview-card"></div>
         </section>
 
+        <p id="reportFormError" class="notice notice-warning hidden" role="alert"></p>
         <button type="submit" id="reportSubmitButton" class="btn btn-red">Revisar alerta y publicar</button>
       </form>
     </div>
@@ -398,8 +402,58 @@ export function actualizarVistaPreviaAlerta() {
     ${imagen}${filas || '<p class="muted">Solo se mostrará el aviso de caso en revisión.</p>'}`;
 }
 
+// Nombre corto de un campo para el mensaje de error: data-etiqueta o su <label>.
+function etiquetaCampo(campo) {
+  const texto = campo.dataset?.etiqueta || campo.labels?.[0]?.textContent || campo.id || 'Campo';
+  return texto.replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+}
+
+// Campos que el navegador marcaría como inválidos (required, min, max...). Devuelve
+// cuáles faltan y cuál enfocar: el primero que se ve en pantalla. Un campo
+// obligatorio oculto no se puede completar, así que no se elige para enfocar y se
+// registra para poder corregirlo.
+export function revisarCamposReporte(form) {
+  const invalidos = Array.from(form.elements).filter(campo => campo.willValidate && !campo.checkValidity());
+  const visible = campo => campo.getClientRects().length > 0;
+  const ocultos = invalidos.filter(campo => !visible(campo));
+  if (ocultos.length) console.error('Campos obligatorios ocultos en el formulario de reporte:', ocultos.map(campo => campo.id || campo.name).join(', '));
+  return { invalidos, enfocar: invalidos.find(visible) || null, etiquetas: invalidos.map(etiquetaCampo) };
+}
+
+function mostrarErrorReporte(mensaje) {
+  const error = document.getElementById('reportFormError');
+  if (!error) return;
+  error.textContent = mensaje;
+  error.classList.toggle('hidden', !mensaje);
+}
+
+// Devuelve true si se puede seguir. Si falta algo, muestra qué y enfoca el campo.
+export function validarFormularioReporte(form) {
+  form.querySelectorAll('[aria-invalid="true"]').forEach(campo => campo.removeAttribute('aria-invalid'));
+  const { invalidos, enfocar, etiquetas } = revisarCamposReporte(form);
+  if (!invalidos.length) {
+    mostrarErrorReporte('');
+    return true;
+  }
+  invalidos.forEach(campo => campo.setAttribute('aria-invalid', 'true'));
+  const detalle = enfocar?.validationMessage ? ` (${enfocar.validationMessage})` : '';
+  mostrarErrorReporte(`Falta completar: ${etiquetas.join(', ')}.${detalle}`);
+  if (enfocar) {
+    enfocar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    enfocar.focus({ preventScroll: true });
+  }
+  return false;
+}
+
+// Al corregir un campo marcado se le saca la marca de error.
+export function desmarcarCampoReporte(event) {
+  const campo = event.target;
+  if (campo?.getAttribute?.('aria-invalid') === 'true' && campo.checkValidity()) campo.removeAttribute('aria-invalid');
+}
+
 export async function handleReportSubmit(e) {
   e.preventDefault();
+  if (!validarFormularioReporte(e.currentTarget)) return;
   // Primer envío: se muestra la vista previa de la alerta temprana para revisarla.
   const previewSection = document.getElementById('alertPreviewSection');
   if (previewSection?.classList.contains('hidden')) {
