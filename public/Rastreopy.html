@@ -9,8 +9,9 @@
   <title>Rastreo PY - Plataforma Colaborativa de Búsqueda de Personas Desaparecidas</title>
   <meta name="description" content="Plataforma colaborativa de búsqueda de personas desaparecidas en Paraguay: consultá reportes públicos, aportá pistas verificables y seguí el estado de cada caso.">
   <link rel="icon" href="/icons/rastreopy.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/icons/rastreopy.svg">
-  <link rel="manifest" href="/manifest.webmanifest">
+  <!-- iOS no acepta SVG para el ícono de la pantalla de inicio -->
+  <link rel="apple-touch-icon" href="/icons/rastreopy-192.png">
+  <!-- Sin manifest: la web no es instalable; la app instalable es /app/ -->
 
   <!-- Leaflet CSS & JS para Mapa Real (OpenStreetMap) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
@@ -47,6 +48,10 @@
       </div>
     </header>
 
+    <!-- Aviso de red caída (public/js/conexion.js). No reemplaza la vista: el feed
+         que ya estaba en pantalla se sigue viendo debajo. -->
+    <div id="offlineBanner" class="offline-banner hidden" role="status">Sin conexión. Lo que ves puede no estar actualizado; volvé a intentar cuando tengas red.</div>
+
     <!-- PANEL LATERAL (DRAWER) -->
     <div id="drawerOverlay" data-on-click="toggleDrawer(false)" class="drawer-overlay hidden"></div>
     <aside id="drawer" class="drawer" aria-label="Menú principal">
@@ -68,21 +73,23 @@
              queda marcando una sección donde ya no estás. El texto de cada ítem
              coincide con el <h1> de su vista. -->
         <nav class="drawer-navigation" aria-label="Secciones">
+          <button type="button" data-role-nav="guest" data-nav-view="auth" data-on-click="drawerNavigate('auth')" class="drawer-item hidden">Ingresar / Registrarse</button>
           <button type="button" data-nav-view="feed" data-on-click="drawerNavigate('feed')" class="drawer-item">Inicio</button>
           <button type="button" data-hide-admin-nav data-nav-view="report" data-on-click="drawerNavigate('report')" class="drawer-item">Reportar persona desaparecida</button>
           <button type="button" data-nav-view="lead" data-on-click="drawerNavigate('lead')" class="drawer-item">Generar pista</button>
           <button type="button" data-nav-view="alerts" data-on-click="toggleDrawer(false); toggleNotificationsModal()" class="drawer-item">Alertas <span id="notifBadge" class="hidden">0</span></button>
           <button type="button" data-nav-view="stats" data-on-click="drawerNavigate('stats')" class="drawer-item">Estadísticas nacionales de búsqueda</button>
-          <button type="button" data-role-nav="citizen" data-nav-view="my-cases" data-on-click="drawerNavigate('my-cases')" class="drawer-item">Mis casos</button>
+          <!-- Visible también sin sesión: al tocarlo lleva al login y vuelve acá -->
+          <button type="button" data-hide-admin-nav data-nav-view="my-cases" data-on-click="drawerNavigate('my-cases')" class="drawer-item">Mis casos</button>
           <button type="button" data-role-nav="admin" data-nav-view="admin" data-on-click="drawerNavigate('admin')" class="drawer-item">Panel de administración <span id="adminPanelBadge" class="nav-count-badge hidden">0</span></button>
         </nav>
       </div>
 
       <div class="drawer-account">
         <p class="drawer-section-label">Cuenta y avisos</p>
-        <button type="button" data-on-click="toggleDrawer(false); enableSystemNotifications()" class="btn btn-outline">Activar avisos del dispositivo</button>
+        <button type="button" data-role-nav="session" data-on-click="toggleDrawer(false); enableSystemNotifications()" class="btn btn-outline">Activar avisos del dispositivo</button>
         <button id="simulateFollowupButton" data-on-click="toggleSimulateTimeModal()" class="btn btn-outline hidden">Simulador de seguimiento (+48 h)</button>
-        <button data-on-click="logout()" class="btn btn-red">Cerrar sesión</button>
+        <button data-role-nav="session" data-on-click="logout()" class="btn btn-red">Cerrar sesión</button>
       </div>
     </aside>
 
@@ -95,6 +102,13 @@
       <p>Marco de referencia: Ley N.º 7605/2025 (RENAPED/MAFE) y Ley N.º 7593/2025, Art. 16 num. 7. Ante una emergencia, llamá al <a href="tel:911">911</a>.</p>
     </footer>
 
+  </div>
+
+  <!-- AVISO "ABRIR LA APP" (solo en celulares, public/js/web.js) -->
+  <div id="openAppNotice" class="open-app-notice hidden" role="region" aria-label="Abrir la app">
+    <p><strong>Rastreo PY tiene app.</strong> Instalala para tenerla a mano.</p>
+    <a id="openAppLink" class="btn btn-primary btn-sm" href="/app/">Abrir la app</a>
+    <button type="button" class="btn btn-outline btn-sm" data-on-click="cerrarAvisoApp()" aria-label="Cerrar aviso">Ahora no</button>
   </div>
 
   <!-- NOTIFICACIÓN / TOAST -->
@@ -162,5 +176,6 @@
 
   <!-- LÓGICA JAVASCRIPT DE LA SPA -->
   <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/web.js"></script>
 </body>
 </html>
