@@ -118,12 +118,13 @@ export function renderReportView() {
 
         <fieldset class="form-group consent-group">
           <legend>Verificación de edad y autorización *</legend>
-          <label><input type="checkbox" id="reporterAdult" required data-etiqueta="Declaración de mayoría de edad"> Declaro que soy mayor de 18 años y estoy autorizado a realizar este reporte.</label>
-          <label><input type="checkbox" id="minorAuthorization" data-etiqueta="Autorización parental o de tutor" data-on-change="updateMinorAuthorization()"> Confirmo que cuento con autorización parental o de tutor legal para reportar a la persona menor de edad.</label>
+          <!-- .check-fila: casilla dibujada por styles.css (no la del navegador) y toda la fila se puede tocar -->
+          <label class="check-fila"><input type="checkbox" id="reporterAdult" required data-etiqueta="Declaración de mayoría de edad"><span class="check-fila-texto">Declaro que soy mayor de 18 años y estoy autorizado a realizar este reporte.</span></label>
+          <label class="check-fila"><input type="checkbox" id="minorAuthorization" data-etiqueta="Autorización parental o de tutor" data-on-change="updateMinorAuthorization()"><span class="check-fila-texto">Confirmo que cuento con autorización parental o de tutor legal para reportar a la persona menor de edad.</span></label>
         </fieldset>
-        <label class="privacy-consent">
+        <label class="check-fila check-fila-suelta">
           <input type="checkbox" id="privacyConsent" required data-etiqueta="Aviso de privacidad">
-          Acepto el aviso de privacidad y el uso de estos datos únicamente para la búsqueda y gestión de este reporte.
+          <span class="check-fila-texto">Acepto el aviso de privacidad y el uso de estos datos únicamente para la búsqueda y gestión de este reporte.</span>
         </label>
 
         <!-- Paso previo al envío: el reportante elige qué ve la zona en la alerta temprana -->
@@ -427,19 +428,43 @@ function mostrarErrorReporte(mensaje) {
   error.classList.toggle('hidden', !mensaje);
 }
 
+const AVISO_CASILLA = 'Marcá esta casilla para continuar';
+
+// Casilla obligatoria sin marcar: la fila entera queda en rojo con un aviso.
+function marcarFilaCasilla(campo, conError) {
+  const fila = campo.type === 'checkbox' ? campo.closest?.('.check-fila') : null;
+  if (!fila) return;
+  fila.classList.toggle('check-fila-error', conError);
+  fila.querySelector('.check-fila-aviso')?.remove();
+  if (conError) {
+    const aviso = document.createElement('span');
+    aviso.className = 'check-fila-aviso';
+    aviso.textContent = AVISO_CASILLA;
+    fila.querySelector('.check-fila-texto')?.append(aviso);
+  }
+}
+
 // Devuelve true si se puede seguir. Si falta algo, muestra qué y enfoca el campo.
 export function validarFormularioReporte(form) {
-  form.querySelectorAll('[aria-invalid="true"]').forEach(campo => campo.removeAttribute('aria-invalid'));
+  form.querySelectorAll('[aria-invalid="true"]').forEach(campo => {
+    campo.removeAttribute('aria-invalid');
+    marcarFilaCasilla(campo, false);
+  });
   const { invalidos, enfocar, etiquetas } = revisarCamposReporte(form);
   if (!invalidos.length) {
     mostrarErrorReporte('');
     return true;
   }
-  invalidos.forEach(campo => campo.setAttribute('aria-invalid', 'true'));
-  const detalle = enfocar?.validationMessage ? ` (${enfocar.validationMessage})` : '';
+  invalidos.forEach(campo => {
+    campo.setAttribute('aria-invalid', 'true');
+    marcarFilaCasilla(campo, true);
+  });
+  const detalle = enfocar?.type === 'checkbox' ? ` ${AVISO_CASILLA}.`
+    : enfocar?.validationMessage ? ` (${enfocar.validationMessage})` : '';
   mostrarErrorReporte(`Falta completar: ${etiquetas.join(', ')}.${detalle}`);
   if (enfocar) {
-    enfocar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Con una casilla se lleva la vista a su fila (caja, texto y aviso).
+    (enfocar.closest?.('.check-fila') || enfocar).scrollIntoView({ behavior: 'smooth', block: 'center' });
     enfocar.focus({ preventScroll: true });
   }
   return false;
@@ -448,7 +473,10 @@ export function validarFormularioReporte(form) {
 // Al corregir un campo marcado se le saca la marca de error.
 export function desmarcarCampoReporte(event) {
   const campo = event.target;
-  if (campo?.getAttribute?.('aria-invalid') === 'true' && campo.checkValidity()) campo.removeAttribute('aria-invalid');
+  if (campo?.getAttribute?.('aria-invalid') === 'true' && campo.checkValidity()) {
+    campo.removeAttribute('aria-invalid');
+    marcarFilaCasilla(campo, false);
+  }
 }
 
 export async function handleReportSubmit(e) {

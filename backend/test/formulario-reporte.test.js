@@ -116,7 +116,10 @@ async function conDocumento(prueba) {
   const error = { textContent: '', clases: new Set(['hidden']), classList: null };
   error.classList = { toggle: (clase, activa) => (activa ? error.clases.add(clase) : error.clases.delete(clase)) };
   const anterior = globalThis.document;
-  globalThis.document = { getElementById: id => (id === 'reportFormError' ? error : null) };
+  globalThis.document = {
+    getElementById: id => (id === 'reportFormError' ? error : null),
+    createElement: () => ({ className: '', textContent: '', remove() { this.quitado = true; } })
+  };
   const errores = [];
   const consola = console.error;
   console.error = (...args) => errores.push(args.join(' '));
@@ -150,5 +153,73 @@ test('validación del reporte: mensaje visible, foco en el primer campo que se v
     // Todo completo: se borra el mensaje y se sigue.
     assert.equal(validarFormularioReporte(formulario([nombre, campo('repFisica')])), true);
     assert.equal(error.clases.has('hidden'), true);
+  });
+});
+
+// Bloque de reglas de styles.css para un selector exacto.
+function reglaCss(css, selector) {
+  const inicio = css.indexOf(`${selector} {`);
+  assert.ok(inicio >= 0, `falta la regla ${selector} en styles.css`);
+  return css.slice(inicio, css.indexOf('}', inicio));
+}
+const px = (regla, propiedad) => Number(new RegExp(String.raw`(?:^|[\s;{])${propiedad}\s*:\s*(\d+(?:\.\d+)?)px`).exec(regla)?.[1] || 0);
+
+test('casillas del reporte: dibujo propio con tamaño visible, fila tocable y foco con teclado', async () => {
+  const todos = await formularioReporte();
+  const casillas = todos.filter(el => el.etiqueta === 'input' && el.atributos.type === 'checkbox');
+  const ids = ['reporterAdult', 'minorAuthorization', 'privacyConsent'];
+  for (const id of ids) assert.ok(casillas.some(el => el.atributos.id === id), `falta la casilla ${id}`);
+  // Toda casilla obligatoria (y las tres de consentimiento) va dentro de una fila .check-fila.
+  const sinFila = casillas
+    .filter(el => 'required' in el.atributos || ids.includes(el.atributos.id))
+    .filter(el => !el.ancestros.some(a => a.etiqueta === 'label' && /(^|\s)check-fila(\s|$)/.test(a.atributos.class || '')))
+    .map(el => el.atributos.id || el.atributos.name);
+  assert.deepEqual(sinFila, [], 'casillas sin fila .check-fila');
+  const textos = todos.filter(el => /(^|\s)check-fila-texto(\s|$)/.test(el.atributos.class || ''));
+  assert.ok(textos.length >= ids.length, 'cada fila lleva su texto en .check-fila-texto');
+
+  const css = await readFile(new URL('styles.css', publicDir), 'utf8');
+  const caja = reglaCss(css, '.check-fila input[type="checkbox"]');
+  assert.match(caja, /(?:^|[\s;{])appearance:\s*none/, 'no usa el dibujo nativo');
+  assert.ok(px(caja, 'width') >= 22 && px(caja, 'height') >= 22, 'la caja mide al menos 22 px');
+  assert.match(caja, /border:\s*2px solid var\(--check-border\)/, 'borde visible');
+  assert.doesNotMatch(caja, /display:\s*none|visibility:\s*hidden|opacity:\s*0[;\s]/);
+  assert.ok(px(reglaCss(css, '.check-fila'), 'min-height') >= 44, 'zona táctil de 44 px');
+  assert.match(reglaCss(css, '.check-fila input[type="checkbox"]:checked'), /background-image:\s*url\("data:image\/svg\+xml/, 'tilde al marcar');
+  assert.match(reglaCss(css, '[data-theme="dark"] .check-fila input[type="checkbox"]:checked'), /background-image/, 'tilde en tema oscuro');
+  assert.match(reglaCss(css, '.check-fila input[type="checkbox"]:focus-visible'), /outline:\s*3px solid/, 'foco visible con teclado');
+  assert.match(reglaCss(css, '.check-fila.check-fila-error, .check-fila.check-fila-error:has(input:focus-visible)'), /border:\s*2px solid var\(--red\)/);
+  // El color del borde existe en los dos temas.
+  for (const tema of ['[data-theme="light"]', '[data-theme="dark"]']) {
+    assert.match(reglaCss(css, tema), /--check-border:\s*#[0-9a-f]{6}/i, `--check-border en ${tema}`);
+  }
+});
+
+test('casilla obligatoria sin marcar: fila en rojo, aviso "Marcá esta casilla para continuar" y vista hasta la fila', async () => {
+  const { validarFormularioReporte } = await import(new URL('js/report.js', publicDir));
+  await conDocumento(async error => {
+    const clases = new Set();
+    const agregados = [];
+    let vistaEnFila = false;
+    const texto = { append: nodo => agregados.push(nodo) };
+    const fila = {
+      classList: { toggle: (clase, activa) => (activa ? clases.add(clase) : clases.delete(clase)) },
+      querySelector: selector => (selector === '.check-fila-texto' ? texto : agregados.find(nodo => !nodo.quitado) || null),
+      scrollIntoView: () => { vistaEnFila = true; }
+    };
+    const privacidad = campo('privacyConsent', { valido: false, etiqueta: 'Acepto el aviso de privacidad' });
+    Object.assign(privacidad, { type: 'checkbox', dataset: { etiqueta: 'Aviso de privacidad' }, closest: () => fila });
+    assert.equal(validarFormularioReporte(formulario([campo('repNombre'), privacidad])), false);
+    assert.ok(clases.has('check-fila-error'));
+    assert.deepEqual(agregados.filter(nodo => !nodo.quitado).map(nodo => nodo.textContent), ['Marcá esta casilla para continuar']);
+    assert.equal(vistaEnFila, true, 'la vista va hasta la fila');
+    assert.equal(privacidad.enfocado, true);
+    assert.equal(error.textContent, 'Falta completar: Aviso de privacidad. Marcá esta casilla para continuar.');
+
+    // Al volver a validar con la casilla marcada se limpia la fila.
+    privacidad.checkValidity = () => true;
+    assert.equal(validarFormularioReporte(formulario([privacidad])), true);
+    assert.equal(clases.has('check-fila-error'), false);
+    assert.equal(agregados.filter(nodo => !nodo.quitado).length, 0);
   });
 });
