@@ -1,5 +1,5 @@
 // Reportar una persona desaparecida: formulario, ubicación y foto.
-import { CAMPOS_ALERTA, ETIQUETA_NO_VERIFICADA, cuerpoPushAlertaTemprana, datosAlerta, fotoPermitida } from './alerta-campos.js';
+import { CAMPOS_ALERTA, ETIQUETA_NO_VERIFICADA, avisoPushAlertaTemprana, datosAlerta, fotoPermitida } from './alerta-campos.js';
 import { apiRequest } from './api.js';
 import { escapeHtml } from './config.js';
 import { estado } from './estado.js';
@@ -147,7 +147,7 @@ export function renderReportView() {
             <p class="alert-preview-paso">1. Le llega este aviso al celular:</p>
             <div class="alert-preview-push">
               <img src="/icons/rastreopy-192.png" alt="" width="36" height="36">
-              <div><strong>Rastreo PY</strong><span id="alertPreviewPush"></span></div>
+              <div><strong id="alertPreviewPushTitulo">Alerta en tu zona</strong><span id="alertPreviewPush"></span></div>
             </div>
             <p class="alert-preview-paso">2. Si lo abre, ve esto:</p>
             <div id="alertPreviewCard" class="alert-preview-card"></div>
@@ -405,7 +405,10 @@ export function actualizarVistaPreviaAlerta() {
     descripcionFisica: document.getElementById('repFisica').value,
     vestimenta: document.getElementById('repVestimenta').value
   };
-  document.getElementById('alertPreviewPush').textContent = cuerpoPushAlertaTemprana(caso, campos);
+  // La distancia depende de quien lo recibe: el ejemplo usa una cualquiera.
+  const aviso = avisoPushAlertaTemprana(caso, campos, 5);
+  document.getElementById('alertPreviewPushTitulo').textContent = aviso.titulo;
+  document.getElementById('alertPreviewPush').textContent = aviso.cuerpo;
   const filas = datosAlerta(caso, campos)
     .map(item => `<p><strong>${escapeHtml(item.etiqueta)}:</strong> ${escapeHtml(item.valor)}</p>`).join('');
   const imagen = campos.includes('foto') && estado.reportPhotoPreviewUrl

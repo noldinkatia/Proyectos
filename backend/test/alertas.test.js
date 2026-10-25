@@ -5,7 +5,8 @@ import test from 'node:test';
 import jwt from 'jsonwebtoken';
 import {
   CAMPOS_POR_DEFECTO,
-  cuerpoPushAlertaTemprana,
+  avisoPushAlertaTemprana,
+  distanciaAproximada,
   normalizarCamposAlerta,
   textoAlertaTemprana
 } from '../../public/js/alerta-campos.js';
@@ -63,23 +64,44 @@ test('alerta temprana: solo campos permitidos, foto bloqueada para menores y tex
   assert.equal(texto, 'Pendiente / En revisión – No verificada. Ciudad: Luque. Edad aproximada: entre 15 y 19 años. Iniciales: M. J. B.');
   assert.doesNotMatch(texto, /María|Benítez|Remera/);
   assert.equal(textoAlertaTemprana(caso, []), 'Pendiente / En revisión – No verificada.');
-  assert.equal(cuerpoPushAlertaTemprana(caso, ['ciudad', 'primerNombre']), 'Alerta en tu zona (Luque): caso en revisión, aún no verificado');
-  assert.equal(cuerpoPushAlertaTemprana(caso, ['primerNombre']), 'Alerta en tu zona: caso en revisión, aún no verificado');
+  assert.deepEqual(avisoPushAlertaTemprana(caso, ['ciudad', 'primerNombre'], 41.3),
+    { titulo: 'Alerta en tu zona · Luque', cuerpo: 'Caso en revisión, aún no verificado. A unos 40 km.' });
+  assert.deepEqual(avisoPushAlertaTemprana(caso, ['ciudad', 'barrio'], 3.4),
+    { titulo: 'Alerta en tu zona · Luque', cuerpo: 'Caso en revisión, aún no verificado. Barrio Centro, a unos 3 km.' });
+  assert.deepEqual(avisoPushAlertaTemprana(caso, ['barrio'], 0.4),
+    { titulo: 'Alerta en tu zona · Centro', cuerpo: 'Caso en revisión, aún no verificado. A menos de 1 km.' });
+  assert.deepEqual(avisoPushAlertaTemprana(caso, ['primerNombre']),
+    { titulo: 'Alerta en tu zona', cuerpo: 'Caso en revisión, aún no verificado.' });
+  assert.deepEqual([distanciaAproximada(160), distanciaAproximada('12.6'), distanciaAproximada(null)], ['a unos 160 km', 'a unos 15 km', '']);
   assert.equal(normalizarNombre('  MARÍA   josé  Benítez '), 'maria jose benitez');
 });
 
-test('push: texto genérico, discreto, con tag por caso; sin claves VAPID queda desactivado', async () => {
-  const temprana = cargaPush('ALERTA_TEMPRANA', 'cas_1', { ciudad: 'Luque', alerta_campos: ['iniciales'], nombre_completo: 'Ana Pérez' });
-  assert.equal(temprana.carga.cuerpo, 'Alerta en tu zona: caso en revisión, aún no verificado');
+test('push: la oficial destaca y la temprana es discreta, con zona, distancia y botón Ver; sin claves VAPID queda desactivado', async () => {
+  const temprana = cargaPush('ALERTA_TEMPRANA', 'cas_1', { ciudad: 'Luque', barrio: 'Itapuamí', alerta_campos: ['iniciales'], nombre_completo: 'Ana Pérez' }, { distanciaKm: '38.2' });
+  assert.equal(temprana.carga.titulo, 'Alerta en tu zona', 'sin ciudad ni barrio elegidos, no los muestra');
+  assert.equal(temprana.carga.cuerpo, 'Caso en revisión, aún no verificado. A unos 40 km.');
   assert.equal(temprana.carga.discreta, true);
+  assert.deepEqual(temprana.carga.acciones, [{ accion: 'ver', titulo: 'Ver' }]);
   assert.equal(temprana.carga.tag, 'rastreo-caso-cas_1');
   assert.equal(temprana.carga.url, '/app/#/alerta/cas_1');
   assert.equal(temprana.opciones.urgency, 'low');
   assert.ok(temprana.opciones.topic.length <= 32);
-  assert.doesNotMatch(JSON.stringify(temprana), /Ana|Pérez/);
-  const oficial = cargaPush('ALERTA_OFICIAL', 'cas_1');
+  assert.doesNotMatch(JSON.stringify(temprana), /Ana|Pérez|Luque|Itapuamí/);
+  const conZona = cargaPush('ALERTA_TEMPRANA', 'cas_1', { ciudad: 'Luque', barrio: 'Itapuamí', alerta_campos: ['ciudad', 'barrio'] }, { distanciaKm: 7 });
+  assert.equal(conZona.carga.titulo, 'Alerta en tu zona · Luque');
+  assert.equal(conZona.carga.cuerpo, 'Caso en revisión, aún no verificado. Barrio Itapuamí, a unos 7 km.');
+  const oficial = cargaPush('ALERTA_OFICIAL', 'cas_1', { ciudad: 'Luque' }, { distanciaKm: 52 });
   assert.equal(oficial.carga.tag, temprana.carga.tag, 'la oficial reemplaza a la temprana en el dispositivo');
   assert.equal(oficial.carga.discreta, false);
+  assert.equal(oficial.carga.titulo, 'Alerta oficial · Luque');
+  assert.equal(oficial.carga.cuerpo, 'Persona desaparecida a unos 50 km. Caso verificado por la administración: tocá para ver la ficha.');
+  assert.equal(oficial.opciones.urgency, 'high');
+  assert.equal(cargaPush('ALERTA_OFICIAL', 'cas_1').carga.titulo, 'Alerta oficial en tu zona');
+  // Nada que parezca un mensaje masivo: sin emojis, signos repetidos ni mayúsculas sostenidas.
+  for (const { carga } of [temprana, conZona, oficial, cargaPush('ALERTA_LOCALIZADO', 'cas_1')]) {
+    const texto = `${carga.titulo} ${carga.cuerpo}`;
+    assert.doesNotMatch(texto, /\p{Extended_Pictographic}|[!¡]|\b[A-ZÁÉÍÓÚÑ]{4,}\b/u, texto);
+  }
   for (const tipo of ['ALERTA_RETRACTADA', 'ALERTA_CERRADO', 'CASO_VALIDADO']) assert.equal(cargaPush(tipo, 'cas_1'), null);
 
   const cliente = webPushSimulado();
@@ -180,7 +202,7 @@ test('alertas de zona con PostgreSQL: radio, retractación, oficial, localizado,
       return result.body.caso.id;
     };
     const avisos = async (casoId, tipo) => (await db.query(`
-      SELECT usuario_id, mensaje, distancia_km, canal, push_resultado FROM notificaciones
+      SELECT id, usuario_id, mensaje, distancia_km, canal, push_resultado FROM notificaciones
       WHERE caso_id = $1 AND tipo = $2 ORDER BY usuario_id
     `, [casoId, tipo])).rows;
     const usuarios = filas => filas.map(fila => fila.usuario_id).sort((a, b) => a - b);
@@ -225,11 +247,18 @@ test('alertas de zona con PostgreSQL: radio, retractación, oficial, localizado,
     const enviosTempranos = cliente.envios.filter(envio => envio.carga.casoId === caso1);
     assert.deepEqual(enviosTempranos.map(envio => envio.endpoint).sort(), [`https://push.example/borde-${suffix}`, `https://push.example/dentro-${suffix}`]);
     for (const envio of enviosTempranos) {
-      assert.equal(envio.carga.cuerpo, 'Alerta en tu zona (Asunción): caso en revisión, aún no verificado');
+      assert.equal(envio.carga.titulo, 'Alerta en tu zona · Asunción');
+      assert.match(envio.carga.cuerpo, /^Caso en revisión, aún no verificado\. A unos (50|160) km\.$/);
+      assert.equal(envio.carga.discreta, true);
       assert.equal(envio.opciones.urgency, 'low');
       assert.doesNotMatch(JSON.stringify(envio), /Ana|Prueba|-21\.|-60\./);
     }
     assert.equal(cliente.envios.some(envio => envio.endpoint.includes('reportante')), false, 'no al reportante');
+    // Un único aviso por caso y destinatario: volver a programar las mismas no reenvía.
+    const enviosAntesDeReprogramar = cliente.envios.length;
+    push.programar(db, tempranas.filter(fila => fila.canal === 'push').map(fila => ({ id: fila.id, canal: 'push' })));
+    await push.esperar();
+    assert.equal(cliente.envios.length, enviosAntesDeReprogramar, 'no se reenvía');
     const admin = await db.query('SELECT tipo FROM notificaciones WHERE caso_id = $1 AND usuario_id = $2', [caso1, adminId]);
     assert.deepEqual(admin.rows.map(row => row.tipo), ['CASO_PENDIENTE']);
 
@@ -279,7 +308,9 @@ test('alertas de zona con PostgreSQL: radio, retractación, oficial, localizado,
     assert.deepEqual(usuarios(oficiales), [reportante, dentro, borde, caducado, tardio].sort((a, b) => a - b));
     const envioOficial = cliente.envios.find(envio => envio.carga.casoId === caso2 && envio.carga.tipo === 'ALERTA_OFICIAL');
     assert.equal(envioOficial.carga.url, `/app/#/caso/${caso2}`);
-    assert.equal(envioOficial.opciones.urgency, 'normal');
+    assert.equal(envioOficial.opciones.urgency, 'high');
+    assert.equal(envioOficial.carga.discreta, false);
+    assert.equal(envioOficial.carga.titulo, 'Alerta oficial · Asunción');
     assert.doesNotMatch(JSON.stringify(envioOficial), /Lucía|Gómez/);
     assert.equal((await api('GET', `/alertas/${caso2}`, dentro)).body.estado, 'PUBLICO');
     assert.equal((await api('GET', `/alertas/${caso2}/foto`, dentro)).status, 404, 'la foto de la alerta temprana ya no se sirve');

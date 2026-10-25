@@ -97,8 +97,27 @@ export function textoAlertaTemprana(caso, campos) {
   return [`${ETIQUETA_NO_VERIFICADA}.`, ...datos].join(' ');
 }
 
-// Texto del push: genérico; a lo sumo la ciudad, si el reportante la eligió.
-export function cuerpoPushAlertaTemprana(caso, campos) {
+// "a unos 40 km": la distancia del aviso, redondeada (la ubicación guardada de
+// quien recibe ya está redondeada a ~1 km).
+export function distanciaAproximada(km) {
+  if (km === null || km === undefined || km === '' || !Number.isFinite(Number(km))) return '';
+  const valor = Number(km);
+  if (valor < 1) return 'a menos de 1 km';
+  if (valor < 10) return `a unos ${Math.round(valor)} km`;
+  return `a unos ${Math.round(valor / 5) * 5} km`;
+}
+
+// Aviso push de la alerta temprana: título con la zona (la ciudad o, si no, el
+// barrio, solo si el reportante los eligió) y un cuerpo corto que dice que no
+// está verificada. Sin nombre, edad, foto ni ubicación exacta.
+export function avisoPushAlertaTemprana(caso, campos, distanciaKm = null) {
   const ciudad = campos.includes('ciudad') ? recortar(caso.ciudad) : '';
-  return `Alerta en tu zona${ciudad ? ` (${ciudad})` : ''}: caso en revisión, aún no verificado`;
+  const barrio = campos.includes('barrio') ? recortar(caso.barrio) : '';
+  const zona = ciudad || barrio;
+  const lugar = ciudad && barrio ? (/^barrio\b/i.test(barrio) ? barrio : `Barrio ${barrio}`) : '';
+  const detalle = [lugar, distanciaAproximada(distanciaKm)].filter(Boolean).join(', ');
+  return {
+    titulo: zona ? `Alerta en tu zona · ${zona}` : 'Alerta en tu zona',
+    cuerpo: `Caso en revisión, aún no verificado.${detalle ? ` ${detalle[0].toUpperCase()}${detalle.slice(1)}.` : ''}`
+  };
 }
