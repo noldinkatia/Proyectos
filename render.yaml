@@ -39,6 +39,13 @@ services:
         sync: false
       - key: MAIL_PASS
         sync: false
+      # Render gratis bloquea SMTP: el correo sale por la API HTTPS de Brevo.
+      # Con BREVO_API_KEY, MAIL_PASS no se usa. MAIL_FROM es el remitente
+      # verificado en Brevo (si queda vacío, se usa MAIL_USER).
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
       - key: JWT_SECRET
         sync: false
       - key: ADMIN_IDENTIFICADOR

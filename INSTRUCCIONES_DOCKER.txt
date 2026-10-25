@@ -107,6 +107,17 @@ Si deseas que se envíen correos reales de recuperación de clave y avisos:
 2. Configura estas variables en backend/.env (no en docker-compose.yml):
    MAIL_USER=tu-cuenta@gmail.com
    MAIL_PASS=tu_clave_de_aplicacion_de_16_caracteres
+   Con esto el correo sale por SMTP de Gmail (BREVO_API_KEY vacía). Es lo normal
+   en Docker local y en el plan B con túnel.
+
+Opción API (Brevo): si BREVO_API_KEY tiene valor, el correo sale por la API
+HTTPS de Brevo y MAIL_PASS no se usa. Hace falta en Render, porque su plan
+gratuito bloquea los puertos SMTP. Localmente también funciona:
+   BREVO_API_KEY=la_clave_de_api_de_brevo
+   MAIL_FROM=remitente-verificado-en-brevo@gmail.com   (vacío = MAIL_USER)
+Cómo obtener la clave: ver DESPLIEGUE.md, sección "Correo: API de Brevo".
+Al arrancar, el log dice qué modo se usa: "Envío de correos: SMTP de Gmail."
+o "Envío de correos: API de Brevo."
 
 
 [ 7. SOLUCIÓN DE PROBLEMAS COMUNES ]
