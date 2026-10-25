@@ -1,7 +1,8 @@
 import express from 'express';
-import { ETIQUETA_NO_VERIFICADA } from './alertas.js';
+import { datosAlerta, fotoPermitida } from '../public/js/alerta-campos.js';
+import { camposDeAlerta, casoParaAlerta, ETIQUETA_NO_VERIFICADA } from './alertas.js';
 import { asyncRoute } from './auth-routes.js';
-import { caseVisibilityParameters, PUBLIC_CASE_FILTER_JOINED, validCoordinates } from './case-shared.js';
+import { caseVisibilityParameters, IMAGE_DATA_URL, PUBLIC_CASE_FILTER_JOINED, validCoordinates } from './case-shared.js';
 import { withTransaction } from './db.js';
 import { ubicacionAproximada } from './geocerca.js';
 
@@ -80,17 +81,26 @@ export function createAlertRouter({ db, requireCitizen, requireUser, push }) {
     res.json({ activa: false, mensaje: 'Alertas desactivadas y ubicación borrada.' });
   }));
 
-  // Lo que ve quien recibió la alerta de un caso. Mientras está en revisión, solo
-  // la vista mínima; cuando el caso es público, la app abre la ficha completa.
+  // Alerta del usuario para este caso, con los datos del caso que hacen falta para
+  // la vista mínima. Solo quien recibió la alerta puede verla.
+  const alertaDelUsuario = async (usuarioId, casoId) => (await db.query(`
+    SELECT c.id, c.estado, c.nombre_completo, c.edad, c.sexo, c.ciudad, c.departamento,
+      c.barrio, c.descripcion_fisica, c.vestimenta, c.alerta_campos, (c.foto <> '') AS tiene_foto,
+      n.distancia_km, (${PUBLIC_CASE_FILTER_JOINED}) AS publico
+    FROM notificaciones n JOIN casos c ON c.id = n.caso_id
+    WHERE n.usuario_id = $2 AND n.caso_id = $3 AND n.tipo IN ('ALERTA_TEMPRANA', 'ALERTA_OFICIAL')
+    ORDER BY n.creada_en DESC LIMIT 1
+  `, [...caseVisibilityParameters(), usuarioId, casoId])).rows[0];
+
+  // La foto va en la vista mínima solo si el reportante la eligió y la persona
+  // es mayor de edad (se vuelve a comprobar acá, no solo al guardar).
+  const muestraFoto = alerta => camposDeAlerta(alerta).includes('foto')
+    && fotoPermitida(alerta.edad, alerta.tiene_foto);
+
+  // Mientras el caso está en revisión, solo la vista mínima con los datos que eligió
+  // el reportante; cuando el caso es público, la app abre la ficha completa.
   router.get('/alertas/:casoId', requireUser, asyncRoute(async (req, res) => {
-    const { rows } = await db.query(`
-      SELECT c.id, c.estado, c.ciudad, c.departamento, c.barrio, n.distancia_km,
-        (${PUBLIC_CASE_FILTER_JOINED}) AS publico
-      FROM notificaciones n JOIN casos c ON c.id = n.caso_id
-      WHERE n.usuario_id = $2 AND n.caso_id = $3 AND n.tipo IN ('ALERTA_TEMPRANA', 'ALERTA_OFICIAL')
-      ORDER BY n.creada_en DESC LIMIT 1
-    `, [...caseVisibilityParameters(), req.auth.id, req.params.casoId]);
-    const alerta = rows[0];
+    const alerta = await alertaDelUsuario(req.auth.id, req.params.casoId);
     if (!alerta) return res.status(404).json({ error: 'Alerta no disponible' });
     const distanciaKm = alerta.distancia_km === null ? null : Number(alerta.distancia_km);
     if (alerta.publico) return res.json({ casoId: alerta.id, estado: 'PUBLICO', distanciaKm });
@@ -102,12 +112,21 @@ export function createAlertRouter({ db, requireCitizen, requireUser, push }) {
       estado: 'PENDIENTE',
       etiqueta: ETIQUETA_NO_VERIFICADA,
       distanciaKm,
-      datos: [
-        { etiqueta: 'Departamento', valor: alerta.departamento },
-        { etiqueta: 'Ciudad', valor: alerta.ciudad },
-        { etiqueta: 'Zona / barrio aproximado', valor: alerta.barrio }
-      ].filter(item => item.valor)
+      datos: datosAlerta(casoParaAlerta(alerta), camposDeAlerta(alerta))
+        .map(({ etiqueta, valor }) => ({ etiqueta, valor })),
+      fotoUrl: muestraFoto(alerta) ? `/api/alertas/${encodeURIComponent(alerta.id)}/foto` : ''
     });
+  }));
+
+  router.get('/alertas/:casoId/foto', requireUser, asyncRoute(async (req, res) => {
+    const alerta = await alertaDelUsuario(req.auth.id, req.params.casoId);
+    if (!alerta || alerta.estado !== 'PENDIENTE' || !muestraFoto(alerta)) {
+      return res.status(404).json({ error: 'Foto no disponible' });
+    }
+    const { rows } = await db.query('SELECT foto FROM casos WHERE id = $1', [alerta.id]);
+    const match = typeof rows[0]?.foto === 'string' ? rows[0].foto.match(IMAGE_DATA_URL) : null;
+    if (!match) return res.status(404).json({ error: 'Foto no disponible' });
+    res.type(`image/${match[1]}`).set('Cache-Control', 'private, no-store').send(Buffer.from(match[2], 'base64'));
   }));
 
   return router;

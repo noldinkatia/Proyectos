@@ -968,6 +968,15 @@ form.card { width: 100%; }
 .alerta-zona h1 { margin: 0; }
 .alerta-zona p { margin: 0; }
 .alerta-zona-foto { width: min(100%, 320px); border-radius: var(--radius-sm); }
+/* Vista previa de la alerta temprana en el formulario de reporte (js/report.js) */
+.alert-preview { display: grid; gap: .75rem; margin: 1rem 0; padding: 1rem; border: 1px solid var(--amber-border); border-radius: var(--radius); background: var(--surface-2); }
+.alert-preview h2 { margin: 0; font-size: 1.05rem; }
+.alert-preview p { margin: 0; }
+.alert-preview-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .35rem .75rem; }
+.alert-preview-fields label { display: flex; align-items: center; gap: .4rem; font-size: .88rem; }
+.alert-preview-push { display: grid; gap: .15rem; padding: .65rem .8rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); font-size: .85rem; }
+.alert-preview-card { display: grid; gap: .4rem; padding: .8rem; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); }
+.alert-preview-card img { width: min(100%, 240px); border-radius: var(--radius-sm); }
 .lead-photo-previews, .moderation-photos { display: flex; flex-wrap: wrap; gap: .45rem; }
 .lead-photo-previews img, .moderation-photos img { width: 76px; height: 76px; border: 1px solid var(--border); border-radius: var(--radius-sm); object-fit: cover; }
 

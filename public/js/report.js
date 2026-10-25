@@ -1,5 +1,7 @@
 // Reportar una persona desaparecida: formulario, ubicación y foto.
+import { CAMPOS_ALERTA, ETIQUETA_NO_VERIFICADA, cuerpoPushAlertaTemprana, datosAlerta, fotoPermitida } from './alerta-campos.js';
 import { apiRequest } from './api.js';
+import { escapeHtml } from './config.js';
 import { estado } from './estado.js';
 import { addBaseTiles, addTextMapZoomControl } from './map.js';
 import { navigateTo } from './router.js';
@@ -14,7 +16,7 @@ export function renderReportView() {
         <p>Completá los datos de la persona. El reporte pasa por validación antes de publicarse.</p>
       </header>
 
-      <form data-on-submit="handleReportSubmit(event)" class="card">
+      <form data-on-submit="handleReportSubmit(event)" data-on-input="actualizarVistaPreviaAlerta()" data-on-change="actualizarVistaPreviaAlerta()" class="card">
         <div class="form-group">
           <label>Nombre Completo *</label>
           <input type="text" id="repNombre" required placeholder="Nombre y apellido de la persona" class="form-control">
@@ -121,7 +123,24 @@ export function renderReportView() {
           Acepto el aviso de privacidad y el uso de estos datos únicamente para la búsqueda y gestión de este reporte.
         </label>
 
-        <button type="submit" class="btn btn-red">Publicar reporte de búsqueda</button>
+        <!-- Paso previo al envío: el reportante elige qué ve la zona en la alerta temprana -->
+        <section id="alertPreviewSection" class="alert-preview hidden" aria-labelledby="alertPreviewTitle">
+          <h2 id="alertPreviewTitle">Vista previa de la alerta temprana</h2>
+          <p>Al publicar, se envía una alerta temprana a quienes tienen activadas las alertas a 160 km o menos, antes de que la administración verifique el caso. <strong>Lo que tildes acá lo van a ver los usuarios de la zona.</strong> El texto "${ETIQUETA_NO_VERIFICADA}" se muestra siempre.</p>
+          <fieldset class="form-group alert-preview-fields">
+            <legend>Datos que se muestran en la alerta</legend>
+            ${CAMPOS_ALERTA.map(campo => `<label><input type="checkbox" name="alertaCampo" value="${campo.clave}"${campo.porDefecto ? ' checked' : ''}${campo.clave === 'foto' ? ' id="alertaCampoFoto"' : ''}> ${escapeHtml(campo.etiqueta)}</label>`).join('')}
+          </fieldset>
+          <p id="alertaFotoAviso" class="muted"></p>
+          <p class="notice-info">Nunca se muestran: datos de contacto, número de denuncia, documento, dirección exacta ni ubicación exacta. Una vez validado, el caso se publica completo como siempre.</p>
+          <div class="alert-preview-push" aria-label="Así llega el aviso al celular">
+            <strong>Rastreo PY</strong>
+            <span id="alertPreviewPush"></span>
+          </div>
+          <div id="alertPreviewCard" class="alert-preview-card"></div>
+        </section>
+
+        <button type="submit" id="reportSubmitButton" class="btn btn-red">Revisar alerta y publicar</button>
       </form>
     </div>
   `;
@@ -338,8 +357,58 @@ export async function onReportCityChange() {
   centerReportMapOnSelection();
 }
 
+function camposElegidos() {
+  return Array.from(document.querySelectorAll('input[name="alertaCampo"]:checked'), input => input.value);
+}
+
+// Vuelve a dibujar la vista previa con lo cargado en el formulario. La foto se
+// bloquea si la persona es menor de 18 años o si no se cargó ninguna.
+export function actualizarVistaPreviaAlerta() {
+  const section = document.getElementById('alertPreviewSection');
+  if (!section) return;
+  const edadCargada = document.getElementById('repEdad').value !== '';
+  const edad = Number(document.getElementById('repEdad').value);
+  const foto = document.getElementById('alertaCampoFoto');
+  const fotoHabilitada = fotoPermitida(edad, Boolean(estado.selectedReportPhoto));
+  foto.disabled = !fotoHabilitada;
+  if (!fotoHabilitada) foto.checked = false;
+  document.getElementById('alertaFotoAviso').textContent = edadCargada && edad < 18
+    ? 'La fotografía no se puede mostrar en la alerta temprana porque la persona es menor de 18 años.'
+    : !estado.selectedReportPhoto ? 'Para mostrar una fotografía, primero cargala en el formulario.' : '';
+
+  const campos = camposElegidos();
+  const caso = {
+    nombreCompleto: document.getElementById('repNombre').value,
+    edad: edadCargada ? edad : null,
+    sexo: document.getElementById('repSexo').value,
+    departamento: document.getElementById('repDepartamento').value,
+    ciudad: document.getElementById('repCiudad').value,
+    barrio: document.getElementById('repBarrio').value,
+    descripcionFisica: document.getElementById('repFisica').value,
+    vestimenta: document.getElementById('repVestimenta').value
+  };
+  document.getElementById('alertPreviewPush').textContent = cuerpoPushAlertaTemprana(caso, campos);
+  const filas = datosAlerta(caso, campos)
+    .map(item => `<p><strong>${escapeHtml(item.etiqueta)}:</strong> ${escapeHtml(item.valor)}</p>`).join('');
+  const imagen = campos.includes('foto') && estado.reportPhotoPreviewUrl
+    ? `<img src="${escapeHtml(estado.reportPhotoPreviewUrl)}" alt="Fotografía que verán en la alerta">` : '';
+  document.getElementById('alertPreviewCard').innerHTML = `
+    <span class="status-tag status-PENDIENTE">${escapeHtml(ETIQUETA_NO_VERIFICADA)}</span>
+    <strong>Alerta en tu zona</strong>
+    ${imagen}${filas || '<p class="muted">Solo se mostrará el aviso de caso en revisión.</p>'}`;
+}
+
 export async function handleReportSubmit(e) {
   e.preventDefault();
+  // Primer envío: se muestra la vista previa de la alerta temprana para revisarla.
+  const previewSection = document.getElementById('alertPreviewSection');
+  if (previewSection?.classList.contains('hidden')) {
+    previewSection.classList.remove('hidden');
+    actualizarVistaPreviaAlerta();
+    document.getElementById('reportSubmitButton').textContent = 'Confirmar y publicar reporte';
+    previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
   const name = document.getElementById('repNombre').value.trim();
   const city = document.getElementById('repCiudad').value.trim();
   let photoData = '';
@@ -381,7 +450,8 @@ export async function handleReportSubmit(e) {
     numeroDenuncia: denuncia,
     declaraMayorEdad: document.getElementById('reporterAdult').checked,
     autorizacionParental: document.getElementById('minorAuthorization').checked,
-    avisoPrivacidadAceptado: document.getElementById('privacyConsent').checked
+    avisoPrivacidadAceptado: document.getElementById('privacyConsent').checked,
+    alertaCampos: camposElegidos()
   };
 
   try {

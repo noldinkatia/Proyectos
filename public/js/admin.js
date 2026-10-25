@@ -1,4 +1,5 @@
 // Panel de administración: bandeja, casos, pistas, auditoría, historial y simulador.
+import { CAMPOS_ALERTA } from './alerta-campos.js';
 import { apiRequest, loadProtectedPhotos } from './api.js';
 import { escapeHtml } from './config.js';
 import { statusLabel, timeSince } from './my-cases.js';
@@ -253,6 +254,12 @@ export function loadAdminHistoryPhotos(container) {
   return loadProtectedPhotos(container);
 }
 
+// Nombres de los campos que el reportante eligió mostrar en la alerta temprana.
+function alertFieldLabels(fields = []) {
+  const labels = CAMPOS_ALERTA.filter(field => fields.includes(field.clave)).map(field => field.etiqueta);
+  return labels.length ? labels.join(', ') : 'solo el aviso de caso en revisión';
+}
+
 export function adminAccept(caseId) {
   const form = document.getElementById('reviewChecklistForm');
   const selectedCase = getStore().casos.find(item => item.id === caseId);
@@ -265,6 +272,7 @@ export function adminAccept(caseId) {
     <span>Descripción: ${escapeHtml(selectedCase.descripcionFisica || 'Sin descripción')}</span>
     <span>Vestimenta: ${escapeHtml(selectedCase.vestimenta || 'Sin especificar')}</span>
     <span>Autorización parental: ${selectedCase.autorizacionParental ? 'Registrada' : 'No registrada / no aplica'}</span>
+    <span>Alerta temprana: ${selectedCase.alertaTempranaEn ? `enviada el ${escapeHtml(new Date(selectedCase.alertaTempranaEn).toLocaleString('es-PY'))}` : 'no enviada (posible duplicado o límite por reportante)'}. El reportante eligió mostrar: ${escapeHtml(alertFieldLabels(selectedCase.alertaCampos))}</span>
   ` : '<span>No se pudo cargar el detalle del caso. Actualizá el panel e intentá otra vez.</span>';
   form.reset();
   form.dataset.caseId = caseId;

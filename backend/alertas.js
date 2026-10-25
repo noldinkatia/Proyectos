@@ -1,14 +1,15 @@
 // Alertas de zona (geocerca de 160 km): se arman dentro de la transacción que
 // cambia el caso, así la notificación y el cambio se guardan juntos o ninguno.
+import { CAMPOS_POR_DEFECTO, textoAlertaTemprana } from '../public/js/alerta-campos.js';
 import { distanciaSql, dentroDelRadioSql } from './geocerca.js';
+
+export { ETIQUETA_NO_VERIFICADA } from '../public/js/alerta-campos.js';
 
 export const LIMITE_ALERTA_TEMPRANA_HORAS = Number(process.env.LIMITE_ALERTA_TEMPRANA_HORAS ?? 24);
 
 if (!Number.isFinite(LIMITE_ALERTA_TEMPRANA_HORAS) || LIMITE_ALERTA_TEMPRANA_HORAS < 0) {
   throw new Error('LIMITE_ALERTA_TEMPRANA_HORAS debe ser un número mayor o igual a cero.');
 }
-
-export const ETIQUETA_NO_VERIFICADA = 'Pendiente / En revisión – No verificada';
 
 // Nombre comparable para detectar duplicados: sin tildes, mayúsculas ni signos.
 export function normalizarNombre(nombre) {
@@ -44,9 +45,22 @@ async function superaLimitePorReportante(client, caso) {
   return rows.length > 0;
 }
 
-function textoAlertaTemprana(caso) {
-  const zona = [caso.barrio, caso.ciudad, caso.departamento].filter(Boolean).join(', ');
-  return `${ETIQUETA_NO_VERIFICADA}. Zona: ${zona}.`;
+// Fila de casos → la forma que usa public/js/alerta-campos.js.
+export function casoParaAlerta(row) {
+  return {
+    nombreCompleto: row.nombre_completo,
+    edad: row.edad,
+    sexo: row.sexo,
+    departamento: row.departamento,
+    ciudad: row.ciudad,
+    barrio: row.barrio,
+    descripcionFisica: row.descripcion_fisica,
+    vestimenta: row.vestimenta
+  };
+}
+
+export function camposDeAlerta(row) {
+  return Array.isArray(row.alerta_campos) ? row.alerta_campos : CAMPOS_POR_DEFECTO;
 }
 
 // Usuarios con alertas de zona activas dentro del radio del caso, con su
@@ -88,7 +102,7 @@ export async function enviarAlertaTemprana(client, caso, { push } = {}) {
     FROM zona z WHERE ${dentroDelRadioSql('z.distancia')}
     ON CONFLICT DO NOTHING
     RETURNING id, usuario_id, canal
-  `, [caso.latitud, caso.longitud, caso.reportado_por_usr_id, caso.id, textoAlertaTemprana(caso),
+  `, [caso.latitud, caso.longitud, caso.reportado_por_usr_id, caso.id, textoAlertaTemprana(casoParaAlerta(caso), camposDeAlerta(caso)),
     Boolean(push?.disponible)]);
   await client.query('UPDATE casos SET alerta_temprana_en = CURRENT_TIMESTAMP WHERE id = $1', [caso.id]);
   return { enviada: true, motivo: null, notificaciones: rows };

@@ -3,6 +3,8 @@
 // notificaciones. Nunca se registran claves ni endpoints en los logs.
 import { createHash } from 'node:crypto';
 import webpush from 'web-push';
+import { cuerpoPushAlertaTemprana } from '../public/js/alerta-campos.js';
+import { camposDeAlerta, casoParaAlerta } from './alertas.js';
 
 const UN_DIA_SEGUNDOS = 24 * 60 * 60;
 const ENVIOS_SIMULTANEOS = 10;
@@ -14,11 +16,12 @@ const topicCaso = casoId => createHash('sha256').update(String(casoId)).digest('
 
 // Lo que se muestra en el dispositivo: texto genérico, sin nombre, edad, foto ni
 // ubicación de la persona. Los detalles se ven al abrir la app.
-export function cargaPush(tipo, casoId) {
+// caso: la fila de casos (para la ciudad, si el reportante la eligió).
+export function cargaPush(tipo, casoId, caso = {}) {
   const id = encodeURIComponent(casoId);
   if (tipo === 'ALERTA_TEMPRANA') {
     return {
-      carga: { titulo: 'Rastreo PY', cuerpo: 'Alerta en tu zona: caso en revisión, aún no verificado', url: `/app/#/alerta/${id}`, tag: tagCaso(casoId), discreta: true },
+      carga: { titulo: 'Rastreo PY', cuerpo: cuerpoPushAlertaTemprana(casoParaAlerta(caso), camposDeAlerta(caso)), url: `/app/#/alerta/${id}`, tag: tagCaso(casoId), discreta: true },
       opciones: { TTL: UN_DIA_SEGUNDOS, urgency: 'low', topic: topicCaso(casoId) }
     };
   }
@@ -48,15 +51,17 @@ function resultadoFinal(estados) {
 // usuario y anota el resultado en notificaciones.push_resultado.
 export async function entregarPush(db, push, ids) {
   const { rows } = await db.query(`
-    SELECT n.id, n.tipo, n.caso_id, s.id AS suscripcion_id, s.endpoint, s.p256dh, s.auth
+    SELECT n.id, n.tipo, n.caso_id, c.ciudad, c.alerta_campos,
+      s.id AS suscripcion_id, s.endpoint, s.p256dh, s.auth
     FROM notificaciones n
+    JOIN casos c ON c.id = n.caso_id
     JOIN alertas_zona a ON a.usuario_id = n.usuario_id
     JOIN suscripciones_push s ON s.usuario_id = n.usuario_id
     WHERE n.id = ANY($1::bigint[]) AND n.canal = 'push'
   `, [ids]);
   const estados = new Map(ids.map(id => [String(id), []]));
   const enviarUno = async row => {
-    const mensaje = cargaPush(row.tipo, row.caso_id);
+    const mensaje = cargaPush(row.tipo, row.caso_id, row);
     if (!mensaje) return;
     try {
       await push.enviar(
