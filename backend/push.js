@@ -9,10 +9,19 @@ import { camposDeAlerta, casoParaAlerta } from './alertas.js';
 const UN_DIA_SEGUNDOS = 24 * 60 * 60;
 const ENVIOS_SIMULTANEOS = 10;
 
+// Más de este número de alertas tempranas por push en una hora para la misma
+// persona: en vez de una por una, un único aviso que las agrupa. 0 = sin agrupar.
+export const LIMITE_PUSH_TEMPRANAS_POR_HORA = Number(process.env.LIMITE_PUSH_TEMPRANAS_POR_HORA ?? 3);
+
+if (!Number.isInteger(LIMITE_PUSH_TEMPRANAS_POR_HORA) || LIMITE_PUSH_TEMPRANAS_POR_HORA < 0) {
+  throw new Error('LIMITE_PUSH_TEMPRANAS_POR_HORA debe ser un número entero mayor o igual a cero.');
+}
+
 // Mismo tag (en el dispositivo) y topic (en el servicio push) por caso: un aviso
 // nuevo del mismo caso reemplaza al anterior en vez de acumularse.
 const tagCaso = casoId => `rastreo-caso-${casoId}`;
 const topicCaso = casoId => createHash('sha256').update(String(casoId)).digest('base64url').slice(0, 32);
+const TAG_AGRUPADAS = 'rastreo-alertas-agrupadas';
 const BOTON_VER = [{ accion: 'ver', titulo: 'Ver' }];
 
 // Lo que se muestra en el dispositivo: sin nombre, edad, foto ni ubicación
@@ -53,6 +62,19 @@ export function cargaPush(tipo, casoId, caso = {}, { distanciaKm = null } = {}) 
   return null;
 }
 
+// Un solo aviso para varias alertas tempranas seguidas: reemplaza al agrupado
+// anterior (mismo tag en el dispositivo y mismo topic en el servicio push).
+export function cargaPushAgrupada(cantidad) {
+  return {
+    carga: {
+      titulo: 'Alertas en tu zona',
+      cuerpo: `Hay ${cantidad} casos en revisión en tu zona. Aún no están verificados.`,
+      url: '/app/#/alertas', tag: TAG_AGRUPADAS, discreta: true, acciones: BOTON_VER
+    },
+    opciones: { TTL: UN_DIA_SEGUNDOS, urgency: 'low', topic: 'alertas-agrupadas' }
+  };
+}
+
 function resultadoFinal(estados) {
   if (estados.includes('enviado')) return 'enviado';
   if (estados.includes('fallido')) return 'fallido';
@@ -66,7 +88,10 @@ function resultadoFinal(estados) {
 export async function entregarPush(db, push, ids) {
   const { rows } = await db.query(`
     SELECT n.id, n.tipo, n.caso_id, n.distancia_km, c.ciudad, c.barrio, c.alerta_campos,
-      s.id AS suscripcion_id, s.endpoint, s.p256dh, s.auth
+      s.id AS suscripcion_id, s.endpoint, s.p256dh, s.auth,
+      (SELECT COUNT(*)::integer FROM notificaciones r
+        WHERE r.usuario_id = n.usuario_id AND r.tipo = 'ALERTA_TEMPRANA' AND r.canal = 'push'
+          AND r.creada_en > CURRENT_TIMESTAMP - INTERVAL '1 hour' AND r.id <= n.id) AS tempranas_ultima_hora
     FROM notificaciones n
     JOIN casos c ON c.id = n.caso_id
     JOIN alertas_zona a ON a.usuario_id = n.usuario_id
@@ -74,13 +99,17 @@ export async function entregarPush(db, push, ids) {
     WHERE n.id = ANY($1::bigint[]) AND n.canal = 'push' AND n.push_resultado IS NULL
   `, [ids]);
   const estados = new Map(rows.map(row => [String(row.id), []]));
+  const limite = push.limiteTempranasPorHora;
   const enviarUno = async row => {
-    const mensaje = cargaPush(row.tipo, row.caso_id, row, { distanciaKm: row.distancia_km });
+    const agrupar = row.tipo === 'ALERTA_TEMPRANA' && limite > 0 && row.tempranas_ultima_hora > limite;
+    const mensaje = agrupar
+      ? cargaPushAgrupada(row.tempranas_ultima_hora)
+      : cargaPush(row.tipo, row.caso_id, row, { distanciaKm: row.distancia_km });
     if (!mensaje) return;
     try {
       await push.enviar(
         { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } },
-        JSON.stringify({ ...mensaje.carga, casoId: row.caso_id, tipo: row.tipo }),
+        JSON.stringify({ ...mensaje.carga, casoId: agrupar ? null : row.caso_id, tipo: row.tipo, agrupada: agrupar }),
         mensaje.opciones
       );
       estados.get(String(row.id)).push('enviado');
@@ -109,7 +138,8 @@ export async function entregarPush(db, push, ids) {
 }
 
 // cliente: la librería web-push, o un reemplazo en los tests.
-export function crearPush({ publicKey, privateKey, subject, cliente = webpush } = {}) {
+// limiteTempranasPorHora: ver LIMITE_PUSH_TEMPRANAS_POR_HORA.
+export function crearPush({ publicKey, privateKey, subject, cliente = webpush, limiteTempranasPorHora = LIMITE_PUSH_TEMPRANAS_POR_HORA } = {}) {
   let disponible = Boolean(publicKey && privateKey && subject);
   if (disponible) {
     try {
@@ -123,6 +153,7 @@ export function crearPush({ publicKey, privateKey, subject, cliente = webpush } 
   return {
     disponible,
     clavePublica: disponible ? publicKey : null,
+    limiteTempranasPorHora,
     enviar: (suscripcion, carga, opciones) => cliente.sendNotification(suscripcion, carga, opciones),
     // Después del commit y sin demorar la respuesta HTTP.
     programar(db, notificaciones) {

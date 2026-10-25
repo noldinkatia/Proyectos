@@ -32,6 +32,9 @@ services:
       # Alertas de zona: una alerta temprana por reportante cada 24 h (0 = sin límite).
       - key: LIMITE_ALERTA_TEMPRANA_HORAS
         value: "24"
+      # Más alertas tempranas por push que esto en una hora llegan en un solo aviso agrupado (0 = no agrupar).
+      - key: LIMITE_PUSH_TEMPRANAS_POR_HORA
+        value: "3"
       # Neon exige conexiones cifradas.
       - key: DATABASE_SSL
         value: "true"

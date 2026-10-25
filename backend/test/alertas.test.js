@@ -13,7 +13,7 @@ import {
 import { normalizarNombre } from '../alertas.js';
 import { createDatabase, initializeDatabase, seedAdministrator } from '../db.js';
 import { dentroDelRadio, distanciaKm, RADIO_ALERTA_KM, ubicacionAproximada } from '../geocerca.js';
-import { cargaPush, crearPush } from '../push.js';
+import { cargaPush, cargaPushAgrupada, crearPush } from '../push.js';
 import { createApp } from '../server.js';
 
 const secret = 'test-secret-with-at-least-thirty-two-characters';
@@ -97,8 +97,11 @@ test('push: la oficial destaca y la temprana es discreta, con zona, distancia y 
   assert.equal(oficial.carga.cuerpo, 'Persona desaparecida a unos 50 km. Caso verificado por la administración: tocá para ver la ficha.');
   assert.equal(oficial.opciones.urgency, 'high');
   assert.equal(cargaPush('ALERTA_OFICIAL', 'cas_1').carga.titulo, 'Alerta oficial en tu zona');
+  const agrupada = cargaPushAgrupada(4);
+  assert.deepEqual([agrupada.carga.titulo, agrupada.carga.cuerpo, agrupada.carga.discreta, agrupada.opciones.urgency],
+    ['Alertas en tu zona', 'Hay 4 casos en revisión en tu zona. Aún no están verificados.', true, 'low']);
   // Nada que parezca un mensaje masivo: sin emojis, signos repetidos ni mayúsculas sostenidas.
-  for (const { carga } of [temprana, conZona, oficial, cargaPush('ALERTA_LOCALIZADO', 'cas_1')]) {
+  for (const { carga } of [temprana, conZona, oficial, agrupada, cargaPush('ALERTA_LOCALIZADO', 'cas_1')]) {
     const texto = `${carga.titulo} ${carga.cuerpo}`;
     assert.doesNotMatch(texto, /\p{Extended_Pictographic}|[!¡]|\b[A-ZÁÉÍÓÚÑ]{4,}\b/u, texto);
   }
@@ -363,6 +366,100 @@ test('alertas de zona con PostgreSQL: radio, retractación, oficial, localizado,
     await db.query('DELETE FROM notificaciones WHERE caso_id = ANY($1) OR usuario_id = ANY($2)', [caseIds, userIds]);
     await db.query('DELETE FROM cambios_estado_pista WHERE pista_id IN (SELECT id FROM pistas WHERE caso_id = ANY($1))', [caseIds]);
     await db.query('DELETE FROM pistas WHERE caso_id = ANY($1)', [caseIds]);
+    await db.query('DELETE FROM suscripciones_caso WHERE caso_id = ANY($1)', [caseIds]);
+    await db.query('DELETE FROM cambios_estado_caso WHERE caso_id = ANY($1)', [caseIds]);
+    await db.query('DELETE FROM casos WHERE id = ANY($1)', [caseIds]);
+    await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [userIds]);
+    await db.end();
+  }
+});
+
+test('push con PostgreSQL: más alertas tempranas por hora que el límite llegan agrupadas; la oficial no se agrupa', {
+  skip: !testDatabaseUrl && 'Defina TEST_DATABASE_URL para ejecutar la prueba de integración con PostgreSQL.'
+}, async () => {
+  const db = createDatabase(testDatabaseUrl);
+  const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
+  const cliente = webPushSimulado();
+  const push = crearPush({ publicKey: 'BPublica', privateKey: 'privada', subject: 'mailto:test@rastreo.py', cliente, limiteTempranasPorHora: 2 });
+  const userIds = [];
+  const caseIds = [];
+  let server;
+  const [lat0, lng0] = [-22.5, -61.5];
+  try {
+    await initializeDatabase(db);
+    const adminEmail = `alertas.agrupar.admin.${suffix}@gmail.com`;
+    await seedAdministrator(db, adminEmail, 'Integration-test-password-123');
+    const adminId = (await db.query('SELECT id FROM usuarios WHERE correo = $1', [adminEmail])).rows[0].id;
+    userIds.push(adminId);
+    const crearUsuario = async nombre => {
+      const { rows } = await db.query(`
+        INSERT INTO usuarios (nombre_completo, correo, contrasena_hash, rol, verificado, acepto_terminos)
+        VALUES ($1, $2, 'sin-uso', 'ciudadano', TRUE, TRUE) RETURNING id
+      `, [nombre, `${nombre}.agrupar.${suffix}@gmail.com`]);
+      userIds.push(rows[0].id);
+      return rows[0].id;
+    };
+    const vecino = await crearUsuario('vecino');
+    await db.query('INSERT INTO alertas_zona (usuario_id, latitud, longitud) VALUES ($1, $2, $3)', [vecino, lat0, lng0]);
+    await db.query('INSERT INTO suscripciones_push (usuario_id, endpoint, p256dh, auth) VALUES ($1, $2, $3, $4)',
+      [vecino, `https://push.example/agrupar-${suffix}`, 'BClave', 'auth']);
+    server = createApp({ db, mailer: { sendMail: async () => {} }, jwtSecret: secret, appUrl: 'http://127.0.0.1', push })
+      .listen(0, '127.0.0.1');
+    await new Promise(resolve => server.once('listening', resolve));
+    const api = async (method, path, id, body, rol = 'ciudadano') => {
+      const response = await fetch(`http://127.0.0.1:${server.address().port}/api${path}`, {
+        method,
+        headers: { Authorization: `Bearer ${jwt.sign({ id, rol }, secret)}`, 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      return { status: response.status, body: await response.json().catch(() => ({})) };
+    };
+
+    // Cuatro reportes de cuatro personas distintas, todos cerca del vecino.
+    for (const [indice, nombre] of ['Ana', 'Berta', 'Carla', 'Dora'].entries()) {
+      const reportante = await crearUsuario(`reportante${indice}`);
+      const creado = await api('POST', '/casos', reportante, {
+        nombreCompleto: `${nombre} Agrupada ${suffix}`, edad: 30 + indice * 10, sexo: 'Femenino', departamento: 'Central',
+        ciudad: 'Luque', descripcionFisica: 'Descripción', vestimenta: 'Vestimenta',
+        fechaHoraDesaparicion: new Date().toISOString(), ubicacion: { lat: lat0, lng: lng0 + 0.1 },
+        declaraMayorEdad: true, autorizacionParental: false, avisoPrivacidadAceptado: true
+      });
+      assert.equal(creado.status, 201, JSON.stringify(creado.body));
+      caseIds.push(creado.body.caso.id);
+      await push.esperar();
+    }
+    const tempranas = cliente.envios.filter(envio => envio.carga.tipo === 'ALERTA_TEMPRANA');
+    assert.equal(tempranas.length, 4, 'un aviso por alerta, pero las de más llegan agrupadas');
+    assert.deepEqual(tempranas.slice(0, 2).map(envio => envio.carga.tag), caseIds.slice(0, 2).map(id => `rastreo-caso-${id}`));
+    assert.deepEqual(tempranas.slice(2).map(envio => [envio.carga.tag, envio.carga.titulo, envio.carga.cuerpo, envio.carga.casoId, envio.opciones.urgency]), [
+      ['rastreo-alertas-agrupadas', 'Alertas en tu zona', 'Hay 3 casos en revisión en tu zona. Aún no están verificados.', null, 'low'],
+      ['rastreo-alertas-agrupadas', 'Alertas en tu zona', 'Hay 4 casos en revisión en tu zona. Aún no están verificados.', null, 'low']
+    ]);
+    const resultados = await db.query(`
+      SELECT push_resultado FROM notificaciones WHERE usuario_id = $1 AND tipo = 'ALERTA_TEMPRANA'
+    `, [vecino]);
+    assert.deepEqual(resultados.rows.map(row => row.push_resultado), ['enviado', 'enviado', 'enviado', 'enviado']);
+
+    // La oficial nunca se agrupa: sale con su caso, sonido y urgencia alta.
+    const validado = await api('POST', `/admin/casos/${caseIds[3]}/estado`, adminId, {
+      estado: 'VALIDADO', numeroDenuncia: 'DEN-AGRUPAR', verificoDenuncia: true, datosCoherentes: true,
+      duplicadosVerificados: true, menorValidado: true
+    }, 'administrador');
+    assert.equal(validado.status, 200, JSON.stringify(validado.body));
+    await push.esperar();
+    const oficial = cliente.envios.find(envio => envio.carga.tipo === 'ALERTA_OFICIAL');
+    assert.deepEqual([oficial.carga.tag, oficial.carga.titulo, oficial.carga.discreta, oficial.opciones.urgency],
+      [`rastreo-caso-${caseIds[3]}`, 'Alerta oficial · Luque', false, 'high']);
+
+    // La retractación nunca sale como push.
+    const enviosAntes = cliente.envios.length;
+    const rechazado = await api('POST', `/admin/casos/${caseIds[0]}/estado`, adminId, { estado: 'RECHAZADO', motivo: 'Prueba' }, 'administrador');
+    assert.equal(rechazado.status, 200, JSON.stringify(rechazado.body));
+    await push.esperar();
+    assert.equal(cliente.envios.length, enviosAntes);
+  } finally {
+    if (server) await new Promise(resolve => server.close(resolve));
+    await db.query('DELETE FROM notificaciones WHERE caso_id = ANY($1) OR usuario_id = ANY($2)', [caseIds, userIds]);
     await db.query('DELETE FROM suscripciones_caso WHERE caso_id = ANY($1)', [caseIds]);
     await db.query('DELETE FROM cambios_estado_caso WHERE caso_id = ANY($1)', [caseIds]);
     await db.query('DELETE FROM casos WHERE id = ANY($1)', [caseIds]);
