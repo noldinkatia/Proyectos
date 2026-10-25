@@ -27,7 +27,7 @@ export { processDueFollowups } from './followups.js';
 
 // Router de /api: define los permisos comunes y las rutas de casos del ciudadano,
 // y monta los routers de pistas, notificaciones, estadísticas y administración.
-export function createCaseRouter({ db, jwtSecret }) {
+export function createCaseRouter({ db, jwtSecret, push }) {
   const router = express.Router();
   const requireUser = authenticate(jwtSecret, db);
   const requireAdmin = [requireUser, requireAdministrator];
@@ -128,6 +128,7 @@ export function createCaseRouter({ db, jwtSecret }) {
     }
     const denuncia = typeof body.numeroDenuncia === 'string' ? body.numeroDenuncia.trim() : '';
     const id = `cas_${randomUUID()}`;
+    let alertasPush = [];
     const created = await withTransaction(db, async client => {
       const { rows } = await client.query(`
         INSERT INTO casos (
@@ -158,9 +159,10 @@ export function createCaseRouter({ db, jwtSecret }) {
         SELECT id, $1, 'Nuevo reporte para validar', $2, 'CASO_PENDIENTE'
         FROM usuarios WHERE rol = 'administrador'
       `, [id, `Se recibió un reporte de ${body.nombreCompleto.trim()} y espera validación.`]);
-      await enviarAlertaTemprana(client, rows[0]);
+      alertasPush = (await enviarAlertaTemprana(client, rows[0], { push })).notificaciones;
       return rows[0];
     });
+    push.programar(db, alertasPush);
     res.status(201).json({ caso: toOwnerCase(created) });
   }));
 
@@ -174,6 +176,7 @@ export function createCaseRouter({ db, jwtSecret }) {
       return res.status(400).json({ error: 'Debe justificar el cierre del caso.' });
     }
 
+    let alertasPush = [];
     const updated = await withTransaction(db, async client => {
       const { rows } = await client.query(`
         SELECT * FROM casos
@@ -203,7 +206,7 @@ export function createCaseRouter({ db, jwtSecret }) {
           INSERT INTO cambios_estado_caso (caso_id, estado_anterior, estado_nuevo, cambiado_por)
           VALUES ($1, $2, $3, $4)
         `, [req.params.id, current.estado, state, req.auth.id]);
-        await alertasPorCambioDeEstado(client, current, state);
+        alertasPush = await alertasPorCambioDeEstado(client, current, state, { push });
       }
       if (state === 'LOCALIZADO') {
         await client.query(`
@@ -215,10 +218,11 @@ export function createCaseRouter({ db, jwtSecret }) {
       return updatedRows[0];
     });
     if (!updated) return res.status(404).json({ error: 'Caso no disponible para seguimiento.' });
+    push.programar(db, alertasPush);
     res.json({ caso: toOwnerCase(updated) });
   }));
 
-  const shared = { db, requireUser, requireAdmin, requireCitizen, publicReadLimiter };
+  const shared = { db, requireUser, requireAdmin, requireCitizen, publicReadLimiter, push };
   router.use(createClueRouter(shared));
   router.use(createNotificationRouter(shared));
   router.use(createAlertRouter(shared));

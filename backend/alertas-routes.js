@@ -2,20 +2,39 @@ import express from 'express';
 import { ETIQUETA_NO_VERIFICADA } from './alertas.js';
 import { asyncRoute } from './auth-routes.js';
 import { caseVisibilityParameters, PUBLIC_CASE_FILTER_JOINED, validCoordinates } from './case-shared.js';
+import { withTransaction } from './db.js';
 import { ubicacionAproximada } from './geocerca.js';
 
 // "Alertas de mi zona": el ciudadano da su consentimiento y su ubicación
 // aproximada; puede desactivarlas cuando quiera, y eso borra la ubicación.
 // Las coordenadas nunca se devuelven ni se registran en los logs.
-export function createAlertRouter({ db, requireCitizen, requireUser }) {
+// Suscripción Web Push del navegador (PushSubscription.toJSON()). null si no vino
+// o no tiene la forma esperada.
+function suscripcionValida(valor) {
+  const endpoint = valor?.endpoint;
+  const { p256dh, auth } = valor?.keys || {};
+  const base64url = /^[A-Za-z0-9_-]+={0,2}$/;
+  if (typeof endpoint !== 'string' || endpoint.length > 2048 || !/^https:\/\/\S+$/.test(endpoint)) return null;
+  if (typeof p256dh !== 'string' || p256dh.length > 256 || !base64url.test(p256dh)) return null;
+  if (typeof auth !== 'string' || auth.length > 256 || !base64url.test(auth)) return null;
+  return { endpoint, p256dh, auth };
+}
+
+export function createAlertRouter({ db, requireCitizen, requireUser, push }) {
   const router = express.Router();
 
   router.get('/alertas-zona', ...requireCitizen, asyncRoute(async (req, res) => {
-    const { rows } = await db.query(
-      'SELECT actualizada_en FROM alertas_zona WHERE usuario_id = $1',
-      [req.auth.id]
-    );
-    res.json({ activa: Boolean(rows[0]), actualizadaEn: rows[0]?.actualizada_en || null });
+    const { rows } = await db.query(`
+      SELECT a.actualizada_en,
+        (SELECT COUNT(*) FROM suscripciones_push s WHERE s.usuario_id = a.usuario_id) AS dispositivos
+      FROM alertas_zona a WHERE a.usuario_id = $1
+    `, [req.auth.id]);
+    res.json({
+      activa: Boolean(rows[0]),
+      actualizadaEn: rows[0]?.actualizada_en || null,
+      dispositivos: Number(rows[0]?.dispositivos || 0),
+      push: { disponible: push.disponible, clavePublica: push.clavePublica }
+    });
   }));
 
   router.put('/alertas-zona', ...requireCitizen, asyncRoute(async (req, res) => {
@@ -27,18 +46,37 @@ export function createAlertRouter({ db, requireCitizen, requireUser }) {
     if (!validCoordinates(lat, lng)) {
       return res.status(400).json({ error: 'La ubicación no es válida.' });
     }
-    await db.query(`
-      INSERT INTO alertas_zona (usuario_id, latitud, longitud)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (usuario_id) DO UPDATE SET
-        latitud = EXCLUDED.latitud, longitud = EXCLUDED.longitud,
-        actualizada_en = CURRENT_TIMESTAMP
-    `, [req.auth.id, ubicacionAproximada(lat), ubicacionAproximada(lng)]);
-    res.json({ activa: true, mensaje: 'Alertas de tu zona activadas.' });
+    const suscripcion = req.body?.suscripcion === undefined ? null : suscripcionValida(req.body.suscripcion);
+    if (req.body?.suscripcion !== undefined && !suscripcion) {
+      return res.status(400).json({ error: 'La suscripción de notificaciones del dispositivo no es válida.' });
+    }
+    await withTransaction(db, async client => {
+      await client.query(`
+        INSERT INTO alertas_zona (usuario_id, latitud, longitud)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (usuario_id) DO UPDATE SET
+          latitud = EXCLUDED.latitud, longitud = EXCLUDED.longitud,
+          actualizada_en = CURRENT_TIMESTAMP
+      `, [req.auth.id, ubicacionAproximada(lat), ubicacionAproximada(lng)]);
+      // Un dispositivo es de una sola cuenta: si otra lo había suscrito, pasa a esta.
+      if (suscripcion) {
+        await client.query(`
+          INSERT INTO suscripciones_push (usuario_id, endpoint, p256dh, auth)
+          VALUES ($1, $2, $3, $4)
+          ON CONFLICT (endpoint) DO UPDATE SET
+            usuario_id = EXCLUDED.usuario_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth,
+            ultimo_error_en = NULL
+        `, [req.auth.id, suscripcion.endpoint, suscripcion.p256dh, suscripcion.auth]);
+      }
+    });
+    res.json({ activa: true, push: Boolean(suscripcion) && push.disponible, mensaje: 'Alertas de tu zona activadas.' });
   }));
 
   router.delete('/alertas-zona', ...requireCitizen, asyncRoute(async (req, res) => {
-    await db.query('DELETE FROM alertas_zona WHERE usuario_id = $1', [req.auth.id]);
+    await withTransaction(db, async client => {
+      await client.query('DELETE FROM suscripciones_push WHERE usuario_id = $1', [req.auth.id]);
+      await client.query('DELETE FROM alertas_zona WHERE usuario_id = $1', [req.auth.id]);
+    });
     res.json({ activa: false, mensaje: 'Alertas desactivadas y ubicación borrada.' });
   }));
 

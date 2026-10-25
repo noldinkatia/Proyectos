@@ -57,9 +57,17 @@ const DESTINATARIOS_EN_RADIO = `
   WHERE u.rol = 'ciudadano' AND u.verificado AND a.usuario_id IS DISTINCT FROM $3::integer
 `;
 
+// 'push' si el push está configurado y el usuario tiene algún dispositivo
+// suscrito; si no, 'app' (solo el centro de notificaciones).
+function canalSql(columnaUsuario, parametroPush) {
+  return `CASE WHEN ${parametroPush}::boolean AND EXISTS (
+    SELECT 1 FROM suscripciones_push s WHERE s.usuario_id = ${columnaUsuario}
+  ) THEN 'push' ELSE 'app' END`;
+}
+
 // Al registrar un reporte: alerta temprana a la zona, salvo duplicado crítico o
 // si el reportante ya generó una dentro del límite de horas.
-export async function enviarAlertaTemprana(client, caso) {
+export async function enviarAlertaTemprana(client, caso, { push } = {}) {
   const duplicado = await buscarDuplicadoCritico(client, caso);
   if (duplicado) {
     await client.query(`
@@ -76,11 +84,12 @@ export async function enviarAlertaTemprana(client, caso) {
     WITH zona AS (${DESTINATARIOS_EN_RADIO})
     INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo, distancia_km, canal)
     SELECT z.usuario_id, $4, 'Alerta en tu zona: caso en revisión', $5, 'ALERTA_TEMPRANA',
-      ROUND(z.distancia::numeric, 1), 'app'
+      ROUND(z.distancia::numeric, 1), ${canalSql('z.usuario_id', '$6')}
     FROM zona z WHERE ${dentroDelRadioSql('z.distancia')}
     ON CONFLICT DO NOTHING
     RETURNING id, usuario_id, canal
-  `, [caso.latitud, caso.longitud, caso.reportado_por_usr_id, caso.id, textoAlertaTemprana(caso)]);
+  `, [caso.latitud, caso.longitud, caso.reportado_por_usr_id, caso.id, textoAlertaTemprana(caso),
+    Boolean(push?.disponible)]);
   await client.query('UPDATE casos SET alerta_temprana_en = CURRENT_TIMESTAMP WHERE id = $1', [caso.id]);
   return { enviada: true, motivo: null, notificaciones: rows };
 }
@@ -96,19 +105,20 @@ const ALERTADOS_ACTIVOS = `
 
 // Al validar: alerta oficial (el caso ya es público) a la zona actual y a quienes
 // recibieron la alerta temprana aunque ya no estén dentro del radio.
-async function alertaOficial(client, caso) {
+async function alertaOficial(client, caso, push) {
   const { rows } = await client.query(`
     WITH zona AS (${DESTINATARIOS_EN_RADIO})
     INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo, distancia_km, canal)
     SELECT z.usuario_id, $4, 'Alerta oficial en tu zona', $5, 'ALERTA_OFICIAL',
-      ROUND(z.distancia::numeric, 1), 'app'
+      ROUND(z.distancia::numeric, 1), ${canalSql('z.usuario_id', '$6')}
     FROM zona z
     WHERE ${dentroDelRadioSql('z.distancia')}
       OR z.usuario_id IN (SELECT usuario_id FROM notificaciones WHERE caso_id = $4 AND tipo = 'ALERTA_TEMPRANA')
     ON CONFLICT DO NOTHING
     RETURNING id, usuario_id, canal
   `, [caso.latitud, caso.longitud, caso.reportado_por_usr_id, caso.id,
-    `Persona desaparecida en ${caso.ciudad}. El caso fue verificado por la administración: abrí la ficha para ver los datos.`]);
+    `Persona desaparecida en ${caso.ciudad}. El caso fue verificado por la administración: abrí la ficha para ver los datos.`,
+    Boolean(push?.disponible)]);
   return rows;
 }
 
@@ -126,16 +136,18 @@ async function retractacion(client, caso) {
 
 // Al localizar: los suscritos al caso ya reciben CASO_LOCALIZADO; acá se avisa
 // al resto de los alertados.
-async function avisoLocalizado(client, caso) {
+async function avisoLocalizado(client, caso, push) {
   const { rows } = await client.query(`
     INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo, distancia_km, canal)
-    SELECT d.usuario_id, $1, 'Caso de tu zona resuelto', $2, 'ALERTA_LOCALIZADO', d.distancia_km, 'app'
+    SELECT d.usuario_id, $1, 'Caso de tu zona resuelto', $2, 'ALERTA_LOCALIZADO', d.distancia_km,
+      ${canalSql('d.usuario_id', '$4')}
     FROM (${ALERTADOS_ACTIVOS}) d
     WHERE d.usuario_id IS DISTINCT FROM $3::integer
       AND d.usuario_id NOT IN (SELECT usuario_id FROM suscripciones_caso WHERE caso_id = $1)
     ON CONFLICT DO NOTHING
     RETURNING id, usuario_id, canal
-  `, [caso.id, 'La persona del caso de tu zona fue localizada. Gracias por estar atento.', caso.reportado_por_usr_id]);
+  `, [caso.id, 'La persona del caso de tu zona fue localizada. Gracias por estar atento.', caso.reportado_por_usr_id,
+    Boolean(push?.disponible)]);
   return rows;
 }
 
@@ -160,14 +172,14 @@ async function avisoCerrado(client, caso) {
 // Avisos de zona por cambio de estado (administración o seguimiento del
 // reportante). Apaga la geocerca al localizar, cerrar o rechazar, y devuelve las
 // notificaciones creadas que pueden salir por push.
-export async function alertasPorCambioDeEstado(client, caso, estadoNuevo) {
+export async function alertasPorCambioDeEstado(client, caso, estadoNuevo, { push } = {}) {
   await client.query('UPDATE casos SET geocerca_activa = $2 WHERE id = $1',
     [caso.id, ['PENDIENTE', 'VALIDADO', 'EN_SEGUIMIENTO'].includes(estadoNuevo)]);
   if (estadoNuevo === 'VALIDADO' && !['VALIDADO', 'EN_SEGUIMIENTO'].includes(caso.estado)) {
-    return alertaOficial(client, caso);
+    return alertaOficial(client, caso, push);
   }
   if (estadoNuevo === 'RECHAZADO') return retractacion(client, caso);
-  if (estadoNuevo === 'LOCALIZADO') return avisoLocalizado(client, caso);
+  if (estadoNuevo === 'LOCALIZADO') return avisoLocalizado(client, caso, push);
   if (estadoNuevo === 'CERRADO') return avisoCerrado(client, caso);
   return [];
 }

@@ -13,6 +13,7 @@ import {
 import { asyncRoute, authenticate, createAuthRouter, requireAdministrator } from './auth-routes.js';
 import { createCaseRouter, processDueFollowups } from './case-routes.js';
 import { enviarCorreo, modoCorreo } from './mailer.js';
+import { pushDesdeEntorno } from './push.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
@@ -31,7 +32,8 @@ export function trustProxyHops(value = process.env.TRUST_PROXY_HOPS) {
   return hops;
 }
 
-export function createApp({ db, mailer, jwtSecret, appUrl = process.env.APP_URL }) {
+// push: notificaciones Web Push (push.js); los tests inyectan uno con web-push simulado.
+export function createApp({ db, mailer, jwtSecret, appUrl = process.env.APP_URL, push = pushDesdeEntorno() }) {
   const app = express();
   app.set('trust proxy', trustProxyHops());
 
@@ -65,7 +67,7 @@ export function createApp({ db, mailer, jwtSecret, appUrl = process.env.APP_URL 
   }));
 
   app.use(express.json({ limit: '12mb' }));
-  app.use('/api', createCaseRouter({ db, jwtSecret }));
+  app.use('/api', createCaseRouter({ db, jwtSecret, push }));
   app.use('/api/auth', createAuthRouter({ db, mailer, jwtSecret }));
 
   app.get('/api/auth/me', authenticate(jwtSecret, db), asyncRoute(async (req, res) => {
@@ -200,9 +202,11 @@ async function start() {
   await ensureAdministrator(db, normalizeEmail(process.env.ADMIN_IDENTIFICADOR), process.env.ADMIN_PASSWORD);
   // Los tests inyectan su propio mailer.sendMail; acá va el envío real.
   const mailer = { sendMail: enviarCorreo };
+  const push = pushDesdeEntorno();
   const app = createApp({
     db,
     mailer,
+    push,
     jwtSecret: process.env.JWT_SECRET,
     appUrl: process.env.APP_URL
   });
@@ -215,6 +219,7 @@ async function start() {
   app.listen(port, '0.0.0.0', () => {
     console.log(`Servidor Rastreo PY disponible en el puerto ${port}.`);
     console.log(`Envío de correos: ${modoCorreo()}.`);
+    console.log(`Notificaciones push: ${push.disponible ? 'activadas' : 'desactivadas (faltan VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY o VAPID_SUBJECT)'}.`);
     console.log(`Proxies de confianza (TRUST_PROXY_HOPS): ${trustProxyHops()}. Para verificar que se ve la IP real de cada cliente, abrí ${process.env.APP_URL.replace(/\/$/, '')}/api/admin/diagnostico-red con sesión de administrador.`);
   });
 }
