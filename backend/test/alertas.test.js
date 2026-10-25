@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import jwt from 'jsonwebtoken';
 import {
@@ -419,6 +420,134 @@ test('sin claves VAPID con PostgreSQL: las alertas quedan en el centro (canal ap
       await db.query('DELETE FROM casos WHERE id = $1', [casoId]);
     }
     await db.query('DELETE FROM notificaciones WHERE usuario_id = ANY($1)', [userIds]);
+    await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [userIds]);
+    await db.end();
+  }
+});
+
+test('cerrar sesión da de baja la suscripción push de este dispositivo (servidor y navegador)', async () => {
+  const llamadas = [];
+  let desuscripta = false;
+  const suscripcion = { endpoint: 'https://push.example/este-dispositivo', unsubscribe: async () => { desuscripta = true; return true; } };
+  const anteriores = {
+    navigator: Object.getOwnPropertyDescriptor(globalThis, 'navigator'),
+    PushManager: globalThis.PushManager,
+    sessionStorage: globalThis.sessionStorage,
+    fetch: globalThis.fetch
+  };
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: { serviceWorker: { getRegistration: async () => ({ pushManager: { getSubscription: async () => suscripcion } }) } }
+  });
+  globalThis.PushManager = class {};
+  globalThis.sessionStorage = { getItem: () => 'token-de-prueba' };
+  globalThis.fetch = async (url, opciones) => {
+    llamadas.push({ url, metodo: opciones.method, cuerpo: JSON.parse(opciones.body), autorizacion: opciones.headers.Authorization });
+    return new Response(JSON.stringify({ eliminada: true }), { status: 200 });
+  };
+  try {
+    const { darDeBajaEsteDispositivo } = await import('../../public/js/push-dispositivo.js');
+    await darDeBajaEsteDispositivo();
+    assert.deepEqual(llamadas, [{
+      url: '/api/push/suscripcion', metodo: 'DELETE',
+      cuerpo: { endpoint: 'https://push.example/este-dispositivo' }, autorizacion: 'Bearer token-de-prueba'
+    }]);
+    assert.equal(desuscripta, true);
+
+    // Sin red: igual se desuscribe en el navegador.
+    desuscripta = false;
+    globalThis.fetch = async () => { throw new TypeError('sin red'); };
+    const consola = console.error;
+    console.error = () => {};
+    try {
+      await darDeBajaEsteDispositivo();
+    } finally {
+      console.error = consola;
+    }
+    assert.equal(desuscripta, true);
+
+    // logout() llama a la baja antes de olvidar la sesión.
+    const auth = await readFile(new URL('../../public/js/auth.js', import.meta.url), 'utf8');
+    const cuerpoLogout = auth.slice(auth.indexOf('export async function logout()'));
+    assert.ok(cuerpoLogout.indexOf('await darDeBajaEsteDispositivo()') > 0);
+    assert.ok(cuerpoLogout.indexOf('await darDeBajaEsteDispositivo()') < cuerpoLogout.indexOf('olvidarSesion()'));
+  } finally {
+    if (anteriores.navigator) Object.defineProperty(globalThis, 'navigator', anteriores.navigator);
+    else delete globalThis.navigator;
+    globalThis.PushManager = anteriores.PushManager;
+    globalThis.sessionStorage = anteriores.sessionStorage;
+    globalThis.fetch = anteriores.fetch;
+  }
+});
+
+test('DELETE /api/push/suscripcion borra solo ese endpoint de esa cuenta y no toca las alertas de zona', async () => {
+  const consultas = [];
+  const db = {
+    async query(sql, values = []) {
+      if (sql.includes('sesion_version FROM usuarios')) return { rows: [{ rol: 'ciudadano', sesion_version: 0 }] };
+      consultas.push({ sql, values });
+      return { rows: [], rowCount: 1 };
+    }
+  };
+  const server = createApp({ db, mailer: { sendMail: async () => {} }, jwtSecret: secret, appUrl: 'http://127.0.0.1', push: crearPush({}) })
+    .listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  try {
+    const url = `http://127.0.0.1:${server.address().port}/api/push/suscripcion`;
+    const headers = { Authorization: `Bearer ${jwt.sign({ id: 42, rol: 'ciudadano' }, secret)}`, 'Content-Type': 'application/json' };
+    assert.equal((await fetch(url, { method: 'DELETE', body: JSON.stringify({ endpoint: 'https://x' }) })).status, 401);
+    assert.equal((await fetch(url, { method: 'DELETE', headers, body: '{}' })).status, 400);
+    const respuesta = await fetch(url, { method: 'DELETE', headers, body: JSON.stringify({ endpoint: 'https://push.example/a' }) });
+    assert.equal(respuesta.status, 200);
+    assert.deepEqual(await respuesta.json(), { eliminada: true });
+    assert.equal(consultas.length, 1);
+    assert.match(consultas[0].sql, /DELETE FROM suscripciones_push WHERE usuario_id = \$1 AND endpoint = \$2/);
+    assert.deepEqual(consultas[0].values, [42, 'https://push.example/a']);
+    assert.equal(consultas.some(item => item.sql.includes('alertas_zona')), false);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('baja del dispositivo con PostgreSQL: solo ese endpoint, solo de su cuenta, alertas de zona intactas', {
+  skip: !testDatabaseUrl && 'Defina TEST_DATABASE_URL para ejecutar la prueba de integración con PostgreSQL.'
+}, async () => {
+  const db = createDatabase(testDatabaseUrl);
+  const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
+  const userIds = [];
+  let server;
+  try {
+    await initializeDatabase(db);
+    for (const nombre of ['dueno', 'otro']) {
+      const { rows } = await db.query(`
+        INSERT INTO usuarios (nombre_completo, correo, contrasena_hash, rol, verificado, acepto_terminos)
+        VALUES ($1, $2, 'sin-uso', 'ciudadano', TRUE, TRUE) RETURNING id
+      `, [nombre, `${nombre}.baja.${suffix}@gmail.com`]);
+      userIds.push(rows[0].id);
+    }
+    const [dueno, otro] = userIds;
+    await db.query('INSERT INTO alertas_zona (usuario_id, latitud, longitud) VALUES ($1, -25.3, -57.6)', [dueno]);
+    const endpoint = nombre => `https://push.example/${nombre}-${suffix}`;
+    for (const [id, nombre] of [[dueno, 'celular'], [dueno, 'tablet'], [otro, 'ajeno']]) {
+      await db.query('INSERT INTO suscripciones_push (usuario_id, endpoint, p256dh, auth) VALUES ($1, $2, $3, $4)',
+        [id, endpoint(nombre), 'BClave', 'auth']);
+    }
+    server = createApp({ db, mailer: { sendMail: async () => {} }, jwtSecret: secret, appUrl: 'http://127.0.0.1', push: crearPush({}) })
+      .listen(0, '127.0.0.1');
+    await new Promise(resolve => server.once('listening', resolve));
+    const baja = async (id, valor) => (await fetch(`http://127.0.0.1:${server.address().port}/api/push/suscripcion`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${jwt.sign({ id, rol: 'ciudadano' }, secret)}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: valor })
+    })).json();
+
+    assert.deepEqual(await baja(dueno, endpoint('ajeno')), { eliminada: false }, 'no borra endpoints de otra cuenta');
+    assert.deepEqual(await baja(dueno, endpoint('celular')), { eliminada: true });
+    const quedan = await db.query('SELECT endpoint FROM suscripciones_push WHERE usuario_id = ANY($1) ORDER BY endpoint', [userIds]);
+    assert.deepEqual(quedan.rows.map(row => row.endpoint), [endpoint('ajeno'), endpoint('tablet')]);
+    assert.equal((await db.query('SELECT 1 FROM alertas_zona WHERE usuario_id = $1', [dueno])).rows.length, 1, 'las alertas de zona siguen activas');
+  } finally {
+    if (server) await new Promise(resolve => server.close(resolve));
     await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [userIds]);
     await db.end();
   }

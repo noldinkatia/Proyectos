@@ -73,6 +73,20 @@ export function createAlertRouter({ db, requireCitizen, requireUser, push }) {
     res.json({ activa: true, push: Boolean(suscripcion) && push.disponible, mensaje: 'Alertas de tu zona activadas.' });
   }));
 
+  // Al cerrar sesión: borra solo la suscripción de ese dispositivo, y solo si es de
+  // la cuenta que cierra. La ubicación y las alertas de zona quedan como estaban.
+  router.delete('/push/suscripcion', requireUser, asyncRoute(async (req, res) => {
+    const endpoint = req.body?.endpoint;
+    if (typeof endpoint !== 'string' || !endpoint || endpoint.length > 2048) {
+      return res.status(400).json({ error: 'Falta el dispositivo a dar de baja.' });
+    }
+    const result = await db.query(
+      'DELETE FROM suscripciones_push WHERE usuario_id = $1 AND endpoint = $2',
+      [req.auth.id, endpoint]
+    );
+    res.json({ eliminada: result.rowCount > 0 });
+  }));
+
   router.delete('/alertas-zona', ...requireCitizen, asyncRoute(async (req, res) => {
     await withTransaction(db, async client => {
       await client.query('DELETE FROM suscripciones_push WHERE usuario_id = $1', [req.auth.id]);
