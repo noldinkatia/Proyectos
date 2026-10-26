@@ -632,6 +632,8 @@ button { touch-action: manipulation; }
 .footer-brand small { color: var(--muted); font-size: .65rem; }
 .institutional-footer > p { max-width: 860px; margin: 0; color: var(--text-2); font-size: .68rem; }
 .institutional-footer a { color: var(--red); font-weight: 800; }
+/* Enlace a #/bases: no es de emergencia, va sin el rojo del 911 */
+.institutional-footer .footer-link { color: var(--info); font-size: .76rem; text-underline-offset: 2px; }
 .institutional-footer .footer-disclaimer { color: var(--muted-2); }
 
 /* Flujo de generación de pistas */

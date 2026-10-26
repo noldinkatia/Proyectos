@@ -169,6 +169,17 @@ test('tema claro/oscuro: un solo botón, en el menú lateral, en la web y en la 
   }
 });
 
+test('"Bases y condiciones": en el pie de la web y en el menú lateral de la web y de la app', async () => {
+  const web = await read('Rastreopy.html');
+  const pie = web.match(/<footer class="app-footer institutional-footer">[\s\S]*?<\/footer>/)[0];
+  assert.match(pie, /<a class="footer-link" href="#\/bases">Bases y condiciones<\/a>/);
+  for (const pagina of ['Rastreopy.html', 'app/index.html']) {
+    const nav = (await read(pagina)).match(/<nav class="drawer-navigation"[\s\S]*?<\/nav>/)[0];
+    // Sin data-role-nav: con y sin sesión. data-nav-view lo marca como sección actual.
+    assert.match(nav, /<button type="button" data-nav-view="legal" data-on-click="drawerNavigate\('legal'\)" class="drawer-item">Bases y condiciones<\/button>/, pagina);
+  }
+});
+
 test('el APP_SHELL del service worker cubre la web, la app y sus módulos', async () => {
   const sw = await read('sw.js');
   const shell = [...sw.match(/const APP_SHELL = \[([\s\S]*?)\];/)[1].matchAll(/'([^']+)'/g)].map(m => m[1]);
