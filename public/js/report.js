@@ -4,6 +4,7 @@ import { apiRequest } from './api.js';
 import { escapeHtml } from './config.js';
 import { estado } from './estado.js';
 import { addBaseTiles, addTextMapZoomControl } from './map.js';
+import { RADIO_ALERTA_KM } from './radio-alerta.js';
 import { navigateTo } from './router.js';
 import { showToast } from './ui.js';
 
@@ -132,7 +133,7 @@ export function renderReportView() {
         <section id="alertPreviewSection" class="alert-preview hidden" aria-labelledby="alertPreviewTitle">
           <h2 id="alertPreviewTitle">¿Qué datos verán las personas cercanas?</h2>
           <div class="alert-preview-intro">
-            <p>Cuando publiques el reporte, avisamos a quienes estén a menos de 160 km para que estén atentos.</p>
+            <p>Cuando publiques el reporte, avisamos a quienes estén a menos de ${RADIO_ALERTA_KM} km para que estén atentos.</p>
             <p>El aviso sale antes de que la administración revise el caso, por eso dice «${ETIQUETA_NO_VERIFICADA}».</p>
             <p>Vos decidís qué datos se muestran.</p>
           </div>

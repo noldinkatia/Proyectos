@@ -2,6 +2,7 @@
 import { escapeHtml } from './config.js';
 import { estado } from './estado.js';
 import { filterFeedCases } from './feed.js';
+import { RADIO_ALERTA_KM } from './radio-alerta.js';
 import { getStore } from './store.js';
 import { showToast } from './ui.js';
 
@@ -41,14 +42,14 @@ export function initMainLeafletMap() {
           let geofence = null;
           estado.activeMarkers.push({ id: c.id, caseId: c.id, marker, geofence, lat: c.ubicacion.lat, lng: c.ubicacion.lng });
 
-          // GEOCERCA DE 160 KM (160.000 METROS): el radio de las alertas de zona
+          // GEOCERCA: el radio de las alertas de zona (Leaflet lo pide en metros)
           if (c.estado === 'VALIDADO' || c.estado === 'EN_SEGUIMIENTO') {
             geofence = L.circle([c.ubicacion.lat, c.ubicacion.lng], {
               color: '#B3261E',
               weight: 1,
               fillColor: '#B3261E',
               fillOpacity: 0.12,
-              radius: 160000
+              radius: RADIO_ALERTA_KM * 1000
             }).addTo(map);
             estado.activeMarkers.at(-1).geofence = geofence;
           }

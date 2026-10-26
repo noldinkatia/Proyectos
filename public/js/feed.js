@@ -1,6 +1,7 @@
 // Inicio: listado de casos, filtros, paginación y ficha del caso.
 import { escapeHtml } from './config.js';
 import { estado } from './estado.js';
+import { RADIO_ALERTA_KM } from './radio-alerta.js';
 import { buildRoute, syncUrl } from './router.js';
 import { buildAgeAnalyticsRows, buildStateAnalyticsRows, renderAnalyticsBars } from './stats.js';
 import { getStore } from './store.js';
@@ -120,7 +121,7 @@ export function renderFeedView(statistics = window.currentStatistics) {
         </div>
         <div id="mainMap" class="map-container"></div>
         <div class="map-legend">
-          Punto: lugar de desaparición. Círculo: zona de alerta de 60 km.
+          Punto: lugar de desaparición. Círculo: zona de alerta de ${RADIO_ALERTA_KM} km.
         </div>
       </div>
 

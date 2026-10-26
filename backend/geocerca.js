@@ -1,7 +1,10 @@
 // Geocerca de las alertas de zona: distancia de Haversine (en JS y en SQL) y
 // radio de 160 km (documento del Workshop, sección 5.2).
+// El radio vive en public/js/radio-alerta.js porque lo usa también la interfaz
+// (círculo y leyenda del mapa): Docker y Render tienen public/ junto a backend/.
+import { RADIO_ALERTA_KM } from '../public/js/radio-alerta.js';
 
-export const RADIO_ALERTA_KM = 160;
+export { RADIO_ALERTA_KM };
 const RADIO_TIERRA_KM = 6371;
 // Margen de 1 mm: un punto calculado justo sobre el borde cuenta como adentro
 // aunque el redondeo de coma flotante lo deje en 160,000000000001.

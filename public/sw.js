@@ -40,6 +40,7 @@ const APP_SHELL = [
   '/js/notifications.js',
   '/js/alerta.js',
   '/js/alerta-campos.js',
+  '/js/radio-alerta.js',
   '/js/push-dispositivo.js',
   '/js/eventos.js',
   '/js/tema-inicial.js',
