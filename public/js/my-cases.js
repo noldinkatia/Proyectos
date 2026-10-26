@@ -1,4 +1,6 @@
-// Mis casos del ciudadano y respuestas al seguimiento.
+// Mis casos del ciudadano. Cada caso activo ofrece solo "Persona localizada" y
+// "Cerrar caso"; las consultas de seguimiento (con "Sigue activo") se responden
+// desde su notificación (notifications.js).
 import { apiRequest } from './api.js';
 import { escapeHtml } from './config.js';
 import { renderNoticeItem } from './notifications.js';
@@ -14,14 +16,14 @@ export function renderMyCasesView(cases, notifications) {
     <section class="account-view">
       <div class="account-view-heading">
         <div><span class="section-kicker">Área ciudadana</span><h1>Mis casos</h1>
-          <p>Consultá el estado de tus reportes y respondé los avisos de seguimiento.</p></div>
+          <p>Consultá el estado de tus reportes. Las consultas de seguimiento llegan al centro de avisos.</p></div>
         <button type="button" class="btn btn-primary" data-on-click="navigateTo('report')">＋ Nuevo reporte</button>
       </div>
       <div class="my-cases-layout">
         <section class="card my-cases-list" aria-labelledby="myCasesHeading">
           <h2 id="myCasesHeading">Reportes registrados por vos</h2>
           ${cases.length ? cases.map(c => {
-            const needsResponse = ['VALIDADO', 'EN_SEGUIMIENTO'].includes(c.estado);
+            const activo = ['VALIDADO', 'EN_SEGUIMIENTO'].includes(c.estado);
             return `<article class="my-case-card">
               <div class="my-case-card-heading"><div><h3>${escapeHtml(c.nombreCompleto)}</h3>
                 <p>${Number(c.edad)} años · ${escapeHtml(c.ciudad)}${c.departamento ? `, ${escapeHtml(c.departamento)}` : ''}</p></div>
@@ -29,8 +31,7 @@ export function renderMyCasesView(cases, notifications) {
               <p class="my-case-meta">Reportado ${new Date(c.fechaCreacion).toLocaleString('es-PY')}</p>
               ${c.estado === 'PENDIENTE' ? '<p class="my-case-notice">Tu reporte está en revisión. Recibirás un aviso cuando se actualice.</p>' : ''}
               ${c.estado === 'RECHAZADO' ? `<p class="my-case-notice">${escapeHtml(c.motivoRechazo || 'El reporte no fue aprobado. Contactá a soporte para más información.')}</p>` : ''}
-              ${needsResponse ? `<div class="my-case-actions table-actions">
-                <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="respondToFollowup(this.dataset.caseId, 'SIGUE_ACTIVA')">Sigue activa</button>
+              ${activo ? `<div class="my-case-actions table-actions">
                 <button type="button" class="btn btn-success btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="respondToFollowup(this.dataset.caseId, 'LOCALIZADO')">Persona localizada</button>
                 <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="respondToFollowup(this.dataset.caseId, 'CERRAR')">Cerrar caso</button>
               </div>` : ''}
@@ -68,6 +69,7 @@ export function timeSince(value) {
 }
 
 export async function respondToFollowup(caseId, action) {
+  if (action === 'LOCALIZADO' && !confirm('¿Confirma que la persona fue localizada?')) return;
   let motivo;
   if (action === 'CERRAR') {
     motivo = prompt('Indica por qué solicitás cerrar el caso:');
