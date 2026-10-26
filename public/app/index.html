@@ -90,6 +90,8 @@
         <button type="button" data-role-nav="session" data-on-click="toggleDrawer(false); enableSystemNotifications()" class="btn btn-outline">Activar avisos del dispositivo</button>
         <!-- Visible solo si el navegador permite instalar (o en iOS, con guía) -->
         <button id="installAppButton" type="button" data-on-click="toggleDrawer(false); installApp()" class="btn btn-outline hidden">Instalar app</button>
+        <!-- En una computadora cuyo navegador no permite instalar (app/pwa.js) -->
+        <p id="installDesktopHint" class="drawer-hint hidden">Para instalarla, abrí esta dirección desde tu celular.</p>
         <button data-role-nav="session" data-on-click="logout()" class="btn btn-red">Cerrar sesión</button>
       </div>
     </aside>

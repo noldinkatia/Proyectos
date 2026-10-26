@@ -1,6 +1,7 @@
 // Punto de entrada solo de la web (/). La lógica compartida con la app la arranca
 // /js/app.js (cargado antes en Rastreopy.html). La web no es instalable: en un
-// celular se ofrece abrir la app (/app/), que sí lo es.
+// celular se ofrece abrir la app (/app/), que sí lo es; en una computadora, el
+// botón "Descargar app" del encabezado lleva al mismo lugar.
 import { acciones } from './app.js';
 
 const CLAVE_AVISO = 'rastreo_aviso_app_cerrado';
@@ -20,9 +21,14 @@ function avisoCerrado() {
 
 // El enlace conserva la ruta (#/caso/..., #/estadisticas): una ficha compartida
 // se abre en la misma ficha dentro de la app.
-function actualizarEnlace() {
-  const enlace = document.getElementById('openAppLink');
+function actualizarEnlace(id) {
+  const enlace = document.getElementById(id);
   if (enlace) enlace.href = `/app/${location.hash}`;
+}
+
+function mostrarEnlaceApp(id) {
+  actualizarEnlace(id);
+  window.addEventListener('hashchange', () => actualizarEnlace(id));
 }
 
 export function cerrarAvisoApp() {
@@ -36,8 +42,10 @@ export function cerrarAvisoApp() {
 
 Object.assign(acciones, { cerrarAvisoApp });
 
-if (esCelular() && !avisoCerrado()) {
-  actualizarEnlace();
-  window.addEventListener('hashchange', actualizarEnlace);
+if (!esCelular()) {
+  mostrarEnlaceApp('headerAppLink');
+  document.getElementById('headerAppLink')?.classList.remove('hidden');
+} else if (!avisoCerrado()) {
+  mostrarEnlaceApp('openAppLink');
   document.getElementById('openAppNotice')?.classList.remove('hidden');
 }

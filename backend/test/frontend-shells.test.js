@@ -86,6 +86,34 @@ test('solo la app es instalable: manifest fijo en /app/ y ninguno en la web', as
   }
 });
 
+test('web en computadora: botón "Descargar app" en el encabezado que lleva a /app/ con la ruta', async () => {
+  const web = await read('Rastreopy.html');
+  const header = web.match(/<header id="topHeader"[\s\S]*?<\/header>/)[0];
+  assert.match(header, /<a id="headerAppLink" class="header-app-link hidden" href="\/app\/">Descargar app<\/a>/);
+  const js = await read('js/web.js');
+  // Fuera de los celulares se muestra el botón; en celulares sigue el aviso de abajo.
+  assert.match(js, /if \(!esCelular\(\)\) \{\s*mostrarEnlaceApp\('headerAppLink'\);\s*document\.getElementById\('headerAppLink'\)\?\.classList\.remove\('hidden'\);/);
+  assert.match(js, /\} else if \(!avisoCerrado\(\)\) \{\s*mostrarEnlaceApp\('openAppLink'\);/);
+  // Conserva #/caso/..., #/estadisticas y se actualiza al navegar.
+  assert.match(js, /enlace\.href = `\/app\/\$\{location\.hash\}`/);
+  assert.match(js, /addEventListener\('hashchange', \(\) => actualizarEnlace\(id\)\)/);
+  const css = await read('styles.css');
+  const regla = css.slice(css.indexOf('#topHeader .header-app-link {'), css.indexOf('}', css.indexOf('#topHeader .header-app-link {')));
+  assert.match(regla, /cursor:\s*pointer/);
+  assert.match(regla, /border:\s*1px solid/, 'se ve como botón');
+});
+
+test('app en computadora: "Instalar app" solo con beforeinstallprompt; si no, aviso para el celular', async () => {
+  const app = await read('app/index.html');
+  assert.match(app, /<p id="installDesktopHint" class="drawer-hint hidden">Para instalarla, abrí esta dirección desde tu celular\.<\/p>/);
+  assert.doesNotMatch(app, /<canvas|qrcode/i, 'sin código QR');
+  const pwa = await read('app/pwa.js');
+  assert.match(pwa, /matchMedia\('\(min-width: 781px\) and \(pointer: fine\)'\)/);
+  assert.match(pwa, /getElementById\('installDesktopHint'\)\?\.classList\.toggle\('hidden', puedeInstalar \|\| yaInstalada\(\) \|\| !esComputadora\(\)\)/);
+  // La bienvenida sigue siendo solo para celulares.
+  assert.match(pwa, /if \(esCelular\(\) && !yaInstalada\(\) && !bienvenidaYaVista\(\)\) mostrarBienvenida\(true\)/);
+});
+
 test('el APP_SHELL del service worker cubre la web, la app y sus módulos', async () => {
   const sw = await read('sw.js');
   const shell = [...sw.match(/const APP_SHELL = \[([\s\S]*?)\];/)[1].matchAll(/'([^']+)'/g)].map(m => m[1]);

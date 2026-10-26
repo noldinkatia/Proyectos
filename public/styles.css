@@ -469,6 +469,10 @@ button { touch-action: manipulation; }
 .role-badge-admin { background: var(--badge-admin-bg); color: var(--badge-admin-fg); }
 #topHeader .header-auth-action { padding: .55rem .8rem; border-radius: var(--radius-sm); background: var(--navy-primary); color: var(--on-dark); font-size: .76rem; white-space: nowrap; }
 #topHeader .header-auth-action:hover { background: var(--navy-hover); }
+/* "Descargar app" de la web en computadoras (public/js/web.js): enlace con forma de botón */
+#topHeader .header-app-link { display: inline-flex; align-items: center; min-height: 2.35rem; padding: .45rem .8rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-strong); cursor: pointer; font-size: .76rem; font-weight: 700; text-decoration: none; white-space: nowrap; }
+#topHeader .header-app-link:hover { border-color: var(--info-border); background: var(--info-soft); color: var(--info); }
+#topHeader .header-app-link:focus-visible { outline: 3px solid var(--info); outline-offset: 2px; }
 
 .public-theme-toggle {
   position: fixed;
@@ -528,6 +532,7 @@ button { touch-action: manipulation; }
 .drawer-account { display: grid; gap: .55rem; padding: 1rem; border-top: 1px solid var(--border); }
 .drawer-section-label { margin: 0; color: var(--muted); font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .drawer-account .btn { width: 100%; justify-content: center; }
+.drawer-hint { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.45; }
 
 /* Sin conexión: franja dentro de la app y página offline.html del service worker */
 .offline-banner { padding: .55rem var(--gutter); border-bottom: 1px solid var(--amber-border); background: var(--amber-soft); color: var(--amber); font-size: .8rem; font-weight: 600; text-align: center; }

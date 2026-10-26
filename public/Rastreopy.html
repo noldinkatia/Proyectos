@@ -38,6 +38,8 @@
       </div>
       <div class="header-actions">
         <button id="themeToggle" type="button" data-on-click="toggleTheme()" aria-label="Cambiar tema">Tema claro</button>
+        <!-- Solo en computadoras (public/js/web.js); en celulares está el aviso de abajo -->
+        <a id="headerAppLink" class="header-app-link hidden" href="/app/">Descargar app</a>
         <button type="button" class="header-notifications" data-on-click="toggleNotificationsModal()" aria-label="Abrir notificaciones">♧<span id="headerNotifBadge" class="hidden">0</span></button>
         <button type="button" id="headerProfile" class="header-profile hidden" data-on-click="toggleDrawer(true)" aria-label="Abrir menú de cuenta">
           <span id="headerProfileAvatar" class="header-profile-avatar" aria-hidden="true"></span>
