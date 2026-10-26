@@ -1,6 +1,7 @@
 // Inicio: listado de casos, filtros, paginación y ficha del caso.
 import { escapeHtml } from './config.js';
 import { estado } from './estado.js';
+import { RADIO_ALERTA_KM } from './radio-alerta.js';
 import { buildRoute, syncUrl } from './router.js';
 import { buildAgeAnalyticsRows, buildStateAnalyticsRows, renderAnalyticsBars } from './stats.js';
 import { getStore } from './store.js';
@@ -120,7 +121,7 @@ export function renderFeedView(statistics = window.currentStatistics) {
         </div>
         <div id="mainMap" class="map-container"></div>
         <div class="map-legend">
-          Punto: lugar de desaparición. Círculo: zona de alerta de 60 km.
+          Punto: lugar de desaparición. Círculo: zona de alerta de ${RADIO_ALERTA_KM} km.
         </div>
       </div>
 
@@ -279,19 +280,33 @@ export function filterFeedCases(resetPage = true) {
   });
 }
 
+// El botón "Mostrar/Ocultar mapa" refleja el panel, se abra desde él o desde la
+// pestaña "Mapa" de la app.
+function marcarBotonMapa(isVisible) {
+  const toggle = document.getElementById('feedMapToggle');
+  if (!toggle) return;
+  toggle.setAttribute('aria-expanded', String(isVisible));
+  toggle.innerHTML = isVisible ? '⌖ Ocultar mapa' : '⌖ Mostrar mapa';
+}
+
 export function setFeedView(view) {
   document.getElementById('feedMapPanel').classList.toggle('hidden', view === 'list');
   document.getElementById('feedCaseList').classList.toggle('hidden', view === 'map');
+  marcarBotonMapa(view !== 'list');
   if (view !== 'list' && estado.activeMap) setTimeout(() => estado.activeMap.invalidateSize(), 0);
 }
 
+// En la web el mapa se muestra junto a la lista. Al ocultarlo se vuelve a la lista,
+// que en la vista "Mapa" de la app estaba oculta (si no, la página quedaba vacía).
 export function toggleFeedMap() {
   const panel = document.getElementById('feedMapPanel');
-  const toggle = document.getElementById('feedMapToggle');
-  const isVisible = panel.classList.toggle('hidden') === false;
-  toggle.setAttribute('aria-expanded', String(isVisible));
-  toggle.innerHTML = isVisible ? '⌖ Ocultar mapa' : '⌖ Mostrar mapa';
-  if (isVisible && estado.activeMap) requestAnimationFrame(() => estado.activeMap.invalidateSize());
+  if (!panel.classList.contains('hidden')) {
+    setFeedView('list');
+    return;
+  }
+  panel.classList.remove('hidden');
+  marcarBotonMapa(true);
+  if (estado.activeMap) requestAnimationFrame(() => estado.activeMap.invalidateSize());
 }
 
 export function openCaseDetail(caseId, options = {}) {

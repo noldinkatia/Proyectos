@@ -52,6 +52,16 @@ export function updateHeaderUser() {
 // ==========================================
 // VISTA 1: BASES Y CONDICIONES (SECCIÓN 3)
 // ==========================================
+// El texto es uno solo: lo usan la pantalla obligatoria, el modal del registro y la
+// página de consulta #/bases.
+export const BASES_TEXTO = `
+          <p><strong>1. Alcance del Servicio:</strong> La plataforma Rastreo PY es un canal de difusión colaborativa y centralización de reportes. No constituye un organismo de seguridad, investigación ni administración de justicia, ni reemplaza las actuaciones de la Policía Nacional de Paraguay o del Ministerio Público.</p>
+          <p><strong>2. Obligatoriedad de Denuncia Oficial:</strong> El uso de esta plataforma no sustituye la radicación formal de la denuncia. Se exige al usuario realizar la denuncia correspondiente ante las instituciones públicas oficiales de manera prioritaria y previa a la carga de datos en la plataforma.</p>
+          <p><strong>3. Deslinde de Responsabilidad:</strong> La plataforma, sus desarrolladores y administradores quedan totalmente eximidos de cualquier responsabilidad legal, civil, penal o administrativa respecto a la conducción, seguimiento o resultados de las investigaciones, así como de la veracidad, exactitud o autenticidad de la información e imágenes ingresadas por terceros.</p>
+          <p><strong>4. Marco de referencia:</strong> Este prototipo académico toma como referencia la Ley N.º 7605/2025 (RENAPED/MAFE) y la Ley N.º 7593/2025, Art. 16, num. 7. Su aplicación y alcance deben ser validados por UNIDA y las autoridades competentes antes de un despliegue operativo. Se prohíbe el ingreso de datos crediticios, bancarios o patrimoniales (Ley N.º 6534/2020), así como datos sensibles ajenos a la finalidad del reporte.</p>
+          <p><strong>5. Derecho de Supresión (Borrado de Datos):</strong> Una vez que la persona reportada sea localizada o el caso sea cerrado por la autoridad competente, la ficha de búsqueda permanecerá visible por un máximo de 24 horas con el estado 'Localizado', a fin de informar a la ciudadanía. Transcurrido ese plazo, la plataforma procederá al retiro y desindexación pública de la ficha. Los datos solo se conservarán, de forma restringida, para el historial interno de la autoridad administradora y como cifras estadísticas agregadas.</p>
+          <p><strong>6. Uso Aceptable:</strong> Queda estrictamente prohibido el ingreso de reportes falsos, difamatorios o el uso de la plataforma para cometer extorsiones, estafas o cobro indebido de recompensas.</p>`;
+
 export function renderLegalTerms() {
   return `
     <div class="legal-view">
@@ -62,13 +72,7 @@ export function renderLegalTerms() {
           <p>Bases y Condiciones Obligatorias de Uso</p>
         </div>
 
-        <div>
-          <p><strong>1. Alcance del Servicio:</strong> La plataforma Rastreo PY es un canal de difusión colaborativa y centralización de reportes. No constituye un organismo de seguridad, investigación ni administración de justicia, ni reemplaza las actuaciones de la Policía Nacional de Paraguay o del Ministerio Público.</p>
-          <p><strong>2. Obligatoriedad de Denuncia Oficial:</strong> El uso de esta plataforma no sustituye la radicación formal de la denuncia. Se exige al usuario realizar la denuncia correspondiente ante las instituciones públicas oficiales de manera prioritaria y previa a la carga de datos en la plataforma.</p>
-          <p><strong>3. Deslinde de Responsabilidad:</strong> La plataforma, sus desarrolladores y administradores quedan totalmente eximidos de cualquier responsabilidad legal, civil, penal o administrativa respecto a la conducción, seguimiento o resultados de las investigaciones, así como de la veracidad, exactitud o autenticidad de la información e imágenes ingresadas por terceros.</p>
-          <p><strong>4. Marco de referencia:</strong> Este prototipo académico toma como referencia la Ley N.º 7605/2025 (RENAPED/MAFE) y la Ley N.º 7593/2025, Art. 16, num. 7. Su aplicación y alcance deben ser validados por UNIDA y las autoridades competentes antes de un despliegue operativo. Se prohíbe el ingreso de datos crediticios, bancarios o patrimoniales (Ley N.º 6534/2020), así como datos sensibles ajenos a la finalidad del reporte.</p>
-          <p><strong>5. Derecho de Supresión (Borrado de Datos):</strong> Una vez que la persona reportada sea localizada o el caso sea cerrado por la autoridad competente, la ficha de búsqueda permanecerá visible por un máximo de 24 horas con el estado 'Localizado', a fin de informar a la ciudadanía. Transcurrido ese plazo, la plataforma procederá al retiro y desindexación pública de la ficha. Los datos solo se conservarán, de forma restringida, para el historial interno de la autoridad administradora y como cifras estadísticas agregadas.</p>
-          <p><strong>6. Uso Aceptable:</strong> Queda estrictamente prohibido el ingreso de reportes falsos, difamatorios o el uso de la plataforma para cometer extorsiones, estafas o cobro indebido de recompensas.</p>
+        <div>${BASES_TEXTO}
         </div>
       </div>
 
@@ -87,6 +91,29 @@ export function renderLegalTerms() {
         </div>
       </div>
     </div>
+  `;
+}
+
+// Página de consulta #/bases: solo lectura, con o sin sesión (la pantalla para
+// aceptarlas es renderLegalTerms, solo para ciudadanos que no las aceptaron).
+export function renderBasesView() {
+  const usuario = getStore().currentUser;
+  const fecha = usuario?.acepto_terminos && usuario.fecha_aceptacion_terminos
+    ? new Date(usuario.fecha_aceptacion_terminos) : null;
+  const aceptadas = fecha && !Number.isNaN(fecha.getTime())
+    ? `<p class="notice">Aceptaste estas bases el ${escapeHtml(fecha.toLocaleDateString('es-PY', { day: 'numeric', month: 'long', year: 'numeric' }))}.</p>`
+    : '';
+  return `
+    <section class="bases-view">
+      <header class="page-heading">
+        <span class="section-kicker">Plataforma Rastreo PY</span>
+        <h1>Bases y condiciones de uso</h1>
+        <p>República del Paraguay · Condiciones que acepta cada ciudadano al crear su cuenta.</p>
+      </header>
+      ${aceptadas}
+      <div class="card bases-texto">${BASES_TEXTO}
+      </div>
+    </section>
   `;
 }
 
@@ -125,6 +152,30 @@ export async function retryTermsAcceptance() {
 }
 
 export function rejectTerms() { showToast('Acceso denegado', 'No es posible acceder sin aceptar las bases y condiciones.', 'error'); }
+
+// Bases desde el registro: <dialog> nativo (Esc lo cierra y el resto de la página
+// queda inerte). Se agrega al <body>, fuera del formulario, así lo escrito no se pierde.
+export function abrirBasesModal() {
+  let modal = document.getElementById('basesModal');
+  if (!modal) {
+    document.body.insertAdjacentHTML('beforeend', `
+      <dialog id="basesModal" class="bases-modal" aria-labelledby="basesModalTitulo">
+        <div class="modal-header">
+          <h2 id="basesModalTitulo">Bases y condiciones de uso</h2>
+          <button type="button" class="btn btn-outline btn-sm" data-on-click="cerrarBasesModal()">Cerrar</button>
+        </div>
+        <div class="modal-body bases-texto">${BASES_TEXTO}</div>
+      </dialog>`);
+    modal = document.getElementById('basesModal');
+    // Se cierre con el botón o con Esc, el foco vuelve al enlace que lo abrió.
+    modal.addEventListener('close', () => document.getElementById('regTermsLink')?.focus());
+  }
+  modal.showModal();
+}
+
+export function cerrarBasesModal() {
+  document.getElementById('basesModal')?.close();
+}
 
 // ==========================================
 // VISTA 2: ACCESO E INICIO DE SESIÓN (SECCIÓN 4)
@@ -202,9 +253,10 @@ export function renderRegisterForm() {
           <button type="button" data-on-click="togglePass('regPassConfirm')">Mostrar</button>
         </div>
       </div>
+      <!-- El enlace es un botón dentro de la etiqueta: tocarlo abre el modal y no tilda la casilla -->
       <label>
         <input type="checkbox" id="regTerms" required>
-        <span>He leído y acepto las bases y condiciones</span>
+        <span>He leído y acepto las <button type="button" id="regTermsLink" class="link-inline" aria-haspopup="dialog" data-on-click="abrirBasesModal()">bases y condiciones</button></span>
       </label>
       <button type="submit" class="btn btn-red">Enviar código al Gmail</button>
     </form>

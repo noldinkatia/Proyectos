@@ -22,7 +22,6 @@
 <body>
 
   <div class="app-container">
-    <button id="publicThemeToggle" class="public-theme-toggle" type="button" data-on-click="toggleTheme()" aria-label="Cambiar tema">Tema claro</button>
 
     <!-- BARRA PRINCIPAL DE NAVEGACIÓN -->
     <header id="topHeader" class="hidden">
@@ -37,7 +36,8 @@
         <button type="button" class="brand-title" data-on-click="navigateTo('home')" aria-label="Ir al inicio">Rastreo PY<span class="brand-subtitle">UNIDA · Ing. en Informática</span></button>
       </div>
       <div class="header-actions">
-        <button id="themeToggle" type="button" data-on-click="toggleTheme()" aria-label="Cambiar tema">Tema claro</button>
+        <!-- Solo en computadoras (public/js/web.js); en celulares está el aviso de abajo -->
+        <a id="headerAppLink" class="header-app-link hidden" href="/app/">Descargar app</a>
         <button type="button" class="header-notifications" data-on-click="toggleNotificationsModal()" aria-label="Abrir notificaciones">♧<span id="headerNotifBadge" class="hidden">0</span></button>
         <button type="button" id="headerProfile" class="header-profile hidden" data-on-click="toggleDrawer(true)" aria-label="Abrir menú de cuenta">
           <span id="headerProfileAvatar" class="header-profile-avatar" aria-hidden="true"></span>
@@ -82,6 +82,8 @@
           <!-- Visible también sin sesión: al tocarlo lleva al login y vuelve acá -->
           <button type="button" data-hide-admin-nav data-nav-view="my-cases" data-on-click="drawerNavigate('my-cases')" class="drawer-item">Mis casos</button>
           <button type="button" data-role-nav="admin" data-nav-view="admin" data-on-click="drawerNavigate('admin')" class="drawer-item">Panel de administración <span id="adminPanelBadge" class="nav-count-badge hidden">0</span></button>
+          <!-- Página de consulta #/bases: con y sin sesión -->
+          <button type="button" data-nav-view="legal" data-on-click="drawerNavigate('legal')" class="drawer-item">Bases y condiciones</button>
         </nav>
       </div>
 
@@ -89,6 +91,9 @@
         <p class="drawer-section-label">Cuenta y avisos</p>
         <button type="button" data-role-nav="session" data-on-click="toggleDrawer(false); enableSystemNotifications()" class="btn btn-outline">Activar avisos del dispositivo</button>
         <button id="simulateFollowupButton" data-on-click="toggleSimulateTimeModal()" class="btn btn-outline hidden">Simulador de seguimiento (+48 h)</button>
+        <!-- Único botón de tema (web y app, con y sin sesión): en el encabezado del
+             celular no hay lugar y uno flotante tapaba contenido. -->
+        <button id="themeToggle" type="button" data-on-click="toggleTheme()" class="btn btn-outline" aria-label="Cambiar tema">Tema claro</button>
         <button data-role-nav="session" data-on-click="logout()" class="btn btn-red">Cerrar sesión</button>
       </div>
     </aside>
@@ -100,6 +105,7 @@
     <footer class="app-footer institutional-footer">
       <div class="footer-brand"><span class="footer-logo">R</span><span><strong>Rastreo PY · UNIDA Paraguay</strong><small>Facultad de Ingeniería en Informática · Prototipo académico</small></span></div>
       <p>Marco de referencia: Ley N.º 7605/2025 (RENAPED/MAFE) y Ley N.º 7593/2025, Art. 16 num. 7. Ante una emergencia, llamá al <a href="tel:911">911</a>.</p>
+      <p><a class="footer-link" href="#/bases">Bases y condiciones</a></p>
     </footer>
 
   </div>

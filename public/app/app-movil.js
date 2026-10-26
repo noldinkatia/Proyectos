@@ -7,10 +7,15 @@ import { navigateTo } from '/js/router.js';
 import { continuarEnNavegador, iniciarPwa, installApp, toggleInstallGuide } from './pwa.js';
 import { abrirAlertasZona, activarAlertasZona, cerrarAlertasZona, desactivarAlertasZona } from './zona.js';
 
-// "Mapa" es el mismo feed mostrado como mapa (no hay una vista aparte).
+// "Mapa" es el mismo feed mostrado como mapa (no hay una vista aparte). El panel
+// queda debajo del inicio y las estadísticas: sin llevar la vista hasta él, tocar
+// "Mapa" no cambiaba nada en pantalla.
 export async function abrirMapa() {
   await navigateTo('home');
-  if (document.getElementById('feedMapPanel')) setFeedView('map');
+  const panel = document.getElementById('feedMapPanel');
+  if (!panel) return;
+  setFeedView('map');
+  panel.scrollIntoView({ block: 'start' });
 }
 
 // Acciones de data-on-*="..." que solo existen en la app (ver eventos.js; el test

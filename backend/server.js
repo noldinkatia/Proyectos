@@ -87,13 +87,18 @@ export function createApp({ db, mailer, jwtSecret, appUrl = process.env.APP_URL,
     } });
   }));
 
+  // Las bases y condiciones las aceptan los ciudadanos (al registrarse o en su primer
+  // ingreso). A un administrador no se le piden: no se guarda nada a su nombre.
   app.post('/api/auth/terminos', authenticate(jwtSecret, db), asyncRoute(async (req, res) => {
+    if (req.auth.rol !== 'ciudadano') {
+      return res.status(403).json({ error: 'Las bases y condiciones solo las aceptan las cuentas de ciudadanos.' });
+    }
     const result = await db.query(`
       UPDATE usuarios
       SET acepto_terminos = TRUE, fecha_aceptacion_terminos = CURRENT_TIMESTAMP,
           actualizado_en = CURRENT_TIMESTAMP
-      WHERE id = $1 AND rol = $2
-    `, [req.auth.id, req.auth.rol]);
+      WHERE id = $1 AND rol = 'ciudadano'
+    `, [req.auth.id]);
     if (!result.rowCount) {
       return res.status(404).json({ error: 'No se encontró el usuario autenticado.' });
     }

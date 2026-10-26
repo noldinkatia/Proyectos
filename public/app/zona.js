@@ -4,6 +4,7 @@
 // servidor la redondea a ≈1 km) y se puede desactivar y borrar cuando quiera.
 import { apiRequest } from '/js/api.js';
 import { escapeHtml } from '/js/config.js';
+import { RADIO_ALERTA_KM } from '/js/radio-alerta.js';
 import { showToast } from '/js/ui.js';
 import { esIos, yaInstalada } from './pwa.js';
 
@@ -39,7 +40,7 @@ function renderZona() {
     const fecha = estado.actualizadaEn ? new Date(estado.actualizadaEn).toLocaleString('es-PY') : '';
     contenido.innerHTML = `
       <p class="notice notice-success">Alertas de tu zona activadas.${fecha ? ` Ubicación aproximada actualizada el ${escapeHtml(fecha)}.` : ''}</p>
-      <p>Recibís avisos de casos a 160 km o menos de tu última ubicación aproximada. Los avisos son discretos: sin nombre, edad, foto ni ubicación exacta; los detalles se ven al abrir la app.</p>
+      <p>Recibís avisos de casos a ${RADIO_ALERTA_KM} km o menos de tu última ubicación aproximada. Los avisos son discretos: sin nombre, edad, foto ni ubicación exacta; los detalles se ven al abrir la app.</p>
       ${sinPushServidor}
       <div class="zona-acciones">
         <button type="button" class="btn btn-outline" data-on-click="activarAlertasZona()">Actualizar mi ubicación</button>
@@ -48,7 +49,7 @@ function renderZona() {
     return;
   }
   contenido.innerHTML = `
-    <p>Te avisamos de casos de personas desaparecidas a 160 km o menos de donde estás. Algunos avisos llegan antes de que la administración verifique el caso y lo indican como <strong>Pendiente / En revisión – No verificada</strong>.</p>
+    <p>Te avisamos de casos de personas desaparecidas a ${RADIO_ALERTA_KM} km o menos de donde estás. Algunos avisos llegan antes de que la administración verifique el caso y lo indican como <strong>Pendiente / En revisión – No verificada</strong>.</p>
     <ul>
       <li>Se guarda solo tu última ubicación aproximada (≈1 km), sin historial.</li>
       <li>No se muestra a nadie ni se usa para otra cosa.</li>
@@ -128,7 +129,7 @@ export async function activarAlertasZona() {
       method: 'PUT',
       body: { consentimiento: true, ubicacion, ...(suscripcion ? { suscripcion: suscripcion.toJSON() } : {}) }
     });
-    showToast('Alertas de tu zona activadas', 'Te avisaremos de casos a 160 km o menos.', 'success');
+    showToast('Alertas de tu zona activadas', `Te avisaremos de casos a ${RADIO_ALERTA_KM} km o menos.`, 'success');
     await abrirAlertasZona();
   } catch (error) {
     showToast('No se pudieron activar las alertas', error.message, 'error');

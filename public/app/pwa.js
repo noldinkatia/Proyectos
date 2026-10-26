@@ -25,6 +25,12 @@ function esCelular() {
     || window.matchMedia('(pointer: coarse)').matches;
 }
 
+// Computadora: pantalla ancha y puntero fino (mouse), y no es un celular. Ahí la
+// app se usa igual; solo cambia cómo se ofrece instalarla.
+function esComputadora() {
+  return !esCelular() && window.matchMedia('(min-width: 781px) and (pointer: fine)').matches;
+}
+
 export function yaInstalada() {
   return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 }
@@ -38,6 +44,8 @@ function actualizarOpcionesInstalacion() {
   document.getElementById('installWelcomeIos')?.classList.toggle('hidden', !ios);
   // Sin evento ni iOS (otro navegador, o Chrome todavía no lo ofreció).
   document.getElementById('installWelcomeOther')?.classList.toggle('hidden', puedeInstalar || ios);
+  // Computadora sin instalación posible (Firefox, Safari de Mac...): se instala desde el celular.
+  document.getElementById('installDesktopHint')?.classList.toggle('hidden', puedeInstalar || yaInstalada() || !esComputadora());
 }
 
 function mostrarBienvenida(visible) {

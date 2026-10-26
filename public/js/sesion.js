@@ -6,6 +6,12 @@
 const CLAVE_TOKEN = 'rastreo_token';
 const CLAVE_USUARIO = 'rastreo_usuario';
 
+// Las bases y condiciones se exigen solo a ciudadanos que todavía no las aceptaron
+// (el backend rechaza la aceptación de un administrador).
+export function debeAceptarBases(usuario) {
+  return String(usuario?.rol || '').toLowerCase() === 'ciudadano' && !usuario.acepto_terminos;
+}
+
 export function esRechazoDeSesion(error) {
   return error?.status === 401 || error?.status === 403;
 }

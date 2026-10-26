@@ -155,6 +155,7 @@ test('registro, verificación, login persistente y autorización por rol', {
     assert.equal(createdUser.rol, 'ciudadano');
     assert.equal(createdUser.verificado, true);
     assert.equal(createdUser.acepto_terminos, true);
+    assert.ok(createdUser.fecha_aceptacion_terminos, 'el registro guarda la fecha de aceptación');
     assert.notEqual(createdUser.contrasena_hash, 'Password-test-1');
     assert.equal(await bcrypt.compare('Password-test-1', createdUser.contrasena_hash), true);
     assert.equal((await db.query(
@@ -192,6 +193,28 @@ test('registro, verificación, login persistente y autorización por rol', {
       headers: { Authorization: `Bearer ${adminLogin.data.token}` }
     });
     assert.equal(adminRequest.status, 200);
+
+    // Bases y condiciones: solo las acepta un ciudadano; al administrador no se le
+    // guarda nada (ni la aceptación ni la fecha).
+    const terminosAdmin = (await db.query(
+      'SELECT acepto_terminos, fecha_aceptacion_terminos, actualizado_en FROM usuarios WHERE correo = $1', [adminEmail]
+    )).rows[0];
+    assert.equal(adminLogin.data.usuario.acepto_terminos, false);
+    const adminTerms = await post('/api/auth/terminos', {}, adminLogin.data.token);
+    assert.equal(adminTerms.response.status, 403);
+    assert.equal(adminTerms.data.error, 'Las bases y condiciones solo las aceptan las cuentas de ciudadanos.');
+    assert.deepEqual((await db.query(
+      'SELECT acepto_terminos, fecha_aceptacion_terminos, actualizado_en FROM usuarios WHERE correo = $1', [adminEmail]
+    )).rows[0], terminosAdmin, 'el administrador queda como estaba');
+    // Un ciudadano sin aceptación (cuenta anterior a la casilla del registro) la guarda con fecha.
+    await db.query('UPDATE usuarios SET acepto_terminos = FALSE, fecha_aceptacion_terminos = NULL WHERE correo = $1', [citizenEmail]);
+    const citizenTerms = await post('/api/auth/terminos', {}, citizenLogin.data.token);
+    assert.equal(citizenTerms.response.status, 200);
+    const aceptado = (await db.query(
+      'SELECT acepto_terminos, fecha_aceptacion_terminos FROM usuarios WHERE correo = $1', [citizenEmail]
+    )).rows[0];
+    assert.equal(aceptado.acepto_terminos, true);
+    assert.ok(Date.now() - new Date(aceptado.fecha_aceptacion_terminos).getTime() < 60_000, 'fecha de aceptación actual');
 
     const pending = await post('/api/auth/registro', {
       nombre_completo: 'Otra Persona',
