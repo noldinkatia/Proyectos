@@ -5,7 +5,7 @@ import test from 'node:test';
 // restaurarSesion (public/js/sesion.js). Solo un 401/403 del servidor puede borrar la
 // sesión; un corte de red, un timeout o un 5xx (proxy/túnel caído) la conservan.
 const publicDir = new URL('../../public/', import.meta.url);
-const { restaurarSesion, recordarUsuario } = await import(new URL('js/sesion.js', publicDir));
+const { debeAceptarBases, restaurarSesion, recordarUsuario } = await import(new URL('js/sesion.js', publicDir));
 
 const USUARIO = { id: 7, nombre: 'Ana', rol: 'ciudadano', acepto_terminos: true };
 
@@ -105,4 +105,13 @@ test('con el apiRequest real: el status del error decide y se avisa a la franja'
   } finally {
     Object.assign(globalThis, anteriores);
   }
+});
+
+test('bases y condiciones: la pantalla obligatoria es solo para ciudadanos que no las aceptaron', () => {
+  assert.equal(debeAceptarBases({ rol: 'ciudadano', acepto_terminos: false }), true);
+  assert.equal(debeAceptarBases({ rol: 'ciudadano', acepto_terminos: true }), false);
+  // Nunca a un administrador, aunque no figure la aceptación (las cuentas de crear-admin.js).
+  assert.equal(debeAceptarBases({ rol: 'administrador', acepto_terminos: false }), false);
+  assert.equal(debeAceptarBases({ rol: 'ADMINISTRADOR' }), false);
+  assert.equal(debeAceptarBases(null), false, 'sin sesión no hay pantalla obligatoria');
 });

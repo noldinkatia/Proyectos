@@ -11,6 +11,7 @@ import { initMainLeafletMap } from './map.js';
 import { renderMyCasesView } from './my-cases.js';
 import { renderNotifList, updateNotifBadge } from './notifications.js';
 import { initReportLeafletMap, initReportLocationSelects, removeReportPhoto, renderReportView } from './report.js';
+import { debeAceptarBases } from './sesion.js';
 import { renderStatsView } from './stats.js';
 import { getStore } from './store.js';
 import { adminDashboardDataSignature, caseCollectionSignature, citizenDashboardSignature, loadAdminDashboardData, replaceBackendCollections, scheduleLocatedExpiry, startLiveSyncPolling, startPublicStatsPolling } from './sync.js';
@@ -97,7 +98,7 @@ export async function applyCurrentRoute() {
   const store = getStore();
 
   // Las bases solo existen como pantalla mientras falte aceptarlas.
-  if (route.view === 'legal' && !(store.currentUser && !store.currentUser.acepto_terminos)) {
+  if (route.view === 'legal' && !debeAceptarBases(store.currentUser)) {
     route = { view: 'feed', params: {} };
   }
   // La verificacion por codigo no se puede retomar en frio: el correo
@@ -207,7 +208,8 @@ export async function navigateTo(view, params = {}, options = {}) {
     return;
   }
 
-  if (store.currentUser && !store.currentUser.acepto_terminos) {
+  // Pantalla obligatoria: solo ciudadanos sin aceptación (nunca administradores).
+  if (debeAceptarBases(store.currentUser)) {
     header.classList.add('hidden');
     main.innerHTML = renderLegalTerms();
     labelButtons(main);
