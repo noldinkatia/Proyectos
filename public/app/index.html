@@ -85,6 +85,8 @@
 
       <div class="drawer-account">
         <p class="drawer-section-label">Cuenta y avisos</p>
+        <!-- Alertas de casos a 160 km (app/zona.js): solo ciudadanos con sesión -->
+        <button type="button" data-role-nav="citizen" data-on-click="toggleDrawer(false); abrirAlertasZona()" class="btn btn-primary hidden">Activar alertas de mi zona</button>
         <button type="button" data-role-nav="session" data-on-click="toggleDrawer(false); enableSystemNotifications()" class="btn btn-outline">Activar avisos del dispositivo</button>
         <!-- Visible solo si el navegador permite instalar (o en iOS, con guía) -->
         <button id="installAppButton" type="button" data-on-click="toggleDrawer(false); installApp()" class="btn btn-outline hidden">Instalar app</button>
@@ -144,6 +146,17 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-primary btn-sm" data-on-click="clearNotifs()">Marcar todas como leídas</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ALERTAS DE MI ZONA (app/zona.js): consentimiento, activar y desactivar -->
+  <div id="zonaAlertasModal" class="hidden">
+    <div role="dialog" aria-modal="true" aria-labelledby="zonaAlertasTitulo">
+      <div class="modal-header">
+        <span id="zonaAlertasTitulo">Alertas de mi zona</span>
+        <button type="button" class="btn btn-outline btn-sm" data-on-click="cerrarAlertasZona()">Cerrar</button>
+      </div>
+      <div id="zonaAlertasContenido" class="modal-body"></div>
     </div>
   </div>
 

@@ -1,6 +1,7 @@
 // Rutas (hash), navegación con control de acceso y vistas que piden cuenta.
 import { loadAdminHistoryPhotos, renderAdminView, selectAdminTab } from './admin.js';
-import { apiRequest } from './api.js';
+import { renderAlertaView } from './alerta.js';
+import { apiRequest, loadProtectedPhotos } from './api.js';
 import { renderAuthScreen, renderLegalTerms, renderOTPView, updateHeaderUser } from './auth.js';
 import { API_BASE, escapeHtml } from './config.js';
 import { estado } from './estado.js';
@@ -28,6 +29,7 @@ export function buildRoute(view, params = {}) {
     case 'report': return '#/reportar';
     case 'lead': return params.caseId ? `#/pista/${encodeURIComponent(params.caseId)}` : '#/pista';
     case 'case': return `#/caso/${encodeURIComponent(params.caseId)}`;
+    case 'alert': return `#/alerta/${encodeURIComponent(params.caseId)}`;
     case 'stats': return '#/estadisticas';
     case 'my-cases': return '#/mis-casos';
     case 'alerts': return '#/alertas';
@@ -57,6 +59,7 @@ export function parseRoute(hash = location.hash) {
     case 'reportar': return { view: 'report', params: {} };
     case 'pista': return { view: 'lead', params: tail ? { caseId: tail } : {} };
     case 'caso': return tail ? { view: 'feed', params: {}, caseId: tail } : { view: 'feed', params: {} };
+    case 'alerta': return tail ? { view: 'alert', params: { caseId: tail } } : { view: 'feed', params: {} };
     case 'estadisticas': return { view: 'stats', params: {} };
     case 'mis-casos': return { view: 'my-cases', params: {} };
     case 'alertas': return { view: 'alerts', params: {} };
@@ -259,6 +262,7 @@ export async function navigateTo(view, params = {}, options = {}) {
   let adminAudit = [];
   let myCases = [];
   let myNotifications = [];
+  let alertData = null;
   if (view === 'feed' || view === 'lead') {
     try {
       const [caseResult, clueResult] = await Promise.all([
@@ -328,6 +332,20 @@ export async function navigateTo(view, params = {}, options = {}) {
       labelButtons(main);
       return;
     }
+  } else if (view === 'alert') {
+    try {
+      alertData = await apiRequest(`/alertas/${encodeURIComponent(params.caseId)}`);
+    } catch (error) {
+      showToast('Alerta no disponible', error.message, 'error');
+      await navigateTo('feed', {}, { replace: true });
+      return;
+    }
+    // Ya validado: se abre la ficha pública completa.
+    if (alertData.estado === 'PUBLICO') {
+      await navigateTo('feed', {}, { replace: true });
+      openCaseDetail(params.caseId);
+      return;
+    }
   } else if (view === 'my-cases') {
     try {
       const [caseResult, notificationResult] = await Promise.all([
@@ -380,6 +398,10 @@ export async function navigateTo(view, params = {}, options = {}) {
       loadAdminHistoryPhotos(main);
       if (params.tab) selectAdminTab(params.tab, null, { silent: true });
       startLiveSyncPolling('admin');
+      break;
+    case 'alert':
+      main.innerHTML = renderAlertaView(alertData);
+      loadProtectedPhotos(main);
       break;
     case 'otp':
       main.innerHTML = renderOTPView(params);

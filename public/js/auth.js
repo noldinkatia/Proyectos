@@ -3,6 +3,7 @@ import { apiRequest } from './api.js';
 import { escapeHtml } from './config.js';
 import { estado } from './estado.js';
 import { startNotificationPolling } from './notifications.js';
+import { darDeBajaEsteDispositivo } from './push-dispositivo.js';
 import { consumePendingDestination, navigateTo } from './router.js';
 import { olvidarSesion, recordarUsuario } from './sesion.js';
 import { getStore } from './store.js';
@@ -447,6 +448,8 @@ export async function logout() {
     clearInterval(estado.notificationRefreshTimer);
     estado.notificationRefreshTimer = null;
   }
+  // Antes de borrar el token: el servidor solo borra endpoints de esta cuenta.
+  await darDeBajaEsteDispositivo();
   olvidarSesion();
   window.backendCurrentUser = null;
   window.backendCaseData = null;

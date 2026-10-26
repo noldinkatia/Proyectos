@@ -1,5 +1,6 @@
 // Punto de entrada: inicialización, eventos de navegación, puente window y service worker.
 // Los demás módulos solo declaran; todo lo que se ejecuta al cargar está acá.
+import { abrirAlerta } from './alerta.js';
 import { adminAccept, adminCloseCase, adminMarkLocated, adminModerateClue, adminOpenCase, adminReject, adminReopenCase, adminReturnToReview, closeReviewChecklist, loadAdminHistory, loadAdminHistoryPhotos, runTimeFastForward, searchAdminHistory, selectAdminTab, submitCaseReview } from './admin.js';
 import { apiRequest, avisarServidor } from './api.js';
 import { acceptTerms, changeRegistrationEmail, handleForgotPassword, handleLogin, handleRegister, logout, rejectTerms, resendVerificationCode, retryTermsAcceptance, togglePass, updatePasswordStrength, verifyEmailCode } from './auth.js';
@@ -11,7 +12,7 @@ import { respondToFollowup } from './my-cases.js';
 import { iniciarConexion } from './conexion.js';
 import { restaurarSesion } from './sesion.js';
 import { clearNotifs, enableSystemNotifications, respondToCaseFollowup, toggleNotificationsModal } from './notifications.js';
-import { centerReportMapOnSelection, handleReportPhotoSelection, handleReportSubmit, onReportCityChange, onReportDepartmentChange, removeReportPhoto, updateMinorAuthorization, useBrowserLocation } from './report.js';
+import { actualizarVistaPreviaAlerta, centerReportMapOnSelection, desmarcarCampoReporte, handleReportPhotoSelection, handleReportSubmit, onReportCityChange, onReportDepartmentChange, removeReportPhoto, updateMinorAuthorization, useBrowserLocation } from './report.js';
 import { applyCurrentRoute, drawerNavigate, navigateTo } from './router.js';
 import { setStatsView } from './stats.js';
 import { syncOnVisible } from './sync.js';
@@ -47,6 +48,7 @@ export const acciones = {
   toggleNotificationsModal,
   enableSystemNotifications,
   clearNotifs,
+  abrirAlerta,
   runTimeFastForward,
   closeCaseDetail,
   openCaseDetail,
@@ -78,6 +80,8 @@ export const acciones = {
   onReportDepartmentChange,
   onReportCityChange,
   handleReportSubmit,
+  actualizarVistaPreviaAlerta,
+  desmarcarCampoReporte,
   handleLeadPhotoSelection,
   clearLeadPhotoSelection,
   filterLeadCases,

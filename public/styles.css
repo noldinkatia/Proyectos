@@ -57,6 +57,9 @@
   /* Líneas y separadores */
   --border: rgba(11,37,69,.12);
   --border-strong: rgba(11,37,69,.22);
+  /* Casillas propias (.check-fila): borde con contraste de al menos 3:1 */
+  --check-border: #5b6b80;
+  --check-mark: #ffffff;
   --border-dashed: #9eabb9;
   --line-subtle: #e9edf1;
   --track: #e8ebef;
@@ -183,6 +186,8 @@
 
   --border: rgba(255,255,255,.09);
   --border-strong: rgba(255,255,255,.17);
+  --check-border: #9aa7bd;
+  --check-mark: #04121a;
   --border-dashed: rgba(255,255,255,.28);
   --line-subtle: rgba(255,255,255,.08);
   --track: #1a2338;
@@ -963,6 +968,65 @@ form.card { width: 100%; }
 .case-detail-modal > section, .review-checklist { width: min(100%,620px); max-height: min(85vh,720px); overflow: auto; }
 .case-detail-modal > section > button { margin-left: auto; }
 .case-detail-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+/* Alerta de zona en revisión (js/alerta.js): solo la vista mínima */
+.alerta-zona { display: grid; gap: .6rem; max-width: 640px; margin: 0 auto; }
+.alerta-zona h1 { margin: 0; }
+.alerta-zona p { margin: 0; }
+.alerta-zona-foto { width: min(100%, 320px); border-radius: var(--radius-sm); }
+/* Vista previa de la alerta temprana en el formulario de reporte (js/report.js) */
+/* Casillas del formulario de reporte: dibujo propio, sin depender del navegador
+   ni de extensiones. Caja de 22 px, fila de 44 px como mínimo y toda tocable. */
+.check-fila { display: flex !important; align-items: flex-start; gap: .75rem; min-height: 44px; margin: .5rem 0; padding: .6rem .75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: .9rem; line-height: 1.45; cursor: pointer; }
+.check-fila:hover { border-color: var(--check-border); }
+.check-fila input[type="checkbox"] {
+  -webkit-appearance: none !important; appearance: none !important;
+  display: inline-block !important; visibility: visible !important; opacity: 1 !important; position: static !important;
+  flex: 0 0 22px; width: 22px !important; height: 22px !important; min-width: 22px; margin: .05rem 0 0 !important;
+  border: 2px solid var(--check-border) !important; border-radius: 5px; background-color: var(--surface);
+  background-repeat: no-repeat; background-position: center; background-size: 16px 16px; cursor: pointer;
+}
+.check-fila input[type="checkbox"]:checked {
+  border-color: var(--accent) !important; background-color: var(--accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3.2L13 4.8' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+[data-theme="dark"] .check-fila input[type="checkbox"]:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3.2L13 4.8' fill='none' stroke='%2304121a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.check-fila input[type="checkbox"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.check-fila:has(input:focus-visible) { border-color: var(--accent); }
+.check-fila input[type="checkbox"]:disabled { opacity: .45 !important; cursor: not-allowed; }
+.check-fila:has(input:disabled) { cursor: not-allowed; color: var(--muted); }
+.check-fila-texto { display: grid; gap: .2rem; min-width: 0; }
+.check-fila-suelta { margin: 1rem 0; }
+.check-fila.check-fila-error, .check-fila.check-fila-error:has(input:focus-visible) { border: 2px solid var(--red); background: var(--red-soft); }
+.check-fila-aviso { color: var(--red); font-size: .85rem; font-weight: 700; }
+.check-fila-aviso::before { content: "⚠ "; }
+.consent-group .check-fila { gap: .75rem; margin: .5rem 0; font-size: .9rem; }
+/* Campos que faltan en el formulario de reporte (validarFormularioReporte) */
+#reportFormError { margin: 1rem 0 .75rem; }
+.form-control[aria-invalid="true"] { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
+input[type="checkbox"][aria-invalid="true"] { outline: 2px solid var(--red); outline-offset: 2px; }
+.check-fila input[type="checkbox"][aria-invalid="true"] { border-color: var(--red) !important; outline: none; }
+.alert-preview { display: grid; gap: .9rem; margin: 1rem 0; padding: 1rem; border: 1px solid var(--amber-border); border-radius: var(--radius); background: var(--surface-2); font-size: 1rem; line-height: 1.5; overflow-wrap: anywhere; }
+.alert-preview h2 { margin: 0; font-size: 1.2rem; line-height: 1.3; }
+.alert-preview h3 { margin: 0; font-size: 1.05rem; }
+.alert-preview p { margin: 0; }
+.alert-preview-intro { display: grid; gap: .35rem; }
+.alert-preview-seguro { padding: .7rem .85rem; border-left: 4px solid var(--green, var(--accent)); border-radius: var(--radius-sm); background: var(--surface); font-weight: 600; }
+.alert-preview-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 .75rem; margin: 0; padding: 0; border: 0; }
+.alert-preview-fields legend { margin-bottom: .25rem; padding: 0; font-weight: 700; }
+.alert-preview-fields .check-fila { margin: .3rem 0; }
+.check-fila-texto small { color: var(--muted); font-size: .85rem; line-height: 1.4; }
+.alert-preview-continuar { color: var(--text-2); }
+.alert-preview-ejemplo { display: grid; gap: .55rem; padding: .9rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
+.alert-preview-paso { color: var(--text-2); font-size: .92rem; }
+.alert-preview-push { display: flex; align-items: center; gap: .7rem; padding: .7rem .85rem; border: 1px solid var(--border-strong); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-overlay); font-size: .92rem; }
+.alert-preview-push img { flex: 0 0 36px; border-radius: 8px; }
+.alert-preview-push div { display: grid; gap: .1rem; min-width: 0; }
+.alert-preview-card { display: grid; gap: .45rem; padding: .85rem; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); }
+.alert-preview-card img { width: min(100%, 240px); border-radius: var(--radius-sm); }
+/* La etiqueta de estado se lee en un celular: sin mayúsculas forzadas y a 14 px. */
+.alert-preview-card .status-tag, .alerta-zona .status-tag { justify-self: start; font-size: .875rem; text-transform: none; letter-spacing: 0; white-space: normal; }
 .lead-photo-previews, .moderation-photos { display: flex; flex-wrap: wrap; gap: .45rem; }
 .lead-photo-previews img, .moderation-photos img { width: 76px; height: 76px; border: 1px solid var(--border); border-radius: var(--radius-sm); object-fit: cover; }
 

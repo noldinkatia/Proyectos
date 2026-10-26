@@ -64,3 +64,12 @@ body.app-movil #toastNotification { bottom: calc(var(--tabbar-h) + .75rem + env(
 .install-welcome p { margin: 0; color: var(--muted); font-size: .9rem; line-height: 1.5; }
 .install-welcome .btn { width: 100%; justify-content: center; }
 .install-welcome .install-steps { margin: 0; padding-left: 1.4rem !important; text-align: left; }
+
+/* Alertas de mi zona (app/zona.js): mismo aspecto que los otros modales */
+#zonaAlertasModal { position: fixed; z-index: 2000; inset: 0; display: flex; align-items: center; justify-content: center; padding: 1rem; background: var(--overlay); backdrop-filter: blur(5px); }
+#zonaAlertasModal > div { display: flex; flex-direction: column; width: min(100%, 480px); max-height: 85vh; overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: var(--shadow-overlay); }
+#zonaAlertasModal .modal-header { display: flex; flex-wrap: nowrap; align-items: center; gap: .5rem; padding: 1rem 1.2rem; border-bottom: 1px solid var(--border); background: var(--surface-2); color: var(--text); }
+#zonaAlertasModal .modal-header > span { min-width: 0; flex: 1 1 auto; font-weight: 700; }
+#zonaAlertasModal .modal-body { display: grid; gap: .75rem; overflow-y: auto; padding: 1rem 1.2rem; font-size: .88rem; line-height: 1.5; }
+#zonaAlertasModal .modal-body ul { margin: 0; padding-left: 1.1rem; }
+#zonaAlertasModal .zona-acciones { display: flex; flex-wrap: wrap; gap: .5rem; }

@@ -1,6 +1,6 @@
 // Un solo service worker en /sw.js (scope "/") para la web (/) y la app (/app/).
 // Al activarse borra los cachés rastreopy-shell-* anteriores (v6, v7, v8...).
-const CACHE_NAME = 'rastreopy-shell-v9';
+const CACHE_NAME = 'rastreopy-shell-v11';
 const OFFLINE_PAGE = '/offline.html';
 const APP_SHELL = [
   '/',
@@ -12,9 +12,11 @@ const APP_SHELL = [
   '/app/manifest.webmanifest',
   '/app/app-movil.js',
   '/app/pwa.js',
+  '/app/zona.js',
   '/icons/rastreopy.svg',
   '/icons/rastreopy-192.png',
   '/icons/rastreopy-512.png',
+  '/icons/rastreopy-badge-96.png',
   '/icons/rastreopy-maskable-192.png',
   '/icons/rastreopy-maskable-512.png',
   '/js/conexion.js',
@@ -36,6 +38,9 @@ const APP_SHELL = [
   '/js/my-cases.js',
   '/js/admin.js',
   '/js/notifications.js',
+  '/js/alerta.js',
+  '/js/alerta-campos.js',
+  '/js/push-dispositivo.js',
   '/js/eventos.js',
   '/js/tema-inicial.js',
   '/js/app.js',
@@ -105,11 +110,75 @@ self.addEventListener('fetch', event => {
   })());
 });
 
+// Web Push (backend/push.js). El servidor manda título, texto, la dirección del
+// caso en la app y un tag por caso: un aviso nuevo del mismo caso reemplaza al
+// anterior. Las alertas tempranas (discreta) llegan sin sonido ni vibración; la
+// oficial suena, vibra, queda en pantalla hasta tocarla y vuelve a sonar si
+// reemplaza a otro aviso del mismo caso.
+const ICONO_AVISO = '/icons/rastreopy-192.png';
+// Monocromo (blanco sobre transparente) para la barra de estado de Android.
+const BADGE_AVISO = '/icons/rastreopy-badge-96.png';
+
+function opcionesAviso(datos) {
+  const texto = (valor, largo = 200) => (typeof valor === 'string' ? valor.slice(0, largo) : '');
+  const url = texto(datos.url).startsWith('/') ? texto(datos.url) : '/app/';
+  const importante = datos.discreta === false;
+  const acciones = (Array.isArray(datos.acciones) ? datos.acciones : [])
+    .filter(item => /^[a-z]{1,20}$/.test(item?.accion) && texto(item.titulo, 30))
+    .slice(0, 2)
+    .map(item => ({ action: item.accion, title: texto(item.titulo, 30) }));
+  const opciones = {
+    body: texto(datos.cuerpo) || 'Tenés una novedad en Rastreo PY.',
+    icon: ICONO_AVISO,
+    badge: BADGE_AVISO,
+    lang: 'es',
+    dir: 'ltr',
+    tag: texto(datos.tag, 100) || 'rastreo-py',
+    renotify: importante,
+    silent: !importante,
+    requireInteraction: importante,
+    timestamp: Date.now(),
+    data: { url }
+  };
+  if (importante) opciones.vibrate = [200, 100, 200];
+  if (acciones.length) opciones.actions = acciones;
+  return { titulo: texto(datos.titulo, 100) || 'Rastreo PY', opciones };
+}
+
+// Todo push termina en un aviso visible: Chrome penaliza al sitio si un push
+// llega y no se muestra nada. Si los datos no se pueden leer o el navegador
+// rechaza alguna opción, se muestra un aviso genérico.
+self.addEventListener('push', event => {
+  let datos = {};
+  try {
+    datos = event.data ? event.data.json() : {};
+  } catch {
+    datos = {};
+  }
+  event.waitUntil((async () => {
+    let url = '/app/';
+    try {
+      const { titulo, opciones } = opcionesAviso(datos && typeof datos === 'object' ? datos : {});
+      url = opciones.data.url;
+      await self.registration.showNotification(titulo, opciones);
+    } catch {
+      await self.registration.showNotification('Rastreo PY', {
+        body: 'Tenés una novedad en Rastreo PY.', icon: ICONO_AVISO, badge: BADGE_AVISO,
+        lang: 'es', dir: 'ltr', tag: 'rastreo-py', data: { url }
+      });
+    }
+  })());
+});
+
+// Tocar el aviso o su botón "Ver" abre lo mismo: la dirección del aviso.
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   const target = new URL(event.notification.data?.url || '/', self.location.origin).href;
   event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
-    const existing = clients.find(client => client.url.startsWith(self.location.origin));
+    // Si el aviso es de la app (/app/...), se prefiere una ventana de la app.
+    const appPath = new URL(target).pathname.startsWith('/app/') ? `${self.location.origin}/app/` : self.location.origin;
+    const existing = clients.find(client => client.url.startsWith(appPath))
+      || clients.find(client => client.url.startsWith(self.location.origin));
     if (existing) return existing.navigate(target).then(() => existing.focus());
     return self.clients.openWindow(target);
   }));

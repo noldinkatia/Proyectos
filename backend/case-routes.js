@@ -2,6 +2,8 @@ import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { rateLimit } from 'express-rate-limit';
 import { createAdminRouter } from './admin-routes.js';
+import { createAlertRouter } from './alertas-routes.js';
+import { alertasPorCambioDeEstado, enviarAlertaTemprana } from './alertas.js';
 import { asyncRoute, authenticate, isAdministrator, requireAdministrator } from './auth-routes.js';
 import {
   caseListColumns,
@@ -20,12 +22,13 @@ import { withTransaction } from './db.js';
 import { createNotificationRouter } from './notification-routes.js';
 import { createStatsRouter } from './stats-routes.js';
 import { ubicacionValida } from './ubicaciones.js';
+import { normalizarCamposAlerta } from '../public/js/alerta-campos.js';
 
 export { processDueFollowups } from './followups.js';
 
 // Router de /api: define los permisos comunes y las rutas de casos del ciudadano,
 // y monta los routers de pistas, notificaciones, estadísticas y administración.
-export function createCaseRouter({ db, jwtSecret }) {
+export function createCaseRouter({ db, jwtSecret, push }) {
   const router = express.Router();
   const requireUser = authenticate(jwtSecret, db);
   const requireAdmin = [requireUser, requireAdministrator];
@@ -126,14 +129,15 @@ export function createCaseRouter({ db, jwtSecret }) {
     }
     const denuncia = typeof body.numeroDenuncia === 'string' ? body.numeroDenuncia.trim() : '';
     const id = `cas_${randomUUID()}`;
+    let alertasPush = [];
     const created = await withTransaction(db, async client => {
       const { rows } = await client.query(`
         INSERT INTO casos (
           id, nombre_completo, edad, sexo, ciudad, departamento, barrio, descripcion_fisica, vestimenta,
           senas_particulares, fecha_hora_desaparicion, foto, latitud, longitud, direccion,
           numero_denuncia, estado, reportado_por_usr_id, proximo_seguimiento,
-          reportante_mayor_edad, autorizacion_parental, aviso_privacidad_aceptado
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+          reportante_mayor_edad, autorizacion_parental, aviso_privacidad_aceptado, alerta_campos
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
         RETURNING *
       `, [
         id, body.nombreCompleto.trim(), Number(body.edad), body.sexo.trim(), body.ciudad.trim(),
@@ -141,7 +145,9 @@ export function createCaseRouter({ db, jwtSecret }) {
         body.fechaHoraDesaparicion, body.foto || '', Number(body.ubicacion.lat), Number(body.ubicacion.lng),
         body.ubicacion.direccion || body.ciudad, denuncia, 'PENDIENTE',
         req.auth.id, new Date(Date.now() + 48 * 60 * 60 * 1000),
-        body.declaraMayorEdad, body.autorizacionParental === true, body.avisoPrivacidadAceptado
+        body.declaraMayorEdad, body.autorizacionParental === true, body.avisoPrivacidadAceptado,
+        // Qué muestra la alerta temprana: solo de la lista permitida (la foto, solo de adultos).
+        JSON.stringify(normalizarCamposAlerta(body.alertaCampos, { edad: Number(body.edad), tieneFoto: Boolean(body.foto) }))
       ]);
       await client.query(
         'INSERT INTO suscripciones_caso (caso_id, usuario_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
@@ -156,8 +162,10 @@ export function createCaseRouter({ db, jwtSecret }) {
         SELECT id, $1, 'Nuevo reporte para validar', $2, 'CASO_PENDIENTE'
         FROM usuarios WHERE rol = 'administrador'
       `, [id, `Se recibió un reporte de ${body.nombreCompleto.trim()} y espera validación.`]);
+      alertasPush = (await enviarAlertaTemprana(client, rows[0], { push })).notificaciones;
       return rows[0];
     });
+    push.programar(db, alertasPush);
     res.status(201).json({ caso: toOwnerCase(created) });
   }));
 
@@ -171,6 +179,7 @@ export function createCaseRouter({ db, jwtSecret }) {
       return res.status(400).json({ error: 'Debe justificar el cierre del caso.' });
     }
 
+    let alertasPush = [];
     const updated = await withTransaction(db, async client => {
       const { rows } = await client.query(`
         SELECT * FROM casos
@@ -200,6 +209,7 @@ export function createCaseRouter({ db, jwtSecret }) {
           INSERT INTO cambios_estado_caso (caso_id, estado_anterior, estado_nuevo, cambiado_por)
           VALUES ($1, $2, $3, $4)
         `, [req.params.id, current.estado, state, req.auth.id]);
+        alertasPush = await alertasPorCambioDeEstado(client, current, state, { push });
       }
       if (state === 'LOCALIZADO') {
         await client.query(`
@@ -211,12 +221,14 @@ export function createCaseRouter({ db, jwtSecret }) {
       return updatedRows[0];
     });
     if (!updated) return res.status(404).json({ error: 'Caso no disponible para seguimiento.' });
+    push.programar(db, alertasPush);
     res.json({ caso: toOwnerCase(updated) });
   }));
 
-  const shared = { db, requireUser, requireAdmin, requireCitizen, publicReadLimiter };
+  const shared = { db, requireUser, requireAdmin, requireCitizen, publicReadLimiter, push };
   router.use(createClueRouter(shared));
   router.use(createNotificationRouter(shared));
+  router.use(createAlertRouter(shared));
   router.use(createStatsRouter(shared));
   router.use(createAdminRouter(shared));
 

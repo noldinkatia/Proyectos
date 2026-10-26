@@ -25,7 +25,7 @@ export function caseListColumns(alias = '') {
     'reportado_por_usr_id', 'localizado_en', 'creado_en', 'proximo_seguimiento',
     'reportante_mayor_edad', 'autorizacion_parental', 'aviso_privacidad_aceptado',
     'checklist_denuncia', 'checklist_coherencia', 'checklist_duplicados', 'checklist_menores',
-    'motivo_cierre', 'seguimiento_etapa'
+    'motivo_cierre', 'seguimiento_etapa', 'alerta_campos', 'alerta_temprana_en'
   ].map(column => `${prefix}${column}`).join(', ') + `, (${prefix}foto <> '') AS tiene_foto`;
 }
 
@@ -118,6 +118,9 @@ export function toAdminCase(row) {
       validacionMenores: Boolean(row.checklist_menores)
     },
     motivoCierre: row.motivo_cierre,
+    // Lo que el reportante eligió mostrar en la alerta temprana y cuándo salió.
+    alertaCampos: Array.isArray(row.alerta_campos) ? row.alerta_campos : [],
+    alertaTempranaEn: row.alerta_temprana_en || null,
     pistas: row.pistas || [],
     cambiosEstado: row.cambios_estado || []
   };

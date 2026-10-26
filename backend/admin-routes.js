@@ -1,4 +1,5 @@
 import express from 'express';
+import { alertasPorCambioDeEstado } from './alertas.js';
 import { asyncRoute } from './auth-routes.js';
 import {
   caseListColumns,
@@ -13,7 +14,7 @@ import { processDueFollowups } from './followups.js';
 
 // Panel de administración: listado y moderación de casos, auditoría, historial
 // de localizados y simulador de seguimiento. Todas las rutas exigen administrador.
-export function createAdminRouter({ db, requireAdmin }) {
+export function createAdminRouter({ db, requireAdmin, push }) {
   const router = express.Router();
 
   router.get('/admin/casos', ...requireAdmin, asyncRoute(async (req, res) => {
@@ -151,6 +152,7 @@ export function createAdminRouter({ db, requireAdmin }) {
     if (state === 'CERRADO' && (typeof req.body?.motivo !== 'string' || !req.body.motivo.trim())) {
       return res.status(400).json({ error: 'Debe indicar la justificación para cerrar el caso.' });
     }
+    let alertasPush = [];
     const updated = await withTransaction(db, async client => {
       const { rows } = await client.query('SELECT * FROM casos WHERE id = $1 FOR UPDATE', [req.params.id]);
       if (!rows[0]) return null;
@@ -190,6 +192,7 @@ export function createAdminRouter({ db, requireAdmin }) {
         INSERT INTO cambios_estado_caso (caso_id, estado_anterior, estado_nuevo, cambiado_por)
         VALUES ($1, $2, $3, $4)
       `, [req.params.id, current.estado, state, req.auth.id]);
+      alertasPush = await alertasPorCambioDeEstado(client, current, state, { push });
       if (current.reportado_por_usr_id) {
         const caseName = current.nombre_completo;
         const reason = typeof req.body?.motivo === 'string' ? req.body.motivo.trim() : '';
@@ -221,6 +224,7 @@ export function createAdminRouter({ db, requireAdmin }) {
       return updatedRows[0];
     });
     if (!updated) return res.status(404).json({ error: 'Caso no disponible' });
+    push.programar(db, alertasPush);
     res.json({ caso: toAdminCase(updated) });
   }));
 

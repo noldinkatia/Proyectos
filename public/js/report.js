@@ -1,5 +1,7 @@
 // Reportar una persona desaparecida: formulario, ubicación y foto.
+import { CAMPOS_ALERTA, ETIQUETA_NO_VERIFICADA, avisoPushAlertaTemprana, datosAlerta, fotoPermitida } from './alerta-campos.js';
 import { apiRequest } from './api.js';
+import { escapeHtml } from './config.js';
 import { estado } from './estado.js';
 import { addBaseTiles, addTextMapZoomControl } from './map.js';
 import { navigateTo } from './router.js';
@@ -14,19 +16,22 @@ export function renderReportView() {
         <p>Completá los datos de la persona. El reporte pasa por validación antes de publicarse.</p>
       </header>
 
-      <form data-on-submit="handleReportSubmit(event)" class="card">
+      <!-- novalidate: la validación la hace validarFormularioReporte, con un mensaje
+           visible y foco en el campo. La del navegador frena el envío sin avisar si
+           un campo obligatorio no se puede enfocar. -->
+      <form novalidate data-on-submit="handleReportSubmit(event)" data-on-input="actualizarVistaPreviaAlerta(); desmarcarCampoReporte(event)" data-on-change="actualizarVistaPreviaAlerta(); desmarcarCampoReporte(event)" class="card">
         <div class="form-group">
-          <label>Nombre Completo *</label>
+          <label for="repNombre">Nombre Completo *</label>
           <input type="text" id="repNombre" required placeholder="Nombre y apellido de la persona" class="form-control">
         </div>
 
         <div class="grid-2">
           <div class="form-group">
-            <label>Edad *</label>
+            <label for="repEdad">Edad *</label>
             <input type="number" id="repEdad" required min="0" max="120" data-on-input="updateMinorAuthorization()" placeholder="Años" class="form-control">
           </div>
           <div class="form-group">
-            <label>Sexo *</label>
+            <label for="repSexo">Sexo *</label>
             <select id="repSexo" class="form-control">
               <option value="Femenino">Femenino</option>
               <option value="Masculino">Masculino</option>
@@ -62,17 +67,17 @@ export function renderReportView() {
         </div>
 
         <div class="form-group">
-          <label>Descripción Física *</label>
+          <label for="repFisica">Descripción Física *</label>
           <textarea id="repFisica" required placeholder="Estatura, tez, tono de cabello..." class="form-control"></textarea>
         </div>
 
         <div class="form-group">
-          <label>Vestimenta al Desaparecer *</label>
+          <label for="repVestimenta">Vestimenta al Desaparecer *</label>
           <input type="text" id="repVestimenta" required placeholder="Prendas y calzados..." class="form-control">
         </div>
 
         <div class="form-group">
-          <label>Señas Particulares</label>
+          <label for="repSenas">Señas Particulares</label>
           <input type="text" id="repSenas" placeholder="Tatuajes, cicatrices o accesorios..." class="form-control">
         </div>
 
@@ -113,15 +118,45 @@ export function renderReportView() {
 
         <fieldset class="form-group consent-group">
           <legend>Verificación de edad y autorización *</legend>
-          <label><input type="checkbox" id="reporterAdult" required> Declaro que soy mayor de 18 años y estoy autorizado a realizar este reporte.</label>
-          <label><input type="checkbox" id="minorAuthorization" data-on-change="updateMinorAuthorization()"> Confirmo que cuento con autorización parental o de tutor legal para reportar a la persona menor de edad.</label>
+          <!-- .check-fila: casilla dibujada por styles.css (no la del navegador) y toda la fila se puede tocar -->
+          <label class="check-fila"><input type="checkbox" id="reporterAdult" required data-etiqueta="Declaración de mayoría de edad"><span class="check-fila-texto">Declaro que soy mayor de 18 años y estoy autorizado a realizar este reporte.</span></label>
+          <label class="check-fila"><input type="checkbox" id="minorAuthorization" data-etiqueta="Autorización parental o de tutor" data-on-change="updateMinorAuthorization()"><span class="check-fila-texto">Confirmo que cuento con autorización parental o de tutor legal para reportar a la persona menor de edad.</span></label>
         </fieldset>
-        <label class="privacy-consent">
-          <input type="checkbox" id="privacyConsent" required>
-          Acepto el aviso de privacidad y el uso de estos datos únicamente para la búsqueda y gestión de este reporte.
+        <label class="check-fila check-fila-suelta">
+          <input type="checkbox" id="privacyConsent" required data-etiqueta="Aviso de privacidad">
+          <span class="check-fila-texto">Acepto el aviso de privacidad y el uso de estos datos únicamente para la búsqueda y gestión de este reporte.</span>
         </label>
 
-        <button type="submit" class="btn btn-red">Publicar reporte de búsqueda</button>
+        <!-- Paso previo al envío: quien reporta elige qué ven las personas cercanas en
+             la alerta temprana. Textos simples, pensados para cualquier persona. -->
+        <section id="alertPreviewSection" class="alert-preview hidden" aria-labelledby="alertPreviewTitle">
+          <h2 id="alertPreviewTitle">¿Qué datos verán las personas cercanas?</h2>
+          <div class="alert-preview-intro">
+            <p>Cuando publiques el reporte, avisamos a quienes estén a menos de 160 km para que estén atentos.</p>
+            <p>El aviso sale antes de que la administración revise el caso, por eso dice «${ETIQUETA_NO_VERIFICADA}».</p>
+            <p>Vos decidís qué datos se muestran.</p>
+          </div>
+          <p class="alert-preview-seguro">Tu número de contacto y el número de denuncia nunca se muestran en la alerta. Tampoco la dirección exacta.</p>
+          <fieldset class="alert-preview-fields">
+            <legend>Marcá lo que querés mostrar</legend>
+            ${CAMPOS_ALERTA.map(campo => `<label class="check-fila"><input type="checkbox" name="alertaCampo" value="${campo.clave}"${campo.porDefecto ? ' checked' : ''}${campo.clave === 'foto' ? ' id="alertaCampoFoto"' : ''}><span class="check-fila-texto"><strong>${escapeHtml(campo.texto)}</strong>${campo.ayuda || campo.clave === 'foto' ? `<small${campo.clave === 'foto' ? ' id="alertaFotoAviso"' : ''}>${escapeHtml(campo.ayuda)}</small>` : ''}</span></label>`).join('')}
+          </fieldset>
+          <p class="alert-preview-continuar">Podés seguir sin cambiar nada: ya dejamos marcados solo los datos de la zona.</p>
+          <div class="alert-preview-ejemplo">
+            <h3>Así lo verá una persona de tu zona</h3>
+            <p class="alert-preview-paso">1. Le llega este aviso al celular:</p>
+            <div class="alert-preview-push">
+              <img src="/icons/rastreopy-192.png" alt="" width="36" height="36">
+              <div><strong id="alertPreviewPushTitulo">Alerta en tu zona</strong><span id="alertPreviewPush"></span></div>
+            </div>
+            <p class="alert-preview-paso">2. Si lo abre, ve esto:</p>
+            <div id="alertPreviewCard" class="alert-preview-card"></div>
+            <p class="alert-preview-paso">Cuando la administración verifique el caso, se publica la ficha completa.</p>
+          </div>
+        </section>
+
+        <p id="reportFormError" class="notice notice-warning hidden" role="alert"></p>
+        <button type="submit" id="reportSubmitButton" class="btn btn-red">Revisar alerta y publicar</button>
       </form>
     </div>
   `;
@@ -338,8 +373,140 @@ export async function onReportCityChange() {
   centerReportMapOnSelection();
 }
 
+function camposElegidos() {
+  return Array.from(document.querySelectorAll('input[name="alertaCampo"]:checked'), input => input.value);
+}
+
+// Vuelve a dibujar la vista previa con lo cargado en el formulario. La foto se
+// bloquea si la persona es menor de 18 años o si no se cargó ninguna.
+export function actualizarVistaPreviaAlerta() {
+  const section = document.getElementById('alertPreviewSection');
+  if (!section) return;
+  const edadCargada = document.getElementById('repEdad').value !== '';
+  const edad = Number(document.getElementById('repEdad').value);
+  const foto = document.getElementById('alertaCampoFoto');
+  const fotoHabilitada = fotoPermitida(edad, Boolean(estado.selectedReportPhoto));
+  foto.disabled = !fotoHabilitada;
+  if (!fotoHabilitada) foto.checked = false;
+  document.getElementById('alertaFotoAviso').textContent = edadCargada && edad < 18
+    ? 'Es una persona menor de edad: la foto no se mostrará.'
+    : !estado.selectedReportPhoto
+      ? 'Si se trata de una persona menor de edad, la foto no se mostrará. Para mostrarla, primero cargá una foto más arriba.'
+      : 'Si se trata de una persona menor de edad, la foto no se mostrará.';
+
+  const campos = camposElegidos();
+  const caso = {
+    nombreCompleto: document.getElementById('repNombre').value,
+    edad: edadCargada ? edad : null,
+    sexo: document.getElementById('repSexo').value,
+    departamento: document.getElementById('repDepartamento').value,
+    ciudad: document.getElementById('repCiudad').value,
+    barrio: document.getElementById('repBarrio').value,
+    descripcionFisica: document.getElementById('repFisica').value,
+    vestimenta: document.getElementById('repVestimenta').value
+  };
+  // La distancia depende de quien lo recibe: el ejemplo usa una cualquiera.
+  const aviso = avisoPushAlertaTemprana(caso, campos, 5);
+  document.getElementById('alertPreviewPushTitulo').textContent = aviso.titulo;
+  document.getElementById('alertPreviewPush').textContent = aviso.cuerpo;
+  const filas = datosAlerta(caso, campos)
+    .map(item => `<p><strong>${escapeHtml(item.etiqueta)}:</strong> ${escapeHtml(item.valor)}</p>`).join('');
+  const imagen = campos.includes('foto') && estado.reportPhotoPreviewUrl
+    ? `<img src="${escapeHtml(estado.reportPhotoPreviewUrl)}" alt="Fotografía que verán en la alerta">` : '';
+  document.getElementById('alertPreviewCard').innerHTML = `
+    <span class="status-tag status-PENDIENTE">${escapeHtml(ETIQUETA_NO_VERIFICADA)}</span>
+    <strong>Alerta en tu zona</strong>
+    ${imagen}${filas || '<p class="muted">Solo verá que hay un caso en revisión cerca.</p>'}`;
+}
+
+// Nombre corto de un campo para el mensaje de error: data-etiqueta o su <label>.
+function etiquetaCampo(campo) {
+  const texto = campo.dataset?.etiqueta || campo.labels?.[0]?.textContent || campo.id || 'Campo';
+  return texto.replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+}
+
+// Campos que el navegador marcaría como inválidos (required, min, max...). Devuelve
+// cuáles faltan y cuál enfocar: el primero que se ve en pantalla. Un campo
+// obligatorio oculto no se puede completar, así que no se elige para enfocar y se
+// registra para poder corregirlo.
+export function revisarCamposReporte(form) {
+  const invalidos = Array.from(form.elements).filter(campo => campo.willValidate && !campo.checkValidity());
+  const visible = campo => campo.getClientRects().length > 0;
+  const ocultos = invalidos.filter(campo => !visible(campo));
+  if (ocultos.length) console.error('Campos obligatorios ocultos en el formulario de reporte:', ocultos.map(campo => campo.id || campo.name).join(', '));
+  return { invalidos, enfocar: invalidos.find(visible) || null, etiquetas: invalidos.map(etiquetaCampo) };
+}
+
+function mostrarErrorReporte(mensaje) {
+  const error = document.getElementById('reportFormError');
+  if (!error) return;
+  error.textContent = mensaje;
+  error.classList.toggle('hidden', !mensaje);
+}
+
+const AVISO_CASILLA = 'Marcá esta casilla para continuar';
+
+// Casilla obligatoria sin marcar: la fila entera queda en rojo con un aviso.
+function marcarFilaCasilla(campo, conError) {
+  const fila = campo.type === 'checkbox' ? campo.closest?.('.check-fila') : null;
+  if (!fila) return;
+  fila.classList.toggle('check-fila-error', conError);
+  fila.querySelector('.check-fila-aviso')?.remove();
+  if (conError) {
+    const aviso = document.createElement('span');
+    aviso.className = 'check-fila-aviso';
+    aviso.textContent = AVISO_CASILLA;
+    fila.querySelector('.check-fila-texto')?.append(aviso);
+  }
+}
+
+// Devuelve true si se puede seguir. Si falta algo, muestra qué y enfoca el campo.
+export function validarFormularioReporte(form) {
+  form.querySelectorAll('[aria-invalid="true"]').forEach(campo => {
+    campo.removeAttribute('aria-invalid');
+    marcarFilaCasilla(campo, false);
+  });
+  const { invalidos, enfocar, etiquetas } = revisarCamposReporte(form);
+  if (!invalidos.length) {
+    mostrarErrorReporte('');
+    return true;
+  }
+  invalidos.forEach(campo => {
+    campo.setAttribute('aria-invalid', 'true');
+    marcarFilaCasilla(campo, true);
+  });
+  const detalle = enfocar?.type === 'checkbox' ? ` ${AVISO_CASILLA}.`
+    : enfocar?.validationMessage ? ` (${enfocar.validationMessage})` : '';
+  mostrarErrorReporte(`Falta completar: ${etiquetas.join(', ')}.${detalle}`);
+  if (enfocar) {
+    // Con una casilla se lleva la vista a su fila (caja, texto y aviso).
+    (enfocar.closest?.('.check-fila') || enfocar).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    enfocar.focus({ preventScroll: true });
+  }
+  return false;
+}
+
+// Al corregir un campo marcado se le saca la marca de error.
+export function desmarcarCampoReporte(event) {
+  const campo = event.target;
+  if (campo?.getAttribute?.('aria-invalid') === 'true' && campo.checkValidity()) {
+    campo.removeAttribute('aria-invalid');
+    marcarFilaCasilla(campo, false);
+  }
+}
+
 export async function handleReportSubmit(e) {
   e.preventDefault();
+  if (!validarFormularioReporte(e.currentTarget)) return;
+  // Primer envío: se muestra la vista previa de la alerta temprana para revisarla.
+  const previewSection = document.getElementById('alertPreviewSection');
+  if (previewSection?.classList.contains('hidden')) {
+    previewSection.classList.remove('hidden');
+    actualizarVistaPreviaAlerta();
+    document.getElementById('reportSubmitButton').textContent = 'Confirmar y publicar reporte';
+    previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
   const name = document.getElementById('repNombre').value.trim();
   const city = document.getElementById('repCiudad').value.trim();
   let photoData = '';
@@ -381,7 +548,8 @@ export async function handleReportSubmit(e) {
     numeroDenuncia: denuncia,
     declaraMayorEdad: document.getElementById('reporterAdult').checked,
     autorizacionParental: document.getElementById('minorAuthorization').checked,
-    avisoPrivacidadAceptado: document.getElementById('privacyConsent').checked
+    avisoPrivacidadAceptado: document.getElementById('privacyConsent').checked,
+    alertaCampos: camposElegidos()
   };
 
   try {

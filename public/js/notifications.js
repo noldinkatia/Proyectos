@@ -32,6 +32,22 @@ export function renderNoticeItem(notice, actionsHtml = '') {
   </article>`;
 }
 
+// Alertas de zona: distancia aproximada y botón para abrir la alerta (vista
+// mínima mientras está en revisión, ficha completa cuando ya se validó).
+function alertaZonaHtml(n) {
+  if (!['ALERTA_TEMPRANA', 'ALERTA_OFICIAL'].includes(n.tipo) || !n.casoId) return '';
+  const distancia = Number.isFinite(n.distanciaKm) ? `<p class="muted">A unos ${Math.max(1, Math.round(n.distanciaKm))} km de tu zona.</p>` : '';
+  return `${distancia}<div class="table-actions">
+      <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(n.casoId)}" data-on-click="abrirAlerta(this.dataset.caseId)">${n.tipo === 'ALERTA_OFICIAL' ? 'Ver ficha' : 'Ver alerta'}</button>
+    </div>`;
+}
+
+// No salen como aviso del sistema por el polling: lo que ya llegó por push (no se
+// repite) y lo que va solo al centro de notificaciones (retractación y cierre).
+export function mostrarComoAvisoDelSistema(item) {
+  return item.canal !== 'push' && !['ALERTA_RETRACTADA', 'ALERTA_CERRADO'].includes(item.tipo);
+}
+
 export async function renderNotifList() {
   const store = getStore();
   const container = document.getElementById('notifList');
@@ -47,14 +63,14 @@ export async function renderNotifList() {
     container.innerHTML = '<div class="notif-empty"><strong>Todo al día</strong><p>No tenés notificaciones por ahora.</p></div>';
     return;
   }
-  container.innerHTML = store.notificaciones.map(n => renderNoticeItem(n,
-      ['SEGUIMIENTO', 'SEGUIMIENTO_VENCIDO'].includes(n.tipo) && n.casoId ? `
+  container.innerHTML = store.notificaciones.map(n => renderNoticeItem(n, alertaZonaHtml(n) ||
+      (['SEGUIMIENTO', 'SEGUIMIENTO_VENCIDO'].includes(n.tipo) && n.casoId ? `
         <div class="table-actions">
           <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(n.casoId)}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'SIGUE_ACTIVA')">Sigue activa</button>
           <button type="button" class="btn btn-success btn-sm" data-case-id="${escapeHtml(n.casoId)}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'LOCALIZADO')">Persona localizada</button>
           <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(n.casoId)}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'PRORROGA')">Solicitar prórroga</button>
           <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(n.casoId)}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'CERRAR')">Cerrar caso</button>
-        </div>` : '')).join('');
+        </div>` : ''))).join('');
 }
 
 export async function respondToCaseFollowup(caseId, action) {
@@ -135,7 +151,7 @@ export async function deliverSystemNotifications(notifications) {
   const key = `rastreo_notif_last_${userId}`;
   const savedId = localStorage.getItem(key);
   const unread = notifications
-    .filter(item => !item.leida && Number.isFinite(Number(item.id)))
+    .filter(item => !item.leida && Number.isFinite(Number(item.id)) && mostrarComoAvisoDelSistema(item))
     .sort((left, right) => Number(left.id) - Number(right.id));
   if (savedId === null) {
     const latestId = Math.max(0, ...notifications.map(item => Number(item.id) || 0));
