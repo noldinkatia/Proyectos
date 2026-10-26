@@ -114,6 +114,27 @@ test('app en computadora: "Instalar app" solo con beforeinstallprompt; si no, av
   assert.match(pwa, /if \(esCelular\(\) && !yaInstalada\(\) && !bienvenidaYaVista\(\)\) mostrarBienvenida\(true\)/);
 });
 
+test('barra lateral en celulares: ancho adaptable, scroll interno y nada encima', async () => {
+  const css = await read('styles.css');
+  const regla = selector => {
+    const inicio = css.indexOf(`${selector} {`);
+    assert.ok(inicio >= 0, `falta la regla ${selector}`);
+    return css.slice(inicio, css.indexOf('}', inicio));
+  };
+  // Hasta 560 px: entre 240 y 300 px, siempre deja una franja de la página (tocarla cierra).
+  const celulares = css.slice(css.indexOf('@media (max-width: 560px) {'));
+  assert.match(celulares.slice(0, celulares.indexOf('\n}')), /\.drawer \{ width: clamp\(240px, 78vw, 300px\); \}/);
+  const drawer = regla('.drawer');
+  assert.match(drawer, /overflow-y:\s*auto/, 'scroll interno en pantallas bajas');
+  assert.match(drawer, /overscroll-behavior:\s*contain/);
+  const z = selector => Number(/z-index:\s*(\d+)/.exec(regla(selector))[1]);
+  assert.ok(z('.open-app-notice') < z('.drawer-overlay'), 'el aviso "Abrir la app" no tapa el menú abierto');
+  // El fondo cierra el menú al tocarlo, en las dos páginas.
+  for (const pagina of ['Rastreopy.html', 'app/index.html']) {
+    assert.match(await read(pagina), /<div id="drawerOverlay" data-on-click="toggleDrawer\(false\)"/, pagina);
+  }
+});
+
 test('el APP_SHELL del service worker cubre la web, la app y sus módulos', async () => {
   const sw = await read('sw.js');
   const shell = [...sw.match(/const APP_SHELL = \[([\s\S]*?)\];/)[1].matchAll(/'([^']+)'/g)].map(m => m[1]);
