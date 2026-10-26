@@ -195,6 +195,22 @@ test('casillas del reporte: dibujo propio con tamaño visible, fila tocable y fo
   }
 });
 
+test('casillas del reporte: el texto de la fila no se selecciona (un clic con el puntero en movimiento tilda igual)', async () => {
+  // Con texto seleccionable, mover el mouse 2 px entre presionar y soltar selecciona
+  // texto y el navegador no activa el <label>: la casilla no cambia.
+  const todos = await formularioReporte();
+  const privacidad = todos.find(el => el.atributos.id === 'privacyConsent');
+  const fila = privacidad.ancestros.find(a => a.etiqueta === 'label');
+  assert.match(fila?.atributos.class || '', /(^|\s)check-fila(\s|$)/, 'el aviso de privacidad va en una fila .check-fila');
+  const css = await readFile(new URL('styles.css', publicDir), 'utf8');
+  const texto = reglaCss(css, '.check-fila-texto');
+  assert.match(texto, /(?:^|[\s;{])user-select:\s*none/);
+  assert.match(texto, /-webkit-user-select:\s*none/, 'Safari');
+  for (const regla of [reglaCss(css, '.check-fila'), texto]) {
+    assert.doesNotMatch(regla, /pointer-events:\s*none/);
+  }
+});
+
 test('casilla obligatoria sin marcar: fila en rojo, aviso "Marcá esta casilla para continuar" y vista hasta la fila', async () => {
   const { validarFormularioReporte } = await import(new URL('js/report.js', publicDir));
   await conDocumento(async error => {

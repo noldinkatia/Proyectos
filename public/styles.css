@@ -1007,7 +1007,9 @@ form.card { width: 100%; }
 .check-fila:has(input:focus-visible) { border-color: var(--accent); }
 .check-fila input[type="checkbox"]:disabled { opacity: .45 !important; cursor: not-allowed; }
 .check-fila:has(input:disabled) { cursor: not-allowed; color: var(--muted); }
-.check-fila-texto { display: grid; gap: .2rem; min-width: 0; }
+/* Sin selección de texto: con touchpad o mouse sensible el puntero se mueve unos px
+   entre presionar y soltar; si eso selecciona texto, el navegador no tilda la casilla. */
+.check-fila-texto { display: grid; gap: .2rem; min-width: 0; -webkit-user-select: none; user-select: none; }
 .check-fila-suelta { margin: 1rem 0; }
 .check-fila.check-fila-error, .check-fila.check-fila-error:has(input:focus-visible) { border: 2px solid var(--red); background: var(--red-soft); }
 .check-fila-aviso { color: var(--red); font-size: .85rem; font-weight: 700; }
