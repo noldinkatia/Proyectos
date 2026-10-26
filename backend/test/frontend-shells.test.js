@@ -135,6 +135,23 @@ test('barra lateral en celulares: ancho adaptable, scroll interno y nada encima'
   }
 });
 
+test('encabezado de la app: nombre centrado con la "R" y acciones en la misma fila en celulares', async () => {
+  const app = await read('app/index.html');
+  // Sin subtítulo en la app: la grilla de .brand-title tiene que ser de una fila.
+  assert.doesNotMatch(app, /brand-subtitle/);
+  const css = await read('app/app.css');
+  assert.match(css, /body\.app-movil \.brand-title \{ grid-template-rows: auto; \}/);
+  assert.match(css, /body\.app-movil \.brand-title::before \{ grid-row: 1; \}/);
+  // La web manda las acciones a una segunda fila hasta 560 px; la app lo anula.
+  const web = await read('styles.css');
+  assert.match(web, /@media \(max-width: 560px\) \{[\s\S]*?#topHeader > div:last-child \{ flex: 1 0 100%;/);
+  const celulares = css.slice(css.indexOf('@media (max-width: 560px) {'));
+  const bloque = celulares.slice(0, celulares.indexOf('\n}'));
+  assert.match(bloque, /body\.app-movil #topHeader \{ flex-wrap: nowrap; \}/);
+  assert.match(bloque, /body\.app-movil #topHeader > div:last-child \{ flex: 0 1 auto; min-width: 0; flex-wrap: nowrap; \}/);
+  assert.match(bloque, /body\.app-movil #headerProfileName \{ max-width: [\d.]+rem; \}/, 'el nombre se recorta antes de empujar la fila');
+});
+
 test('el APP_SHELL del service worker cubre la web, la app y sus módulos', async () => {
   const sw = await read('sw.js');
   const shell = [...sw.match(/const APP_SHELL = \[([\s\S]*?)\];/)[1].matchAll(/'([^']+)'/g)].map(m => m[1]);
