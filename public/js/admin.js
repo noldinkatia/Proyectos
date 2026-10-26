@@ -64,7 +64,7 @@ export function renderAdminView(history, clues = [], audit = []) {
         <p class="workflow-guidance"><strong>Flujo seguro:</strong> 1. Validar con la lista de control → 2. Aprobar y publicar. También podés rechazar con motivo; los cambios quedan registrados.</p>
         ${pending.length ? `<div class="table-scroll"><table><thead><tr><th>Caso</th><th>Estado</th><th>Validación</th><th>Reportado</th><th>Acciones</th></tr></thead><tbody>
           ${pending.map(c => `<tr>
-            <td data-label="Caso"><strong>${escapeHtml(c.nombreCompleto)}</strong><br><span class="muted">${escapeHtml(c.ciudad)}, ${Number(c.edad)} años</span></td>
+            <td data-label="Caso"><strong>${escapeHtml(c.nombreCompleto)}</strong><br><span class="muted">${escapeHtml(c.ciudad)}, ${Number(c.edad)} años</span>${avisoAntecedente(c)}</td>
             <td data-label="Estado"><span class="status-tag status-PENDIENTE">En revisión</span></td>
             <td data-label="Validación"><span class="validation-state">Sin validar</span></td>
             <td data-label="Reportado">${timeSince(c.fechaCreacion)}</td>
@@ -261,6 +261,58 @@ function alertFieldLabels(fields = []) {
   return labels.length ? labels.join(', ') : 'solo el aviso de caso en revisión';
 }
 
+// Antecedentes activos de quien reportó (solo el panel; el ciudadano nunca los ve).
+// No bloquean nada: avisan para revisar el reporte con más cuidado. En la fila de
+// la bandeja va una marca corta; en la revisión, el detalle con los botones.
+export function avisoAntecedente(c, { detalle = false } = {}) {
+  const lista = Array.isArray(c?.antecedentesReportante) ? c.antecedentesReportante : [];
+  if (!detalle) return lista.length ? '<br><span class="marca-antecedente">⚠ Reportante con antecedente</span>' : '';
+  const items = lista.map(a => `<li><strong>${escapeHtml(new Date(a.registradoEn).toLocaleDateString('es-PY'))}</strong> · ${escapeHtml(a.motivo)}${a.registradoPor ? ` <span class="muted">(marcó: ${escapeHtml(a.registradoPor)})</span>` : ''}
+        <button type="button" class="btn btn-outline btn-sm" data-antecedente-id="${escapeHtml(a.id)}" data-on-click="adminRetirarAntecedente(this.dataset.antecedenteId)">Retirar marca</button></li>`).join('');
+  const marcar = c?.reportadoPorUsrId
+    ? `<button type="button" class="btn btn-outline btn-sm" data-user-id="${Number(c.reportadoPorUsrId)}" data-on-click="adminMarcarAntecedente(this.dataset.userId)">Marcar antecedente del reportante</button>`
+    : '';
+  if (!lista.length) return marcar ? `<div class="aviso-antecedente">${marcar}</div>` : '';
+  return `<div class="aviso-antecedente aviso-antecedente-activo" role="note">
+      <p><strong>⚠ El reportante tiene ${lista.length === 1 ? 'un antecedente' : `${lista.length} antecedentes`} de reporte falso o abusivo.</strong>
+        Revisá este reporte con más cuidado. No se bloqueó nada: la alerta temprana a la zona salió igual.</p>
+      <ul>${items}</ul>${marcar}
+    </div>`;
+}
+
+export async function adminMarcarAntecedente(usuarioId) {
+  const motivo = await pedirMotivo({
+    titulo: 'Marcar antecedente del reportante',
+    mensaje: 'Solo la administración lo ve. No bloquea a la persona: es un aviso al revisar sus reportes.',
+    etiqueta: 'Motivo (reporte falso o abusivo)', textoConfirmar: 'Marcar antecedente', peligro: true
+  });
+  if (motivo === null) return;
+  try {
+    await apiRequest(`/admin/usuarios/${encodeURIComponent(usuarioId)}/antecedentes`, { method: 'POST', body: { motivo } });
+    closeReviewChecklist();
+    showToast('Antecedente registrado', 'Se verá al revisar los reportes de esta persona.', 'success');
+    navigateTo('admin');
+  } catch (error) {
+    showToast('No se pudo registrar el antecedente', error.message, 'error');
+  }
+}
+
+export async function adminRetirarAntecedente(antecedenteId) {
+  const motivo = await pedirMotivo({
+    titulo: 'Retirar la marca', mensaje: 'El antecedente queda en el historial con el motivo del retiro.',
+    etiqueta: 'Motivo del retiro', textoConfirmar: 'Retirar marca'
+  });
+  if (motivo === null) return;
+  try {
+    await apiRequest(`/admin/antecedentes/${encodeURIComponent(antecedenteId)}/retirar`, { method: 'POST', body: { motivo } });
+    closeReviewChecklist();
+    showToast('Marca retirada', 'Quedó registrada en la auditoría.', 'success');
+    navigateTo('admin');
+  } catch (error) {
+    showToast('No se pudo retirar la marca', error.message, 'error');
+  }
+}
+
 export function adminAccept(caseId) {
   const form = document.getElementById('reviewChecklistForm');
   const selectedCase = getStore().casos.find(item => item.id === caseId);
@@ -273,6 +325,7 @@ export function adminAccept(caseId) {
     <span>Descripción: ${escapeHtml(selectedCase.descripcionFisica || 'Sin descripción')}</span>
     <span>Vestimenta: ${escapeHtml(selectedCase.vestimenta || 'Sin especificar')}</span>
     <span>Autorización parental: ${selectedCase.autorizacionParental ? 'Registrada' : 'No registrada / no aplica'}</span>
+    ${avisoAntecedente(selectedCase, { detalle: true })}
     <span>Declaración de responsabilidad: ${selectedCase.declaracionAceptadaEn ? `aceptada el ${escapeHtml(new Date(selectedCase.declaracionAceptadaEn).toLocaleString('es-PY'))} (versión ${escapeHtml(selectedCase.declaracionVersion || '')})` : 'sin registro (reporte anterior a la declaración)'}</span>
     <span>Alerta temprana: ${selectedCase.alertaTempranaEn ? `enviada el ${escapeHtml(new Date(selectedCase.alertaTempranaEn).toLocaleString('es-PY'))}` : 'no enviada (posible duplicado o límite por reportante)'}. El reportante eligió mostrar: ${escapeHtml(alertFieldLabels(selectedCase.alertaCampos))}</span>
   ` : '<span>No se pudo cargar el detalle del caso. Actualizá el panel e intentá otra vez.</span>';

@@ -1123,6 +1123,14 @@ table tr:hover td { background: var(--surface-2); }
 #notifModal .modal-header > span, #simTimeModal .modal-header > span, #installGuideModal .modal-header > span { min-width: 0; flex: 1 1 auto; font-weight: 700; }
 #notifModal .modal-footer, #simTimeModal .modal-footer { display: flex; justify-content: flex-end; padding: .8rem 1.2rem; border-top: 1px solid var(--border); background: var(--surface); }
 #simTimeModal .modal-body, #installGuideModal .modal-body { margin: 0; padding: 1rem 1.2rem; color: var(--muted); font-size: .85rem; line-height: 1.5; }
+/* Antecedente del reportante (solo panel del administrador, admin.js) */
+.marca-antecedente { display: inline-block; margin-top: .3rem; padding: .1rem .45rem; border-radius: var(--radius-pill); background: var(--amber-soft); color: var(--amber); font-size: .72rem; font-weight: 800; }
+.aviso-antecedente { display: grid; gap: .5rem; justify-items: start; }
+.aviso-antecedente-activo { padding: .75rem .85rem; border: 1px solid var(--amber-border); border-radius: var(--radius-sm); background: var(--amber-soft); color: var(--text); }
+.aviso-antecedente p { margin: 0; font-size: .84rem; line-height: 1.45; }
+.aviso-antecedente ul { display: grid; gap: .45rem; margin: 0; padding-left: 1.1rem; font-size: .82rem; }
+.aviso-antecedente li .btn { margin-left: .35rem; }
+
 /* Cuadros propios en lugar de prompt()/confirm() (dialogo.js): <dialog> nativo */
 .dialogo { width: min(100% - 2rem, 480px); max-height: 90vh; padding: 0; overflow: auto; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: var(--shadow-overlay); }
 .dialogo::backdrop { background: var(--overlay); backdrop-filter: blur(4px); }

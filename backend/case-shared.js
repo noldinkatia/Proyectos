@@ -137,6 +137,8 @@ export function toAdminCase(row) {
     motivoRechazo: row.motivo_rechazo,
     reportadoPorUsrId: row.reportado_por_usr_id,
     contactoReportante: row.contacto_reportante,
+    // Antecedentes activos del reportante (migración 008): solo en respuestas de administración.
+    antecedentesReportante: Array.isArray(row.antecedentes_reportante) ? row.antecedentes_reportante : [],
     reportanteMayorEdad: Boolean(row.reportante_mayor_edad),
     // Declaración de responsabilidad (solo administración): cuándo y qué versión.
     declaracionAceptadaEn: row.declaracion_aceptada_en || null,

@@ -13,6 +13,16 @@ import {
 import { withTransaction } from './db.js';
 import { avisoLocalizadoAlReportante, processDueFollowups } from './followups.js';
 
+// Antecedentes activos de quien reportó el caso c (solo para el panel).
+const ANTECEDENTES_ACTIVOS_DEL_REPORTANTE = `(
+  SELECT COALESCE(json_agg(json_build_object(
+    'id', ant.id::text, 'motivo', ant.motivo, 'registradoEn', ant.registrado_en,
+    'registradoPor', reg.nombre_completo
+  ) ORDER BY ant.registrado_en DESC), '[]'::json)
+  FROM antecedentes_usuario ant LEFT JOIN usuarios reg ON reg.id = ant.registrado_por
+  WHERE ant.usuario_id = c.reportado_por_usr_id AND ant.retirado_en IS NULL
+)`;
+
 // Panel de administración: listado y moderación de casos, auditoría, historial
 // de localizados y simulador de seguimiento. Todas las rutas exigen administrador.
 export function createAdminRouter({ db, requireAdmin, push }) {
@@ -22,6 +32,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
     const pagination = paginationFromQuery(req.query);
     const { rows } = await db.query(`
       SELECT ${caseListColumns('c')}, u.correo AS contacto_reportante,
+        ${ANTECEDENTES_ACTIVOS_DEL_REPORTANTE} AS antecedentes_reportante,
         COUNT(*) OVER() AS total_registros
       FROM casos c LEFT JOIN usuarios u ON u.id = c.reportado_por_usr_id
       ORDER BY c.creado_en DESC
@@ -46,6 +57,20 @@ export function createAdminRouter({ db, requireAdmin, push }) {
       JOIN pistas p ON p.id = h.pista_id
       JOIN casos c ON c.id = p.caso_id
       LEFT JOIN usuarios a ON a.id = h.cambiado_por
+      UNION ALL
+      -- Antecedentes: quién marcó a quién y quién retiró la marca, con el motivo.
+      SELECT ant.registrado_en, 'Antecedente', u.nombre_completo, NULL, 'MARCADO',
+        a.nombre_completo, ant.motivo
+      FROM antecedentes_usuario ant
+      JOIN usuarios u ON u.id = ant.usuario_id
+      LEFT JOIN usuarios a ON a.id = ant.registrado_por
+      UNION ALL
+      SELECT ant.retirado_en, 'Antecedente', u.nombre_completo, 'MARCADO', 'RETIRADO',
+        a.nombre_completo, ant.motivo_retiro
+      FROM antecedentes_usuario ant
+      JOIN usuarios u ON u.id = ant.usuario_id
+      LEFT JOIN usuarios a ON a.id = ant.retirado_por
+      WHERE ant.retirado_en IS NOT NULL
       ORDER BY fecha DESC
       LIMIT 100
     `);
@@ -264,5 +289,45 @@ export function createAdminRouter({ db, requireAdmin, push }) {
     res.json({ mensaje: 'Simulación completada.', ...result });
   }));
 
+  // Antecedente de reporte falso o abusivo (migración 008): solo administración y
+  // solo sobre cuentas de ciudadanos. No bloquea nada: el panel lo muestra al
+  // revisar sus reportes.
+  router.post('/admin/usuarios/:id/antecedentes', ...requireAdmin, asyncRoute(async (req, res) => {
+    const motivo = typeof req.body?.motivo === 'string' ? req.body.motivo.trim() : '';
+    if (!motivo) return res.status(400).json({ error: 'Debe indicar el motivo del antecedente.' });
+    const usuarioId = Number(req.params.id);
+    if (!Number.isInteger(usuarioId)) return res.status(404).json({ error: 'Usuario no disponible.' });
+    const { rows: usuarios } = await db.query("SELECT id FROM usuarios WHERE id = $1 AND rol = 'ciudadano'", [usuarioId]);
+    if (!usuarios[0]) return res.status(404).json({ error: 'Usuario no disponible.' });
+    const { rows } = await db.query(`
+      INSERT INTO antecedentes_usuario (usuario_id, motivo, registrado_por)
+      VALUES ($1, $2, $3) RETURNING *
+    `, [usuarioId, motivo, req.auth.id]);
+    res.status(201).json({ antecedente: aAntecedente(rows[0]) });
+  }));
+
+  // Retirar no borra: queda en el historial con quién, cuándo y por qué.
+  router.post('/admin/antecedentes/:id/retirar', ...requireAdmin, asyncRoute(async (req, res) => {
+    const motivo = typeof req.body?.motivo === 'string' ? req.body.motivo.trim() : '';
+    if (!motivo) return res.status(400).json({ error: 'Debe indicar el motivo para retirar la marca.' });
+    if (!/^\d+$/.test(req.params.id)) return res.status(404).json({ error: 'El antecedente no existe o ya fue retirado.' });
+    const { rows } = await db.query(`
+      UPDATE antecedentes_usuario
+      SET retirado_en = CURRENT_TIMESTAMP, retirado_por = $2, motivo_retiro = $3
+      WHERE id = $1 AND retirado_en IS NULL
+      RETURNING *
+    `, [req.params.id, req.auth.id, motivo]);
+    if (!rows[0]) return res.status(404).json({ error: 'El antecedente no existe o ya fue retirado.' });
+    res.json({ antecedente: aAntecedente(rows[0]) });
+  }));
+
   return router;
+}
+
+function aAntecedente(row) {
+  return {
+    id: String(row.id), usuarioId: row.usuario_id, motivo: row.motivo,
+    registradoPor: row.registrado_por, registradoEn: row.registrado_en,
+    retiradoEn: row.retirado_en, retiradoPor: row.retirado_por, motivoRetiro: row.motivo_retiro
+  };
 }

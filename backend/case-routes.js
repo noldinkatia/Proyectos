@@ -172,11 +172,21 @@ export function createCaseRouter({ db, jwtSecret, push }) {
         'INSERT INTO cambios_estado_caso (caso_id, estado_nuevo, cambiado_por) VALUES ($1, $2, $3)',
         [id, rows[0].estado, req.auth.id]
       );
+      // Aviso solo para la administración: si quien reporta tiene un antecedente
+      // activo, se menciona (no se bloquea nada; la alerta temprana sale igual).
+      const { rows: antecedentes } = await client.query(
+        'SELECT COUNT(*)::int AS total FROM antecedentes_usuario WHERE usuario_id = $1 AND retirado_en IS NULL',
+        [req.auth.id]
+      );
+      const total = Number(antecedentes[0]?.total) || 0;
+      const conAntecedente = total
+        ? ` Atención: quien lo reportó tiene ${total === 1 ? 'un antecedente' : `${total} antecedentes`} de reporte falso o abusivo; la alerta temprana a la zona se envía igual.`
+        : '';
       await client.query(`
         INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo)
         SELECT id, $1, 'Nuevo reporte para validar', $2, 'CASO_PENDIENTE'
         FROM usuarios WHERE rol = 'administrador'
-      `, [id, `Se recibió un reporte de ${body.nombreCompleto.trim()} y espera validación.`]);
+      `, [id, `Se recibió un reporte de ${body.nombreCompleto.trim()} y espera validación.${conAntecedente}`]);
       alertasPush = (await enviarAlertaTemprana(client, rows[0], { push })).notificaciones;
       return rows[0];
     });
