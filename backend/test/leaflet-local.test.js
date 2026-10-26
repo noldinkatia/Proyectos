@@ -22,6 +22,11 @@ test('las páginas cargan Leaflet local, con su hash de integridad y sin bloquea
     // defer corre en orden de documento: Leaflet antes que los módulos de la página.
     assert.ok(html.indexOf('/vendor/leaflet/leaflet.js') < html.indexOf('<script type="module"'), pagina);
   }
+  // Git no debe convertir finales de línea de estos archivos: el CSS original trae CRLF
+  // y, normalizado a LF, su hash ya no coincidiría con el de la página (en el despliegue,
+  // que se construye desde Git, el navegador bloquearía Leaflet).
+  const atributos = await readFile(new URL('../../.gitattributes', import.meta.url), 'utf8');
+  assert.match(atributos, /^public\/vendor\/\*\* -text\r?$/m);
   const licencia = await readFile(new URL('vendor/leaflet/LICENSE.txt', publicDir), 'utf8');
   assert.match(licencia, /BSD 2-Clause License/);
   assert.match(licencia, /Volodymyr Agafonkin/);

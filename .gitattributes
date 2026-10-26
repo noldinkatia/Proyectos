@@ -1,0 +1,4 @@
+# Archivos de terceros con hash de integridad (SRI) en las páginas: se guardan tal
+# cual, sin convertir finales de línea. Si Git los normalizara, el hash dejaría de
+# coincidir y el navegador bloquearía Leaflet (ver backend/test/leaflet-local.test.js).
+public/vendor/** -text
