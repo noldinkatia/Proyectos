@@ -189,7 +189,6 @@ export async function navigateTo(view, params = {}, options = {}) {
   if (!store.currentUser && view !== 'otp' && !PUBLIC_VIEWS.includes(view)) {
     header.classList.add('hidden');
     main.innerHTML = renderAuthScreen(params.authMode || 'login', params.identifier || '');
-    document.getElementById('publicThemeToggle').classList.remove('hidden');
     labelButtons(main);
     window.rastreoCurrentView = 'auth';
     window.rastreoCurrentParams = { authMode: params.authMode || 'login' };
@@ -211,7 +210,6 @@ export async function navigateTo(view, params = {}, options = {}) {
   if (store.currentUser && !store.currentUser.acepto_terminos) {
     header.classList.add('hidden');
     main.innerHTML = renderLegalTerms();
-    document.getElementById('publicThemeToggle').classList.remove('hidden');
     labelButtons(main);
     window.rastreoCurrentView = 'legal';
     window.rastreoCurrentParams = {};
@@ -221,12 +219,9 @@ export async function navigateTo(view, params = {}, options = {}) {
 
   if (store.currentUser) {
     header.classList.remove('hidden');
-    document.getElementById('publicThemeToggle').classList.add('hidden');
     updateHeaderUser();
   } else {
-    const showPublicNavigation = PUBLIC_VIEWS.includes(view);
-    header.classList.toggle('hidden', !showPublicNavigation);
-    document.getElementById('publicThemeToggle').classList.toggle('hidden', showPublicNavigation);
+    header.classList.toggle('hidden', !PUBLIC_VIEWS.includes(view));
     updateHeaderUser();
   }
 

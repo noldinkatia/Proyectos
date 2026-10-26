@@ -25,8 +25,6 @@ export function applyTheme(theme) {
   document.documentElement.dataset.theme = selectedTheme;
   const button = document.getElementById('themeToggle');
   if (button) button.textContent = selectedTheme === 'dark' ? 'Tema claro' : 'Tema oscuro';
-  const publicButton = document.getElementById('publicThemeToggle');
-  if (publicButton) publicButton.textContent = selectedTheme === 'dark' ? 'Tema claro' : 'Tema oscuro';
 }
 
 export function toggleTheme() {

@@ -22,7 +22,6 @@
 <body>
 
   <div class="app-container">
-    <button id="publicThemeToggle" class="public-theme-toggle" type="button" data-on-click="toggleTheme()" aria-label="Cambiar tema">Tema claro</button>
 
     <!-- BARRA PRINCIPAL DE NAVEGACIÓN -->
     <header id="topHeader" class="hidden">
@@ -37,7 +36,6 @@
         <button type="button" class="brand-title" data-on-click="navigateTo('home')" aria-label="Ir al inicio">Rastreo PY<span class="brand-subtitle">UNIDA · Ing. en Informática</span></button>
       </div>
       <div class="header-actions">
-        <button id="themeToggle" type="button" data-on-click="toggleTheme()" aria-label="Cambiar tema">Tema claro</button>
         <!-- Solo en computadoras (public/js/web.js); en celulares está el aviso de abajo -->
         <a id="headerAppLink" class="header-app-link hidden" href="/app/">Descargar app</a>
         <button type="button" class="header-notifications" data-on-click="toggleNotificationsModal()" aria-label="Abrir notificaciones">♧<span id="headerNotifBadge" class="hidden">0</span></button>
@@ -91,6 +89,9 @@
         <p class="drawer-section-label">Cuenta y avisos</p>
         <button type="button" data-role-nav="session" data-on-click="toggleDrawer(false); enableSystemNotifications()" class="btn btn-outline">Activar avisos del dispositivo</button>
         <button id="simulateFollowupButton" data-on-click="toggleSimulateTimeModal()" class="btn btn-outline hidden">Simulador de seguimiento (+48 h)</button>
+        <!-- Único botón de tema (web y app, con y sin sesión): en el encabezado del
+             celular no hay lugar y uno flotante tapaba contenido. -->
+        <button id="themeToggle" type="button" data-on-click="toggleTheme()" class="btn btn-outline" aria-label="Cambiar tema">Tema claro</button>
         <button data-role-nav="session" data-on-click="logout()" class="btn btn-red">Cerrar sesión</button>
       </div>
     </aside>

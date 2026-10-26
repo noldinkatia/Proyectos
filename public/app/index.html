@@ -31,7 +31,6 @@
 <body class="app-movil">
 
   <div class="app-container">
-    <button id="publicThemeToggle" class="public-theme-toggle" type="button" data-on-click="toggleTheme()" aria-label="Cambiar tema">Tema claro</button>
 
     <!-- BARRA SUPERIOR -->
     <header id="topHeader" class="hidden">
@@ -46,7 +45,6 @@
         <button type="button" class="brand-title" data-on-click="navigateTo('home')" aria-label="Ir al inicio">Rastreo PY</button>
       </div>
       <div class="header-actions">
-        <button id="themeToggle" type="button" data-on-click="toggleTheme()" aria-label="Cambiar tema">Tema claro</button>
         <button type="button" class="header-notifications" data-on-click="toggleNotificationsModal()" aria-label="Abrir notificaciones">♧<span id="headerNotifBadge" class="hidden">0</span></button>
         <button type="button" id="headerProfile" class="header-profile hidden" data-on-click="toggleDrawer(true)" aria-label="Abrir menú de cuenta">
           <span id="headerProfileAvatar" class="header-profile-avatar" aria-hidden="true"></span>
@@ -92,6 +90,8 @@
         <button id="installAppButton" type="button" data-on-click="toggleDrawer(false); installApp()" class="btn btn-outline hidden">Instalar app</button>
         <!-- En una computadora cuyo navegador no permite instalar (app/pwa.js) -->
         <p id="installDesktopHint" class="drawer-hint hidden">Para instalarla, abrí esta dirección desde tu celular.</p>
+        <!-- Único botón de tema, igual que en la web -->
+        <button id="themeToggle" type="button" data-on-click="toggleTheme()" class="btn btn-outline" aria-label="Cambiar tema">Tema claro</button>
         <button data-role-nav="session" data-on-click="logout()" class="btn btn-red">Cerrar sesión</button>
       </div>
     </aside>

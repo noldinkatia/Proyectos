@@ -407,7 +407,6 @@ button { touch-action: manipulation; }
 
 
 .header-actions { display: flex; flex: 0 0 auto; align-items: center; gap: .65rem; margin-left: auto; }
-#topHeader .header-actions #themeToggle { color: var(--muted); font-size: .68rem; }
 #topHeader .header-notifications {
   position: relative;
   display: grid;
@@ -474,22 +473,6 @@ button { touch-action: manipulation; }
 #topHeader .header-app-link:hover { border-color: var(--info-border); background: var(--info-soft); color: var(--info); }
 #topHeader .header-app-link:focus-visible { outline: 3px solid var(--info); outline-offset: 2px; }
 
-.public-theme-toggle {
-  position: fixed;
-  z-index: 1100;
-  top: .8rem;
-  right: 1rem;
-  min-height: 40px;
-  padding: .5rem .75rem;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-  font-size: .82rem;
-  font-weight: 600;
-}
-
 .drawer-overlay { position: fixed; z-index: 1040; inset: 0; background: var(--overlay); backdrop-filter: blur(3px); }
 .drawer {
   position: fixed;
@@ -541,8 +524,6 @@ button { touch-action: manipulation; }
 
 /* Sin conexión: franja dentro de la app y página offline.html del service worker */
 .offline-banner { padding: .55rem var(--gutter); border-bottom: 1px solid var(--amber-border); background: var(--amber-soft); color: var(--amber); font-size: .8rem; font-weight: 600; text-align: center; }
-/* En login el botón de tema es fijo arriba a la derecha: la franja le deja lugar */
-.public-theme-toggle:not(.hidden) ~ .offline-banner { padding-right: 8.5rem; text-align: left; }
 .offline-page { display: grid; min-height: 100vh; place-items: center; padding: 1rem; }
 .offline-page .card { width: min(100%, 420px); text-align: center; }
 .offline-page img { width: 72px; height: 72px; }
@@ -862,7 +843,7 @@ form.card { width: 100%; }
 #termsSaveError .btn { margin-top: .5rem; }
 
 .auth-view, .legal-view { display: flex; min-height: calc(100vh - var(--header-h)); flex-direction: column; justify-content: center; gap: 1.25rem; padding: clamp(1rem,4vw,2rem); background: transparent !important; color: var(--text) !important; }
-.auth-view > div:first-child { width: 100%; max-width: 520px; align-self: center; padding-right: 7rem; }
+.auth-view > div:first-child { width: 100%; max-width: 520px; align-self: center; }
 .auth-view > div:first-child p, .legal-view > div:first-child > div:first-child p { color: var(--muted); font-size: .85rem; }
 .auth-view h1, .legal-view h1 { color: var(--text) !important; font: 800 clamp(1.5rem,3vw,2rem)/1.2 Sora, Inter, sans-serif; }
 .auth-panel { width: 100%; max-width: 520px; align-self: center; padding: clamp(1.2rem,4vw,2rem); }
@@ -1198,7 +1179,6 @@ table tr:hover td { background: var(--surface-2); }
   .admin-metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 560px) {
-  .public-theme-toggle { top: .65rem; right: .65rem; min-height: 36px; padding: .4rem .55rem; font-size: .76rem; }
   /* Celulares: siempre queda una franja de la página a la vista (tocarla cierra el menú) */
   .drawer { width: clamp(240px, 78vw, 300px); }
   #topHeader { flex-wrap: wrap; gap: .15rem .45rem; padding-inline: .65rem; }
@@ -1206,7 +1186,6 @@ table tr:hover td { background: var(--surface-2); }
   #topHeader > div:last-child { flex: 1 0 100%; flex-wrap: wrap; justify-content: flex-end; }
   #topHeader > .header-actions { flex: 1 0 auto; margin-left: auto; }
   #topHeader > div { gap: .3rem; }
-  #topHeader .header-actions #themeToggle { display: none; }
   #headerProfileName { max-width: 6.5rem; font-size: .62rem; }
   #topHeader .header-profile { gap: .35rem; padding: .15rem .4rem .15rem .15rem; }
   .header-profile-avatar { width: 1.9rem; height: 1.9rem; font-size: .78rem; }
@@ -1254,7 +1233,6 @@ table tr:hover td { background: var(--surface-2); }
   .map-container { height: 290px; }
   #reportMap, #leadMap { height: 250px; }
   .card { padding: 1rem; }
-  .auth-view > div:first-child { padding-right: 6.5rem; }
   #toastNotification { right: .75rem; bottom: .75rem; width: calc(100vw - 1.5rem); }
 }
 @media (prefers-reduced-motion: reduce) {

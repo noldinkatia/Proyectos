@@ -152,6 +152,23 @@ test('encabezado de la app: nombre centrado con la "R" y acciones en la misma fi
   assert.match(bloque, /body\.app-movil #headerProfileName \{ max-width: [\d.]+rem; \}/, 'el nombre se recorta antes de empujar la fila');
 });
 
+test('tema claro/oscuro: un solo botón, en el menú lateral, en la web y en la app', async () => {
+  for (const pagina of ['Rastreopy.html', 'app/index.html']) {
+    const html = await read(pagina);
+    const botones = html.match(/data-on-click="toggleTheme\(\)"/g) || [];
+    assert.equal(botones.length, 1, `${pagina}: un solo botón de tema`);
+    const drawer = html.match(/<aside id="drawer"[\s\S]*?<\/aside>/)[0];
+    assert.match(drawer, /<div class="drawer-account">[\s\S]*<button id="themeToggle" type="button" data-on-click="toggleTheme\(\)" class="btn btn-outline"/, `${pagina}: en "Cuenta y avisos"`);
+    // Sin data-role-nav: se ve con y sin sesión.
+    assert.doesNotMatch(drawer.match(/<button id="themeToggle"[^>]*>/)[0], /data-role-nav|hidden/);
+    assert.doesNotMatch(html.match(/<header id="topHeader"[\s\S]*?<\/header>/)[0], /themeToggle/, `${pagina}: no en el encabezado`);
+  }
+  // Ya no hay botón flotante ni los rellenos que le dejaban lugar.
+  for (const archivo of ['styles.css', 'app/app.css', 'js/router.js', 'js/ui.js']) {
+    assert.doesNotMatch(await read(archivo), /publicThemeToggle|public-theme-toggle/, archivo);
+  }
+});
+
 test('el APP_SHELL del service worker cubre la web, la app y sus módulos', async () => {
   const sw = await read('sw.js');
   const shell = [...sw.match(/const APP_SHELL = \[([\s\S]*?)\];/)[1].matchAll(/'([^']+)'/g)].map(m => m[1]);

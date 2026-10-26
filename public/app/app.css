@@ -8,7 +8,6 @@
 
 body.app-movil { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
 body.app-movil #topHeader { padding-top: calc(.55rem + env(safe-area-inset-top)); }
-body.app-movil .public-theme-toggle { top: calc(.65rem + env(safe-area-inset-top)); }
 /* Encabezado: la app no tiene el subtítulo de la web. Con la grilla de dos filas de
    .brand-title el nombre quedaba arriba y no centrado con la "R". */
 body.app-movil .brand-title { grid-template-rows: auto; }
