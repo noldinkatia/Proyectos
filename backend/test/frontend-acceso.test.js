@@ -137,3 +137,178 @@ test('el campo de correo usa un datalist sin romper el autocompletado del navega
     globalThis.document = anterior;
   }
 });
+
+const verificacion = await import(new URL('js/verificacion.js', publicDir));
+const { estado } = await import(new URL('js/estado.js', publicDir));
+
+function almacen(inicial = {}) {
+  const mapa = new Map(Object.entries(inicial));
+  return { getItem: k => (mapa.has(k) ? mapa.get(k) : null), setItem: (k, v) => mapa.set(k, String(v)), removeItem: k => mapa.delete(k), mapa };
+}
+
+// sessionStorage y un document mínimo para las funciones de la pantalla del código.
+function conNavegador(fn) {
+  const anteriores = { sessionStorage: globalThis.sessionStorage, document: globalThis.document };
+  const sesion = almacen();
+  globalThis.sessionStorage = sesion;
+  globalThis.document = { getElementById: () => null, querySelector: () => null };
+  const restaurar = () => {
+    auth.terminarVerificacion(); // detiene el temporizador de reenvío
+    globalThis.sessionStorage = anteriores.sessionStorage;
+    globalThis.document = anteriores.document;
+  };
+  let resultado;
+  try {
+    resultado = fn(sesion);
+  } catch (error) {
+    restaurar();
+    throw error;
+  }
+  // Si fn es async, se restaura recién cuando termina.
+  if (resultado && typeof resultado.then === 'function') return resultado.finally(restaurar);
+  restaurar();
+  return resultado;
+}
+
+test('sessionStorage guarda solo correo, propósito y próximo reenvío (nunca contraseña ni código)', () => {
+  const s = almacen();
+  verificacion.guardarVerificacion({ correo: 'ana@gmail.com', proposito: 'registro', proximoReenvio: 123, contrasena: 'x', codigo: '123456' }, s);
+  assert.deepEqual(JSON.parse(s.getItem('rastreo_verificacion')), { correo: 'ana@gmail.com', proposito: 'registro', proximoReenvio: 123 });
+  assert.deepEqual(verificacion.leerVerificacion(s), { correo: 'ana@gmail.com', proposito: 'registro', proximoReenvio: 123 });
+  verificacion.borrarVerificacion(s);
+  assert.equal(verificacion.leerVerificacion(s), null);
+  // Datos inválidos o ajenos no se guardan ni se leen.
+  for (const malo of [{ correo: 'ana@hotmail.com', proposito: 'registro' }, { correo: 'ana@gmail.com', proposito: 'otro' }]) {
+    verificacion.guardarVerificacion(malo, s);
+    assert.equal(s.getItem('rastreo_verificacion'), null);
+  }
+  assert.equal(verificacion.leerVerificacion(almacen({ rastreo_verificacion: '{roto' })), null);
+  assert.equal(verificacion.leerVerificacion({ getItem() { throw new Error('bloqueado'); } }), null);
+});
+
+test('espera para reenviar: segundos restantes y texto', () => {
+  assert.equal(verificacion.segundosParaReenviar(10_500, 1_000), 10);
+  assert.equal(verificacion.segundosParaReenviar(500, 1_000), 0);
+  assert.equal(verificacion.textoEspera(45), '45 s');
+  assert.equal(verificacion.textoEspera(61), '2 min');
+  assert.equal(verificacion.textoEspera(3000), '50 min');
+  assert.equal(verificacion.textoEspera(3900), '1 h 5 min');
+});
+
+test('recargar #/verificar retoma el flujo con lo guardado (correo, propósito y espera)', () => conNavegador(sesion => {
+  auth.terminarVerificacion();
+  sesion.setItem('rastreo_verificacion', JSON.stringify({ correo: 'ana@gmail.com', proposito: 'restablecer', proximoReenvio: Date.now() + 30_000 }));
+  assert.equal(auth.restaurarVerificacion(), true);
+  assert.equal(estado.activeOtpEmail, 'ana@gmail.com');
+  assert.equal(estado.activeOtpPurpose, 'restablecer');
+  assert.ok(estado.resendSeconds > 28 && estado.resendSeconds <= 30);
+  const html = auth.renderOTPView({});
+  assert.match(html, /Si <strong>ana@gmail\.com<\/strong> está registrado, te enviamos un código/, 'no revela si existe');
+  assert.match(html, /El código vence en 10 minutos/);
+  assert.match(html, /<button type="button" id="resendCodeButton"[^>]*disabled>Reenviar código \(en \d+ s\)<\/button>/);
+  assert.match(html, /<form data-on-submit="verifyEmailCode\(event\)" novalidate>/, 'Enter verifica');
+  assert.match(html, /<label for="otpInput">Código de 6 dígitos<\/label>/);
+  // Sin nada guardado, no hay flujo que retomar (el router manda al ingreso).
+  auth.terminarVerificacion();
+  assert.equal(auth.restaurarVerificacion(), false);
+}));
+
+test('la cuenta regresiva guarda el próximo reenvío y terminar el flujo borra lo guardado', () => conNavegador(sesion => {
+  estado.activeOtpEmail = 'ana@gmail.com';
+  estado.activeOtpPurpose = 'registro';
+  estado.pendingRegistration = { nombre_completo: 'Ana', correo: 'ana@gmail.com', contrasena: 'Secreta-123', acepto_terminos: true };
+  auth.startResendCountdown(2700); // p. ej. reintentarEn de un 429 por hora
+  const guardado = JSON.parse(sesion.getItem('rastreo_verificacion'));
+  assert.deepEqual(Object.keys(guardado).sort(), ['correo', 'proposito', 'proximoReenvio']);
+  assert.ok(Math.abs(guardado.proximoReenvio - (Date.now() + 2_700_000)) < 2000);
+  assert.ok(!sesion.getItem('rastreo_verificacion').includes('Secreta-123'), 'la contraseña nunca se guarda');
+  auth.terminarVerificacion();
+  assert.equal(sesion.getItem('rastreo_verificacion'), null);
+  assert.equal(estado.resendSeconds, 0);
+  assert.equal(estado.resendTimer, null);
+  estado.pendingRegistration = null;
+}));
+
+test('cada salida del flujo borra lo guardado: verificar, otro correo, volver, ingresar y cerrar sesión', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const fuente = (await readFile(new URL('js/auth.js', publicDir), 'utf8')).replace(/\r\n/g, '\n');
+  const cuerpo = nombre => {
+    const inicio = fuente.search(new RegExp(`export (async )?function ${nombre}[(]`));
+    assert.ok(inicio >= 0, `falta ${nombre}`);
+    return fuente.slice(inicio, fuente.indexOf('\n}\n', inicio));
+  };
+  for (const nombre of ['verifyEmailCode', 'changeRegistrationEmail', 'salirDeVerificacion', 'completarRegistroDeNuevo', 'handleLogin', 'logout']) {
+    assert.match(cuerpo(nombre), /terminarVerificacion\(\)/, nombre);
+  }
+  // Empezar otro flujo reemplaza lo guardado del anterior.
+  assert.match(cuerpo('handleRegister'), /iniciarVerificacion\(email, 'registro'\)/);
+  assert.match(cuerpo('handleForgotPassword'), /iniciarVerificacion\(email, 'restablecer'\)/);
+});
+
+// fetch simulado: responde según la ruta y registra lo pedido.
+function conServidorSimulado(respuestas, fn) {
+  const pedidos = [];
+  const anterior = globalThis.fetch;
+  globalThis.fetch = async (url, opciones) => {
+    const ruta = String(url).replace(/^\/api/, '');
+    pedidos.push({ ruta, cuerpo: JSON.parse(opciones.body || '{}') });
+    const [status, cuerpo] = respuestas[ruta] || [404, { error: 'sin ruta' }];
+    return { ok: status < 400, status, json: async () => cuerpo };
+  };
+  return conNavegador(async sesion => {
+    const aviso = { textContent: '', classList: { remove() {} }, append(...partes) { this.textContent += partes.map(p => (typeof p === 'string' ? p : p.textContent)).join(''); } };
+    globalThis.document = {
+      getElementById: id => (id === 'otpFeedback' ? aviso : null),
+      querySelector: () => null,
+      createElement: () => ({ setAttribute() {}, textContent: '' })
+    };
+    try {
+      await fn({ pedidos, aviso, sesion });
+    } finally {
+      globalThis.fetch = anterior;
+      estado.pendingRegistration = null;
+    }
+  });
+}
+
+test('429 al reenviar: muestra la espera real (reintentarEn) y bloquea el botón ese tiempo', () => conServidorSimulado({
+  '/auth/registro/reenviar': [429, { error: 'Se alcanzó el límite de 5 envíos por hora para este contacto.', reintentarEn: 3000 }]
+}, async ({ aviso, sesion }) => {
+  estado.activeOtpEmail = 'ana@gmail.com';
+  estado.activeOtpPurpose = 'registro';
+  estado.resendSeconds = 0;
+  await auth.resendVerificationCode();
+  assert.equal(aviso.textContent, 'Se alcanzó el límite de 5 envíos por hora para este contacto. Podés pedir otro código en 50 min.');
+  assert.equal(estado.resendSeconds, 3000, 'no un minuto fijo');
+  const guardado = JSON.parse(sesion.getItem('rastreo_verificacion'));
+  assert.ok(Math.abs(guardado.proximoReenvio - (Date.now() + 3_000_000)) < 2000, 'la espera sobrevive a una recarga');
+}));
+
+test('"Reenviar código" tras 5 intentos fallidos vuelve a enviar el mismo /auth/registro con los datos en memoria', () => conServidorSimulado({
+  '/auth/registro/reenviar': [400, { error: 'No hay un registro pendiente. Complete el formulario de registro nuevamente.' }],
+  '/auth/registro': [200, { mensaje: 'Código enviado al Gmail.' }]
+}, async ({ pedidos, aviso }) => {
+  const datos = { nombre_completo: 'Ana Pérez', correo: 'ana@gmail.com', contrasena: 'Secreta-123', acepto_terminos: true };
+  estado.pendingRegistration = datos;
+  estado.activeOtpEmail = 'ana@gmail.com';
+  estado.activeOtpPurpose = 'registro';
+  estado.resendSeconds = 0;
+  await auth.resendVerificationCode();
+  assert.deepEqual(pedidos.map(p => p.ruta), ['/auth/registro/reenviar', '/auth/registro']);
+  assert.deepEqual(pedidos[1].cuerpo, datos, 'el mismo pedido del formulario');
+  assert.equal(aviso.textContent, 'Enviamos un código nuevo a tu Gmail.');
+  assert.equal(estado.resendSeconds, 60);
+}));
+
+test('sin los datos en memoria (se recargó la página) pide completar el registro, sin decir si el correo existe', () => conServidorSimulado({
+  '/auth/registro/reenviar': [400, { error: 'No hay un registro pendiente. Complete el formulario de registro nuevamente.' }]
+}, async ({ pedidos, aviso }) => {
+  estado.pendingRegistration = null;
+  estado.activeOtpEmail = 'ana@gmail.com';
+  estado.activeOtpPurpose = 'registro';
+  estado.resendSeconds = 0;
+  await auth.resendVerificationCode();
+  assert.deepEqual(pedidos.map(p => p.ruta), ['/auth/registro/reenviar'], 'no manda nada sin los datos');
+  assert.match(aviso.textContent, /Completá el registro de nuevo para recibir otro código\. Completar el registro$/);
+  assert.doesNotMatch(aviso.textContent, /registrad[oa]|existe|cuenta/i);
+}));

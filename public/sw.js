@@ -22,6 +22,7 @@ const APP_SHELL = [
   '/js/conexion.js',
   '/js/web.js',
   '/js/sesion.js',
+  '/js/verificacion.js',
   '/js/estado.js',
   '/js/config.js',
   '/js/api.js',

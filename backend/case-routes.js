@@ -4,7 +4,7 @@ import { rateLimit } from 'express-rate-limit';
 import { createAdminRouter } from './admin-routes.js';
 import { createAlertRouter } from './alertas-routes.js';
 import { alertasPorCambioDeEstado, enviarAlertaTemprana } from './alertas.js';
-import { asyncRoute, authenticate, isAdministrator, requireAdministrator } from './auth-routes.js';
+import { asyncRoute, authenticate, isAdministrator, requireAdministrator, respuestaLimite } from './auth-routes.js';
 import {
   caseListColumns,
   caseVisibilityParameters,
@@ -51,7 +51,8 @@ export function createCaseRouter({ db, jwtSecret, push }) {
     limit: Number(process.env.LIMITE_LECTURA_PUBLICA_POR_MINUTO) || 3000,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
-    message: { error: 'Demasiadas consultas desde esta red. Intente nuevamente en un minuto.' }
+    message: { error: 'Demasiadas consultas desde esta red. Intente nuevamente en un minuto.' },
+    handler: respuestaLimite
   });
 
   router.use((_req, res, next) => {

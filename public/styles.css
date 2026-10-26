@@ -843,6 +843,14 @@ form.card { width: 100%; }
 .notice-success { border-color: var(--green-border); background: var(--green-soft); }
 .notice-success::before { color: var(--green); content: "Listo"; }
 .notice-info { padding: .8rem .9rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-info); color: var(--text-2); font-size: .74rem; }
+/* Pantalla del código (#/verificar) */
+.otp-view .card { width: min(100%, 520px); margin-inline: auto; }
+.otp-view h3 { margin-top: 0; }
+.otp-ayuda { color: var(--muted); font-size: .82rem; }
+.otp-view form .btn-primary { width: 100%; justify-content: center; }
+.otp-acciones { display: grid; gap: .5rem; margin-top: .75rem; }
+.otp-acciones .btn { width: 100%; justify-content: center; }
+#otpFeedback .btn { margin-top: .5rem; }
 #authFeedback, #otpFeedback, #termsSaveError, #reportPhotoError { margin: .75rem 0; padding: .8rem .95rem; border: 1px solid var(--info-border); border-radius: var(--radius-sm); background: var(--info-soft); color: var(--text); font-size: .82rem; }
 #termsSaveError, #reportPhotoError { border-color: var(--red-border); background: var(--red-soft); }
 #termsSaveError .btn { margin-top: .5rem; }

@@ -6,6 +6,7 @@ import { startNotificationPolling } from './notifications.js';
 import { darDeBajaEsteDispositivo } from './push-dispositivo.js';
 import { consumePendingDestination, navigateTo } from './router.js';
 import { olvidarSesion, recordarUsuario } from './sesion.js';
+import { borrarVerificacion, guardarVerificacion, leerVerificacion, segundosParaReenviar, textoEspera } from './verificacion.js';
 import { getStore } from './store.js';
 import { showToast } from './ui.js';
 
@@ -336,6 +337,7 @@ export async function handleLogin(e) {
   try {
     const result = await apiRequest('/auth/login', { method: 'POST', body: { correo: email, contrasena: password } });
     sessionStorage.setItem('rastreo_token', result.token);
+    terminarVerificacion();
     window.backendCurrentUser = result.usuario;
     recordarUsuario(result.usuario);
     const destino = consumePendingDestination();
@@ -380,10 +382,7 @@ export async function handleRegister(e) {
       acepto_terminos: true
     };
     await apiRequest('/auth/registro', { method: 'POST', body: estado.pendingRegistration });
-    estado.activeOtpEmail = email;
-    estado.activeOtpPurpose = 'registro';
-    navigateTo('otp', { contact: email, purpose: 'registro' });
-    startResendCountdown(60);
+    iniciarVerificacion(email, 'registro');
   } catch (error) {
     handleAuthError(error);
   }
@@ -398,68 +397,146 @@ export async function handleForgotPassword() {
     return;
   }
   try {
-    const res = await apiRequest('/auth/restablecer/solicitar', { method: 'POST', body: { correo: email } });
-    estado.activeOtpEmail = email;
-    estado.activeOtpPurpose = 'restablecer';
-    navigateTo('otp', { contact: email, purpose: 'restablecer', notice: res?.mensaje });
-    startResendCountdown(60);
+    await apiRequest('/auth/restablecer/solicitar', { method: 'POST', body: { correo: email } });
+    iniciarVerificacion(email, 'restablecer');
   } catch (error) {
     handleAuthError(error);
   }
 }
 
-export function startResendCountdown(seconds) {
+// ==========================================
+// PANTALLA DEL CÓDIGO (#/verificar)
+// ==========================================
+// Correo, propósito y próximo reenvío quedan en sessionStorage (verificacion.js)
+// para que recargar la página no pierda el flujo. Nunca la contraseña ni el código.
+
+// Empieza un flujo nuevo (registro o restablecer): reemplaza lo guardado del
+// anterior y espera 60 s antes del primer reenvío, como el servidor.
+function iniciarVerificacion(correo, proposito) {
+  estado.activeOtpEmail = correo;
+  estado.activeOtpPurpose = proposito;
+  startResendCountdown(60);
+  navigateTo('otp', { contact: correo, purpose: proposito });
+}
+
+function detenerCuentaRegresiva() {
   if (estado.resendTimer) clearInterval(estado.resendTimer);
-  estado.resendSeconds = seconds;
+  estado.resendTimer = null;
+  estado.resendSeconds = 0;
+}
+
+// Sale del flujo del código: verificación exitosa, otro correo, volver al ingreso,
+// iniciar o cerrar sesión. Borra lo guardado.
+export function terminarVerificacion() {
+  detenerCuentaRegresiva();
+  borrarVerificacion();
+  estado.activeOtpEmail = '';
+  estado.activeOtpPurpose = 'registro';
+}
+
+// Después de recargar #/verificar: vuelve al flujo con lo guardado. false si no hay.
+export function restaurarVerificacion() {
+  if (estado.activeOtpEmail) return true;
+  const guardado = leerVerificacion();
+  if (!guardado) return false;
+  estado.activeOtpEmail = guardado.correo;
+  estado.activeOtpPurpose = guardado.proposito;
+  startResendCountdown(segundosParaReenviar(guardado.proximoReenvio));
+  return true;
+}
+
+export function startResendCountdown(seconds) {
+  detenerCuentaRegresiva();
+  estado.resendSeconds = Math.max(0, Math.ceil(Number(seconds) || 0));
+  guardarVerificacion({
+    correo: estado.activeOtpEmail,
+    proposito: estado.activeOtpPurpose,
+    proximoReenvio: Date.now() + estado.resendSeconds * 1000
+  });
   updateResendButton();
+  if (!estado.resendSeconds) return;
   estado.resendTimer = setInterval(() => {
     estado.resendSeconds -= 1;
     updateResendButton();
-    if (estado.resendSeconds <= 0) {
-      clearInterval(estado.resendTimer);
-      estado.resendTimer = null;
-    }
+    if (estado.resendSeconds <= 0) detenerCuentaRegresiva();
   }, 1000);
+}
+
+function textoReenviar() {
+  return estado.resendSeconds > 0 ? `Reenviar código (en ${textoEspera(estado.resendSeconds)})` : 'Reenviar código';
 }
 
 export function updateResendButton() {
   const button = document.getElementById('resendCodeButton');
   if (!button) return;
   button.disabled = estado.resendSeconds > 0;
-  button.textContent = estado.resendSeconds > 0 ? `Reenviar código (${estado.resendSeconds}s)` : 'Reenviar código';
+  button.textContent = textoReenviar();
 }
 
-export function renderOTPView(params) {
+export function renderOTPView(params = {}) {
   estado.activeOtpEmail = params.contact || estado.activeOtpEmail;
   estado.activeOtpPurpose = params.purpose || estado.activeOtpPurpose;
   const isReset = estado.activeOtpPurpose === 'restablecer';
+  const correo = `<strong>${escapeHtml(estado.activeOtpEmail)}</strong>`;
+  // En la recuperación nunca se dice si el correo tiene cuenta.
   const introMessage = isReset
-    ? (params.notice ? escapeHtml(params.notice) : 'Si el Gmail está registrado, recibirá un código de 6 dígitos para restablecer la contraseña.')
-    : `Hemos enviado un código de 6 dígitos a <strong>${escapeHtml(estado.activeOtpEmail)}</strong>`;
+    ? `Si ${correo} está registrado, te enviamos un código de 6 dígitos para crear una contraseña nueva.`
+    : `Enviamos un código de 6 dígitos a ${correo}.`;
   return `
-    <div>
+    <div class="otp-view">
       <div class="card">
         <h3>${isReset ? 'Restablecer contraseña' : 'Verificar correo'}</h3>
         <p>${introMessage}</p>
-        <input type="text" id="otpInput" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" aria-label="Código de 6 dígitos" class="form-control">
-        ${isReset ? `${campoContrasena({ id: 'resetPassword', etiqueta: 'Nueva contraseña', autocomplete: 'new-password', placeholder: 'Mínimo 8 caracteres', atributos: 'minlength="8"' })}${campoContrasena({ id: 'resetPasswordConfirm', etiqueta: 'Confirmar contraseña', autocomplete: 'new-password', placeholder: 'Repita la contraseña', atributos: 'minlength="8"' })}` : ''}
-        <div id="otpFeedback" class="hidden" role="status"></div>
-        <button data-on-click="verifyEmailCode()" class="btn btn-primary">${isReset ? 'Cambiar contraseña' : 'Verificar y crear cuenta'}</button>
-        <button id="resendCodeButton" data-on-click="resendVerificationCode()" class="btn btn-outline" ${estado.resendSeconds > 0 ? 'disabled' : ''}>${estado.resendSeconds > 0 ? `Reenviar código (${estado.resendSeconds}s)` : 'Reenviar código'}</button>
-        ${!isReset ? `<button data-on-click="changeRegistrationEmail()" class="btn btn-outline">Cambiar correo</button>` : ''}
-        <button data-on-click="navigateTo('auth', {authMode:'login'})" class="btn btn-outline">Volver a iniciar sesión</button>
+        <p class="otp-ayuda">El código vence en 10 minutos. Si no lo ves, revisá la carpeta de spam.</p>
+        <form data-on-submit="verifyEmailCode(event)" novalidate>
+          <div class="form-group">
+            <label for="otpInput">Código de 6 dígitos</label>
+            <input type="text" id="otpInput" name="one-time-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required class="form-control">
+          </div>
+          ${isReset ? `${campoContrasena({ id: 'resetPassword', etiqueta: 'Nueva contraseña', autocomplete: 'new-password', placeholder: 'Mínimo 8 caracteres', atributos: 'minlength="8"' })}${campoContrasena({ id: 'resetPasswordConfirm', etiqueta: 'Confirmar contraseña', autocomplete: 'new-password', placeholder: 'Repita la contraseña', atributos: 'minlength="8"' })}` : ''}
+          <div id="otpFeedback" class="hidden" role="status"></div>
+          <button type="submit" class="btn btn-primary">${isReset ? 'Cambiar contraseña' : 'Verificar y crear cuenta'}</button>
+        </form>
+        <div class="otp-acciones">
+          <button type="button" id="resendCodeButton" data-on-click="resendVerificationCode()" class="btn btn-outline" ${estado.resendSeconds > 0 ? 'disabled' : ''}>${textoReenviar()}</button>
+          ${!isReset ? '<button type="button" data-on-click="changeRegistrationEmail()" class="btn btn-outline">Usar otro correo</button>' : ''}
+          <button type="button" data-on-click="salirDeVerificacion()" class="btn btn-outline">Volver al inicio de sesión</button>
+        </div>
       </div>
     </div>
   `;
 }
 
-export function showOtpFeedback(message) {
+// accion (opcional): { texto, enClic } agrega un botón al aviso, p. ej. para volver
+// a completar el registro.
+export function showOtpFeedback(message, accion) {
   const feedback = document.getElementById('otpFeedback');
+  if (!feedback) return;
   feedback.textContent = message;
+  if (accion) {
+    const boton = document.createElement('button');
+    boton.type = 'button';
+    boton.className = 'btn btn-outline btn-sm';
+    boton.textContent = accion.texto;
+    boton.setAttribute('data-on-click', accion.enClic);
+    feedback.append(' ', boton);
+  }
   feedback.classList.remove('hidden');
 }
 
-export async function verifyEmailCode() {
+// Mensaje de un 429 con la espera real (reintentarEn del servidor). Si hay que
+// esperar, el botón de reenvío queda bloqueado ese tiempo.
+function avisoDeLimite(error) {
+  const espera = Number(error.reintentarEn);
+  if (error.status === 429 && espera > 0) {
+    startResendCountdown(espera);
+    return `${error.message} Podés pedir otro código en ${textoEspera(espera)}.`;
+  }
+  return error.message;
+}
+
+export async function verifyEmailCode(event) {
+  event?.preventDefault?.();
   const code = document.getElementById('otpInput').value.trim();
   if (!/^\d{6}$/.test(code)) {
     showOtpFeedback('Ingrese un código válido de 6 dígitos.');
@@ -475,12 +552,13 @@ export async function verifyEmailCode() {
         method: 'POST',
         body: { correo: estado.activeOtpEmail, codigo: code, nueva_contrasena: password }
       });
-      if (estado.resendTimer) clearInterval(estado.resendTimer);
+      const correo = estado.activeOtpEmail;
+      terminarVerificacion();
       estado.pendingRegistration = null;
       window.authNotice = 'La contraseña se actualizó correctamente. Inicie sesión.';
-      navigateTo('auth', { authMode: 'login', identifier: estado.activeOtpEmail });
+      navigateTo('auth', { authMode: 'login', identifier: correo });
     } catch (error) {
-      showOtpFeedback(error.message);
+      showOtpFeedback(mensajeDeVerificacion(error));
     }
     return;
   }
@@ -489,43 +567,93 @@ export async function verifyEmailCode() {
       method: 'POST',
       body: { correo: estado.activeOtpEmail, codigo: code }
     });
-    if (estado.resendTimer) clearInterval(estado.resendTimer);
+    const correo = estado.activeOtpEmail;
+    terminarVerificacion();
     estado.pendingRegistration = null;
     window.authNotice = 'Cuenta creada correctamente. Ya puede iniciar sesión.';
-    navigateTo('auth', { authMode: 'login', identifier: estado.activeOtpEmail });
+    navigateTo('auth', { authMode: 'login', identifier: correo });
   } catch (error) {
-    showOtpFeedback(error.message);
+    showOtpFeedback(mensajeDeVerificacion(error));
   }
+}
+
+// Tras 5 intentos fallidos el servidor borra el código (429, reintentarEn 0): hay
+// que pedir uno nuevo con "Reenviar código".
+function mensajeDeVerificacion(error) {
+  if (error.status === 429 && Number(error.reintentarEn) === 0) {
+    return `${error.message} Tocá «Reenviar código» para recibir uno nuevo.`;
+  }
+  return avisoDeLimite(error);
 }
 
 export async function resendVerificationCode() {
   if (estado.resendSeconds > 0) return;
   try {
     if (estado.activeOtpPurpose === 'restablecer') {
+      // Respuesta igual exista o no la cuenta.
       const res = await apiRequest('/auth/restablecer/solicitar', {
         method: 'POST',
         body: { correo: estado.activeOtpEmail }
       });
       startResendCountdown(60);
-      showOtpFeedback(res?.mensaje || 'Se solicitó un nuevo código para restablecer la contraseña.');
-    } else {
-      await apiRequest('/auth/registro/reenviar', {
-        method: 'POST',
-        body: { correo: estado.activeOtpEmail }
-      });
-      startResendCountdown(60);
-      showOtpFeedback('Enviamos un nuevo código a tu Gmail.');
+      showOtpFeedback(res?.mensaje || 'Si el Gmail está registrado, recibirá un código nuevo.');
+      return;
     }
+    try {
+      await apiRequest('/auth/registro/reenviar', { method: 'POST', body: { correo: estado.activeOtpEmail } });
+    } catch (error) {
+      // 400: ya no hay registro pendiente (el código se borró tras 5 intentos
+      // fallidos): se vuelve a enviar el registro.
+      if (error.status === 400) return reenviarRegistro();
+      throw error;
+    }
+    startResendCountdown(60);
+    showOtpFeedback('Enviamos un código nuevo a tu Gmail.');
   } catch (error) {
-    showOtpFeedback(error.message);
-    if (error.status === 429) startResendCountdown(60);
+    showOtpFeedback(avisoDeLimite(error));
   }
 }
 
-export function changeRegistrationEmail() {
-  if (estado.resendTimer) clearInterval(estado.resendTimer);
-  estado.pendingRegistration = null;
+// El mismo /auth/registro del formulario (cuenta para el límite de 5 por hora), con
+// los datos que quedaron en memoria. Si ya no están (la página se recargó: la
+// contraseña nunca se guarda), se pide completar el registro de nuevo.
+async function reenviarRegistro() {
+  const datos = estado.pendingRegistration;
+  if (!datos?.contrasena || datos.correo !== estado.activeOtpEmail) {
+    showOtpFeedback('Ese código ya no sirve y, por seguridad, los datos del registro no se guardan en el navegador. Completá el registro de nuevo para recibir otro código.',
+      { texto: 'Completar el registro', enClic: 'completarRegistroDeNuevo()' });
+    return;
+  }
+  try {
+    await apiRequest('/auth/registro', { method: 'POST', body: datos });
+    startResendCountdown(60);
+    showOtpFeedback('Enviamos un código nuevo a tu Gmail.');
+  } catch (error) {
+    showOtpFeedback(avisoDeLimite(error));
+  }
+}
+
+// Vuelve al formulario de registro con el correo ya escrito.
+export function completarRegistroDeNuevo() {
+  const correo = estado.activeOtpEmail;
+  terminarVerificacion();
+  estado.pendingRegistration = { correo };
   navigateTo('auth', { authMode: 'register' });
+}
+
+// "Usar otro correo": conserva el nombre y vuelve al registro con el correo vacío.
+export async function changeRegistrationEmail() {
+  const nombre = estado.pendingRegistration?.nombre_completo;
+  terminarVerificacion();
+  estado.pendingRegistration = nombre ? { nombre_completo: nombre } : null;
+  await navigateTo('auth', { authMode: 'register' });
+  document.getElementById('regEmail')?.focus();
+}
+
+export function salirDeVerificacion() {
+  terminarVerificacion();
+  estado.pendingRegistration = null;
+  navigateTo('auth', { authMode: 'login' });
 }
 
 export async function logout() {
@@ -536,6 +664,7 @@ export async function logout() {
   // Antes de borrar el token: el servidor solo borra endpoints de esta cuenta.
   await darDeBajaEsteDispositivo();
   olvidarSesion();
+  terminarVerificacion();
   window.backendCurrentUser = null;
   window.backendCaseData = null;
   estado.pendingDestination = null;

@@ -2,7 +2,7 @@
 import { loadAdminHistoryPhotos, renderAdminView, selectAdminTab } from './admin.js';
 import { renderAlertaView } from './alerta.js';
 import { apiRequest, loadProtectedPhotos } from './api.js';
-import { renderAuthScreen, renderBasesView, renderLegalTerms, renderOTPView, updateHeaderUser } from './auth.js';
+import { renderAuthScreen, renderBasesView, renderLegalTerms, renderOTPView, restaurarVerificacion, updateHeaderUser } from './auth.js';
 import { API_BASE, escapeHtml } from './config.js';
 import { estado } from './estado.js';
 import { closeCaseDetail, filterFeedCases, openCaseDetail, renderFeedView } from './feed.js';
@@ -99,9 +99,10 @@ export async function applyCurrentRoute() {
 
   // #/bases siempre existe: para un ciudadano que falta aceptarlas es la pantalla
   // obligatoria (navigateTo), para el resto la página de consulta.
-  // La verificacion por codigo no se puede retomar en frio: el correo
-  // vive en memoria y no se pone en la URL.
-  if (route.view === 'otp' && !estado.activeOtpEmail) {
+  // La verificacion por codigo se retoma con lo guardado en sessionStorage
+  // (correo, proposito y proximo reenvio; verificacion.js). El correo nunca va
+  // en la URL. Sin nada guardado, se vuelve al ingreso.
+  if (route.view === 'otp' && !restaurarVerificacion()) {
     route = { view: 'auth', params: { authMode: 'login' } };
   }
 
