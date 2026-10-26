@@ -3,6 +3,7 @@
 // desde su notificación (notifications.js).
 import { apiRequest } from './api.js';
 import { escapeHtml } from './config.js';
+import { confirmar, pedirMotivo } from './dialogo.js';
 import { renderNoticeItem } from './notifications.js';
 import { navigateTo } from './router.js';
 import { showToast } from './ui.js';
@@ -76,13 +77,24 @@ export function timeSince(value) {
   return `Hace ${days} ${days === 1 ? 'día' : 'días'}`;
 }
 
-export async function respondToFollowup(caseId, action) {
-  if (action === 'LOCALIZADO' && !confirm('¿Confirma que la persona fue localizada?')) return;
-  let motivo;
-  if (action === 'CERRAR') {
-    motivo = prompt('Indica por qué solicitás cerrar el caso:');
-    if (!motivo?.trim()) return;
+// Confirmación o motivo de una respuesta de seguimiento ("Mis casos" y la
+// notificación de seguimiento usan la misma). null si se canceló.
+export async function prepararRespuestaSeguimiento(action) {
+  if (action === 'LOCALIZADO') {
+    const ok = await confirmar({ titulo: 'Persona localizada', mensaje: '¿Confirmás que la persona fue localizada?', textoConfirmar: 'Sí, fue localizada' });
+    return ok ? {} : null;
   }
+  if (action === 'CERRAR') {
+    const motivo = await pedirMotivo({ titulo: 'Cerrar caso', etiqueta: '¿Por qué cerrás el caso?', textoConfirmar: 'Cerrar caso', peligro: true });
+    return motivo === null ? null : { motivo };
+  }
+  return {};
+}
+
+export async function respondToFollowup(caseId, action) {
+  const extra = await prepararRespuestaSeguimiento(action);
+  if (!extra) return;
+  const { motivo } = extra;
   try {
     await apiRequest(`/casos/${encodeURIComponent(caseId)}/seguimiento`, {
       method: 'POST',

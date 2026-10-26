@@ -2,6 +2,7 @@
 import { apiRequest } from './api.js';
 import { escapeHtml } from './config.js';
 import { estado } from './estado.js';
+import { prepararRespuestaSeguimiento } from './my-cases.js';
 import { buildRoute, navigateTo } from './router.js';
 import { getStore, saveStore } from './store.js';
 import { NOTICE_TONES, formatRelativeTime, showToast } from './ui.js';
@@ -83,13 +84,12 @@ export function seguimientoHtml(n) {
 }
 
 export async function respondToCaseFollowup(caseId, action) {
-  if (action === 'LOCALIZADO' && !confirm('¿Confirma que la persona fue localizada?')) return;
-  const motivo = action === 'CERRAR' ? prompt('Indique el motivo para cerrar el caso:') : '';
-  if (action === 'CERRAR' && !motivo?.trim()) return;
+  const extra = await prepararRespuestaSeguimiento(action);
+  if (!extra) return;
   try {
     await apiRequest(`/casos/${encodeURIComponent(caseId)}/seguimiento`, {
       method: 'POST',
-      body: { accion: action, motivo: motivo?.trim() || '' }
+      body: { accion: action, motivo: extra.motivo || '' }
     });
     document.getElementById('notifModal').classList.add('hidden');
     showToast('Respuesta registrada', 'Se actualizó el seguimiento del caso.', 'success');

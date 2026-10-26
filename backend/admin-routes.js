@@ -135,8 +135,13 @@ export function createAdminRouter({ db, requireAdmin, push }) {
     if (!['PENDIENTE', 'VALIDADO', 'EN_SEGUIMIENTO', 'LOCALIZADO', 'CERRADO', 'RECHAZADO'].includes(state)) {
       return res.status(400).json({ error: 'El estado solicitado no es válido.' });
     }
-    if (state === 'RECHAZADO' && (typeof req.body?.motivo !== 'string' || !req.body.motivo.trim())) {
+    // Un motivo de solo espacios no cuenta. Se guarda sin los espacios de más.
+    const motivo = typeof req.body?.motivo === 'string' ? req.body.motivo.trim() : '';
+    if (state === 'RECHAZADO' && !motivo) {
       return res.status(400).json({ error: 'Debe indicar el motivo del rechazo.' });
+    }
+    if (state === 'PENDIENTE' && !motivo) {
+      return res.status(400).json({ error: 'Debe indicar qué debe corregirse antes de volver a validar el caso.' });
     }
     if (state === 'VALIDADO'
       && (typeof req.body?.numeroDenuncia !== 'string' || !req.body.numeroDenuncia.trim())) {
@@ -150,7 +155,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
     ].some(key => req.body?.[key] !== true)) {
       return res.status(400).json({ error: 'Debe completar toda la lista de validación antes de publicar el caso.' });
     }
-    if (state === 'CERRADO' && (typeof req.body?.motivo !== 'string' || !req.body.motivo.trim())) {
+    if (state === 'CERRADO' && !motivo) {
       return res.status(400).json({ error: 'Debe indicar la justificación para cerrar el caso.' });
     }
     let alertasPush = [];
@@ -193,7 +198,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
           END
         WHERE id = $1 RETURNING *
       `, [
-        req.params.id, state, req.body?.motivo || null, req.body?.numeroDenuncia || '',
+        req.params.id, state, motivo || null, req.body?.numeroDenuncia || '',
         req.body?.verificoDenuncia === true, req.body?.datosCoherentes === true,
         req.body?.duplicadosVerificados === true, req.body?.menorValidado === true,
         current.estado
@@ -205,7 +210,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
       alertasPush = await alertasPorCambioDeEstado(client, current, state, { push });
       if (current.reportado_por_usr_id) {
         const caseName = current.nombre_completo;
-        const reason = typeof req.body?.motivo === 'string' ? req.body.motivo.trim() : '';
+        const reason = motivo;
         const transition = state === 'VALIDADO'
           ? ['Reporte aprobado', `El reporte de ${caseName} fue aprobado y publicado.`, 'CASO_VALIDADO']
           : state === 'PENDIENTE'

@@ -2,6 +2,7 @@
 import { CAMPOS_ALERTA } from './alerta-campos.js';
 import { apiRequest, loadProtectedPhotos } from './api.js';
 import { escapeHtml } from './config.js';
+import { confirmar, pedirMotivo } from './dialogo.js';
 import { statusLabel, timeSince } from './my-cases.js';
 import { navigateTo, syncUrl } from './router.js';
 import { getStore } from './store.js';
@@ -310,8 +311,11 @@ export async function submitCaseReview(event) {
 }
 
 export async function adminReject(caseId) {
-  const motivo = prompt('Ingrese el motivo obligatorio del rechazo del caso:');
-  if (!motivo) return;
+  const motivo = await pedirMotivo({
+    titulo: 'Rechazar reporte', mensaje: 'El ciudadano recibe este motivo en su aviso.',
+    etiqueta: 'Motivo del rechazo', textoConfirmar: 'Rechazar reporte', peligro: true
+  });
+  if (motivo === null) return;
   try {
     await apiRequest(`/admin/casos/${encodeURIComponent(caseId)}/estado`, {
       method: 'POST', body: { estado: 'RECHAZADO', motivo }
@@ -324,7 +328,11 @@ export async function adminReject(caseId) {
 }
 
 export async function adminMarkLocated(caseId) {
-  if (!confirm('¿Confirmar que la persona ha sido localizada? La ficha permanecerá visible hasta 24 horas y luego se retirará del acceso público.')) return;
+  if (!await confirmar({
+    titulo: 'Marcar como localizada',
+    mensaje: 'La ficha permanecerá visible hasta 24 horas y luego se retirará del acceso público.',
+    textoConfirmar: 'Marcar como localizada'
+  })) return;
   try {
     await apiRequest(`/admin/casos/${encodeURIComponent(caseId)}/estado`, {
       method: 'POST', body: { estado: 'LOCALIZADO' }
@@ -337,11 +345,13 @@ export async function adminMarkLocated(caseId) {
 }
 
 export async function adminCloseCase(caseId) {
-  const motivo = prompt('Indique la justificación para cerrar este caso:');
-  if (!motivo?.trim()) return;
+  const motivo = await pedirMotivo({
+    titulo: 'Cerrar caso', etiqueta: 'Justificación del cierre', textoConfirmar: 'Cerrar caso', peligro: true
+  });
+  if (motivo === null) return;
   try {
     await apiRequest(`/admin/casos/${encodeURIComponent(caseId)}/estado`, {
-      method: 'POST', body: { estado: 'CERRADO', motivo: motivo.trim() }
+      method: 'POST', body: { estado: 'CERRADO', motivo }
     });
     showToast('Caso cerrado', 'Se registró la justificación de cierre.', 'success');
     navigateTo('admin');
@@ -351,11 +361,14 @@ export async function adminCloseCase(caseId) {
 }
 
 export async function adminReturnToReview(caseId) {
-  const motivo = prompt('Indique qué debe corregirse antes de volver a validar el caso:');
-  if (!motivo?.trim()) return;
+  const motivo = await pedirMotivo({
+    titulo: 'Devolver a revisión', mensaje: 'El ciudadano recibe este motivo para corregir el reporte.',
+    etiqueta: 'Qué debe corregirse', textoConfirmar: 'Devolver a revisión'
+  });
+  if (motivo === null) return;
   try {
     await apiRequest(`/admin/casos/${encodeURIComponent(caseId)}/estado`, {
-      method: 'POST', body: { estado: 'PENDIENTE', motivo: motivo.trim() }
+      method: 'POST', body: { estado: 'PENDIENTE', motivo }
     });
     showToast('Caso devuelto a revisión', 'Se notificó al ciudadano el motivo de la corrección.', 'success');
     navigateTo('admin');
@@ -377,12 +390,14 @@ export async function adminReopenCase(caseId) {
 }
 
 export async function adminModerateClue(clueId, state) {
-  const motivo = state === 'RECHAZADA' ? prompt('Indique el motivo para rechazar esta pista:') : '';
-  if (state === 'RECHAZADA' && !motivo?.trim()) return;
+  const motivo = state === 'RECHAZADA'
+    ? await pedirMotivo({ titulo: 'Rechazar pista', etiqueta: 'Motivo del rechazo', textoConfirmar: 'Rechazar pista', peligro: true })
+    : '';
+  if (motivo === null) return;
   try {
     await apiRequest(`/admin/pistas/${encodeURIComponent(clueId)}/estado`, {
       method: 'POST',
-      body: { estado: state, motivo: motivo?.trim() || '' }
+      body: { estado: state, motivo }
     });
     showToast('Moderación registrada', state === 'VALIDADA' ? 'La pista ya puede mostrarse públicamente.' : 'La pista quedó fuera de publicación.', 'success');
     navigateTo('admin');
@@ -396,7 +411,11 @@ export async function runTimeFastForward() {
     showToast('Acceso restringido', 'Solo un administrador puede ejecutar la simulación.', 'error');
     return;
   }
-  if (!confirm('Esta simulación fuerza el seguimiento de todos los casos activos y puede generar avisos y cambios de estado. ¿Continuar?')) return;
+  if (!await confirmar({
+    titulo: 'Simular avance de 48 horas',
+    mensaje: 'Esta simulación fuerza el seguimiento de todos los casos activos y puede generar avisos y cambios de estado.',
+    textoConfirmar: 'Simular', peligro: true
+  })) return;
   try {
     const result = await apiRequest('/admin/simulador/avanzar-48h', { method: 'POST' });
     document.getElementById('simTimeModal').classList.add('hidden');

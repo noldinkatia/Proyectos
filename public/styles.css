@@ -1123,6 +1123,23 @@ table tr:hover td { background: var(--surface-2); }
 #notifModal .modal-header > span, #simTimeModal .modal-header > span, #installGuideModal .modal-header > span { min-width: 0; flex: 1 1 auto; font-weight: 700; }
 #notifModal .modal-footer, #simTimeModal .modal-footer { display: flex; justify-content: flex-end; padding: .8rem 1.2rem; border-top: 1px solid var(--border); background: var(--surface); }
 #simTimeModal .modal-body, #installGuideModal .modal-body { margin: 0; padding: 1rem 1.2rem; color: var(--muted); font-size: .85rem; line-height: 1.5; }
+/* Cuadros propios en lugar de prompt()/confirm() (dialogo.js): <dialog> nativo */
+.dialogo { width: min(100% - 2rem, 480px); max-height: 90vh; padding: 0; overflow: auto; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: var(--shadow-overlay); }
+.dialogo::backdrop { background: var(--overlay); backdrop-filter: blur(4px); }
+.dialogo-formulario { display: grid; gap: .7rem; padding: 1.2rem; }
+.dialogo-titulo { margin: 0; color: var(--text-strong); font: 700 1.05rem/1.3 Sora, Inter, sans-serif; }
+.dialogo-texto { color: var(--text-2); font-size: .9rem; line-height: 1.5; }
+.dialogo-texto p { margin: 0 0 .5rem; }
+.dialogo-texto ul { margin: 0; padding-left: 1.2rem; }
+.dialogo-texto li { margin-bottom: .45rem; }
+.dialogo-etiqueta { color: var(--text); font-size: .85rem; font-weight: 700; }
+.dialogo-ayuda { margin: -.35rem 0 0; color: var(--muted); font-size: .8rem; }
+.dialogo-motivo { min-height: 5.5rem; resize: vertical; }
+.dialogo-motivo[aria-invalid="true"] { border-color: var(--red); }
+.dialogo-error { min-height: 1.2em; margin: 0; color: var(--red); font-size: .84rem; font-weight: 700; }
+.dialogo-error:empty { min-height: 0; }
+.dialogo-botones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+
 /* Bases y condiciones desde el registro (auth.js): <dialog> nativo, mismo aspecto que los otros modales */
 .bases-modal { width: min(100% - 2rem, 560px); max-height: 85vh; padding: 0; overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: var(--shadow-overlay); }
 .bases-modal[open] { display: flex; flex-direction: column; }
@@ -1224,6 +1241,9 @@ table tr:hover td { background: var(--surface-2); }
   .admin-metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 560px) {
+  /* Cuadros de dialogo.js: botones a todo el ancho, el principal arriba */
+  .dialogo-botones { flex-direction: column-reverse; }
+  .dialogo-botones .btn { width: 100%; justify-content: center; }
   /* Celulares: siempre queda una franja de la página a la vista (tocarla cierra el menú) */
   .drawer { width: clamp(240px, 78vw, 300px); }
   #topHeader { flex-wrap: wrap; gap: .15rem .45rem; padding-inline: .65rem; }
