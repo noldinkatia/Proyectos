@@ -67,6 +67,7 @@ export function initMainLeafletMap() {
       });
 
       estado.activeMap = map;
+      restaurarMiUbicacion(map);
       filterFeedCases();
     } catch (e) {
       mapEl.innerHTML = '<div>No se pudo cargar el mapa. Verifique su conexión.</div>';
@@ -119,14 +120,68 @@ export function viewCaseOnFeed(caseId) {
   }
 }
 
+// "Ver mi ubicación" (mapa del inicio en la web y pestaña Mapa en la app). El permiso
+// se pide solo al tocar el botón, nunca al cargar. La posición queda en memoria de
+// esta página: no se guarda ni se envía al servidor (las alertas de zona son aparte y
+// tienen su propio consentimiento, app/zona.js).
+let miUbicacion = null; // { lat, lng, precision } o null
+let capaUbicacion = null;
+
+// Título y mensaje para cada error de la geolocalización del navegador.
+export function mensajeErrorUbicacion(error) {
+  if (error?.code === 1) return ['Permiso denegado', 'No diste permiso para ver tu ubicación. Podés habilitarlo en la configuración del navegador y volver a intentar.'];
+  if (error?.code === 3) return ['Tardó demasiado', 'No se pudo obtener tu ubicación a tiempo. Probá de nuevo, mejor al aire libre o con el GPS encendido.'];
+  return ['Sin señal de ubicación', 'No se pudo obtener tu ubicación: puede que el GPS esté apagado o que no haya señal.'];
+}
+
+// Punto azul con el círculo de precisión (radio = precisión informada, en metros).
+function dibujarUbicacion(map) {
+  capaUbicacion?.remove();
+  capaUbicacion = null;
+  if (!miUbicacion || !map) return;
+  const centro = [miUbicacion.lat, miUbicacion.lng];
+  capaUbicacion = L.layerGroup([
+    L.circle(centro, { radius: Math.max(miUbicacion.precision, 10), color: '#2563eb', weight: 1, fillColor: '#3b82f6', fillOpacity: 0.15, interactive: false }),
+    L.circleMarker(centro, { radius: 8, color: '#ffffff', weight: 3, fillColor: '#2563eb', fillOpacity: 1 }).bindTooltip('Tu ubicación aproximada')
+  ]).addTo(map);
+}
+
+function actualizarBotonUbicacion({ buscando = false } = {}) {
+  const boton = document.getElementById('miUbicacionBoton');
+  if (!boton) return;
+  boton.disabled = buscando;
+  boton.textContent = buscando ? 'Buscando tu ubicación…' : miUbicacion ? 'Quitar mi ubicación' : 'Ver mi ubicación';
+  boton.setAttribute('aria-pressed', String(Boolean(miUbicacion)));
+}
+
+// Al volver a crear el mapa (cambio de vista o actualización de datos) se redibuja.
+export function restaurarMiUbicacion(map) {
+  dibujarUbicacion(map);
+  actualizarBotonUbicacion();
+}
+
 export function useMyLocationOnMap() {
-  if (!navigator.geolocation) {
-    showToast('Información', 'La geolocalización no está disponible en este navegador.', 'error');
+  if (miUbicacion) {
+    miUbicacion = null;
+    dibujarUbicacion(null);
+    actualizarBotonUbicacion();
     return;
   }
+  if (!navigator.geolocation) {
+    showToast('Ubicación no disponible', 'Este navegador no permite ver tu ubicación.', 'error');
+    return;
+  }
+  actualizarBotonUbicacion({ buscando: true });
   navigator.geolocation.getCurrentPosition(position => {
-    if (estado.activeMap) estado.activeMap.setView([position.coords.latitude, position.coords.longitude], 13);
-  }, () => showToast('Ubicación no disponible', 'No se pudo obtener la ubicación. Verifique los permisos del navegador.', 'error'));
+    miUbicacion = { lat: position.coords.latitude, lng: position.coords.longitude, precision: position.coords.accuracy || 0 };
+    dibujarUbicacion(estado.activeMap);
+    estado.activeMap?.setView([miUbicacion.lat, miUbicacion.lng], 14);
+    actualizarBotonUbicacion();
+  }, error => {
+    const [titulo, mensaje] = mensajeErrorUbicacion(error);
+    showToast(titulo, mensaje, 'error');
+    actualizarBotonUbicacion();
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
 }
 
 export function focusCaseOnMap(caseId) {

@@ -115,7 +115,7 @@ export function renderFeedView(statistics = window.currentStatistics) {
         <div>
           <span>Mapa de desapariciones</span>
           <div>
-            <button data-on-click="useMyLocationOnMap()" class="btn btn-outline btn-sm">Mi ubicación</button>
+            <button type="button" id="miUbicacionBoton" aria-pressed="false" data-on-click="useMyLocationOnMap()" class="btn btn-outline btn-sm">Ver mi ubicación</button>
             <button data-on-click="centerMapOnParaguay()" class="btn btn-outline btn-sm">Centrar mapa</button>
           </div>
         </div>

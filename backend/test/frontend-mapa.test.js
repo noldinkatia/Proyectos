@@ -107,3 +107,79 @@ test('mapa oscuro: filtro solo sobre las teselas y solo con el tema oscuro', asy
   const mapa = await readFile(new URL('js/map.js', publicDir), 'utf8');
   assert.match(mapa, /L\.tileLayer\('https:\/\/tile\.openstreetmap\.org\/\{z\}\/\{x\}\/\{y\}\.png'/);
 });
+
+// "Ver mi ubicación" (map.js) con Leaflet, geolocalización, DOM y fetch simulados.
+test('"Ver mi ubicación": pide permiso solo al tocar, dibuja punto y precisión, centra y se puede quitar', async () => {
+  const { useMyLocationOnMap, mensajeErrorUbicacion } = await import(new URL('js/map.js', publicDir));
+  const { estado } = await import(new URL('js/estado.js', publicDir));
+  const anteriores = { L: globalThis.L, navigator: Object.getOwnPropertyDescriptor(globalThis, 'navigator'), document: globalThis.document, fetch: globalThis.fetch };
+  const dibujado = [];
+  const vistas = [];
+  let pedidosGeo = 0;
+  let responder;
+  const capa = tipo => ({ tipo, bindTooltip() { return this; } });
+  globalThis.L = {
+    circle: (centro, op) => ({ ...capa('circulo'), centro, radio: op.radius }),
+    circleMarker: (centro, op) => ({ ...capa('punto'), centro, color: op.fillColor }),
+    layerGroup: capas => ({ capas, addTo() { dibujado.push(this); return this; }, remove() { dibujado.splice(dibujado.indexOf(this), 1); } })
+  };
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { geolocation: {
+    getCurrentPosition(ok, error, opciones) { pedidosGeo += 1; responder = { ok, error, opciones }; }
+  } } });
+  const boton = { disabled: false, textContent: 'Ver mi ubicación', atributos: {}, setAttribute(n, v) { this.atributos[n] = v; } };
+  const toast = { titulo: { innerText: '' }, mensaje: { innerText: '' } };
+  globalThis.document = { getElementById: id => ({ miUbicacionBoton: boton, toastTitle: toast.titulo, toastMessage: toast.mensaje, toastNotification: { dataset: {}, classList: { add() {}, remove() {} } } })[id] || null };
+  globalThis.fetch = () => { throw new Error('la ubicación no debe enviarse al servidor'); };
+  estado.activeMap = { setView: (centro, zoom) => vistas.push([centro, zoom]) };
+  try {
+    assert.equal(pedidosGeo, 0, 'nada al cargar');
+    useMyLocationOnMap();
+    assert.equal(pedidosGeo, 1);
+    assert.equal(boton.textContent, 'Buscando tu ubicación…');
+    assert.equal(boton.disabled, true);
+    assert.equal(responder.opciones.enableHighAccuracy, true);
+    responder.ok({ coords: { latitude: -25.3, longitude: -57.6, accuracy: 35 } });
+    assert.equal(dibujado.length, 1);
+    assert.deepEqual(dibujado[0].capas.map(c => [c.tipo, c.centro]), [['circulo', [-25.3, -57.6]], ['punto', [-25.3, -57.6]]]);
+    assert.equal(dibujado[0].capas[0].radio, 35, 'círculo de precisión');
+    assert.equal(dibujado[0].capas[1].color, '#2563eb', 'punto azul');
+    assert.deepEqual(vistas.at(-1), [[-25.3, -57.6], 14], 'centra el mapa');
+    assert.equal(boton.textContent, 'Quitar mi ubicación');
+    assert.equal(boton.atributos['aria-pressed'], 'true');
+    // Tocar de nuevo la quita, sin volver a pedir la posición.
+    useMyLocationOnMap();
+    assert.equal(dibujado.length, 0);
+    assert.equal(pedidosGeo, 1);
+    assert.equal(boton.textContent, 'Ver mi ubicación');
+    assert.equal(boton.atributos['aria-pressed'], 'false');
+    // Permiso negado: mensaje claro y el botón vuelve a estar disponible.
+    useMyLocationOnMap();
+    responder.error({ code: 1 });
+    assert.equal(toast.titulo.innerText, 'Permiso denegado');
+    assert.equal(boton.disabled, false);
+    assert.equal(dibujado.length, 0);
+  } finally {
+    globalThis.L = anteriores.L;
+    if (anteriores.navigator) Object.defineProperty(globalThis, 'navigator', anteriores.navigator);
+    globalThis.document = anteriores.document;
+    globalThis.fetch = anteriores.fetch;
+    estado.activeMap = null;
+    clearTimeout(estado.toastTimeout);
+  }
+  assert.equal(mensajeErrorUbicacion({ code: 1 })[0], 'Permiso denegado');
+  assert.equal(mensajeErrorUbicacion({ code: 2 })[0], 'Sin señal de ubicación');
+  assert.equal(mensajeErrorUbicacion({ code: 3 })[0], 'Tardó demasiado');
+});
+
+test('"Ver mi ubicación": nunca al cargar y sin enviar nada al servidor', async () => {
+  const mapa = (await readFile(new URL('js/map.js', publicDir), 'utf8')).replace(/\r\n/g, '\n');
+  const inicio = mapa.indexOf('let miUbicacion');
+  const bloque = mapa.slice(inicio, mapa.indexOf('export function focusCaseOnMap', inicio));
+  assert.doesNotMatch(bloque, /apiRequest|fetch\(|sessionStorage|localStorage/, 'solo en memoria');
+  // getCurrentPosition aparece una sola vez en map.js: dentro de useMyLocationOnMap.
+  assert.equal((mapa.match(/getCurrentPosition/g) || []).length, 1);
+  const funcion = mapa.slice(mapa.indexOf('export function useMyLocationOnMap'), mapa.indexOf('\n}\n', mapa.indexOf('export function useMyLocationOnMap')));
+  assert.match(funcion, /getCurrentPosition/);
+  const feed = await readFile(new URL('js/feed.js', publicDir), 'utf8');
+  assert.match(feed, /<button type="button" id="miUbicacionBoton" aria-pressed="false" data-on-click="useMyLocationOnMap\(\)" class="btn btn-outline btn-sm">Ver mi ubicación<\/button>/);
+});
