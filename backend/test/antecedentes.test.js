@@ -90,7 +90,7 @@ test('antecedentes: marcar y retirar con motivo, auditoría y nunca en respuesta
     assert.equal(nuevo.status, 201, 'no se bloquea');
     const avisoAdmin = (await db.query("SELECT mensaje FROM notificaciones WHERE usuario_id = $1 AND caso_id = $2 AND tipo = 'CASO_PENDIENTE'",
       [adminId, nuevo.data.caso.id])).rows[0].mensaje;
-    assert.match(avisoAdmin, /quien lo reportó tiene un antecedente de reporte falso o abusivo; la alerta temprana a la zona se envía igual\./);
+    assert.match(avisoAdmin, /quien lo reportó tiene un antecedente de reporte falso o abusivo\. La marca no bloquea el reporte ni la alerta temprana\./);
 
     // --- Ninguna respuesta del ciudadano ni pública lo menciona
     const login = await pedir('POST', '/auth/login', null, { correo: marcado.correo, contrasena: 'Password-test-1' });
@@ -165,11 +165,13 @@ test('antecedentes: marcar y retirar con motivo, auditoría y nunca en respuesta
 
 test('panel: marca corta en la bandeja y detalle con "Retirar marca" en la revisión', async () => {
   const { avisoAntecedente } = await import(new URL('../../public/js/admin.js', import.meta.url));
-  const caso = { reportadoPorUsrId: 7, antecedentesReportante: [{ id: '3', motivo: 'Reporte <falso>', registradoEn: '2026-10-12T15:00:00Z', registradoPor: 'Admin' }] };
+  const caso = { reportadoPorUsrId: 7, alertaTempranaEn: '2026-10-12T15:05:00Z', antecedentesReportante: [{ id: '3', motivo: 'Reporte <falso>', registradoEn: '2026-10-12T15:00:00Z', registradoPor: 'Admin' }] };
   assert.equal(avisoAntecedente(caso), '<br><span class="marca-antecedente">⚠ Reportante con antecedente</span>');
   const detalle = avisoAntecedente(caso, { detalle: true });
   assert.match(detalle, /El reportante tiene un antecedente de reporte falso o abusivo/);
-  assert.match(detalle, /No se bloqueó nada: la alerta temprana a la zona salió igual/);
+  assert.match(detalle, /La marca no bloquea nada: la alerta temprana a la zona salió igual\./);
+  // Si la alerta no salió (duplicado, límite por reportante), no se dice que salió.
+  assert.match(avisoAntecedente({ ...caso, alertaTempranaEn: null }, { detalle: true }), /La marca no bloquea nada\.<\/p>/);
   assert.match(detalle, /Reporte &lt;falso&gt;/, 'el motivo se escapa');
   assert.match(detalle, /data-antecedente-id="3" data-on-click="adminRetirarAntecedente\(this\.dataset\.antecedenteId\)">Retirar marca</);
   assert.match(detalle, /data-user-id="7" data-on-click="adminMarcarAntecedente\(this\.dataset\.userId\)">Marcar antecedente del reportante</);

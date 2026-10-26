@@ -180,7 +180,7 @@ export function createCaseRouter({ db, jwtSecret, push }) {
       );
       const total = Number(antecedentes[0]?.total) || 0;
       const conAntecedente = total
-        ? ` Atención: quien lo reportó tiene ${total === 1 ? 'un antecedente' : `${total} antecedentes`} de reporte falso o abusivo; la alerta temprana a la zona se envía igual.`
+        ? ` Atención: quien lo reportó tiene ${total === 1 ? 'un antecedente' : `${total} antecedentes`} de reporte falso o abusivo. La marca no bloquea el reporte ni la alerta temprana.`
         : '';
       await client.query(`
         INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo)

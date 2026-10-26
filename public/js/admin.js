@@ -275,7 +275,7 @@ export function avisoAntecedente(c, { detalle = false } = {}) {
   if (!lista.length) return marcar ? `<div class="aviso-antecedente">${marcar}</div>` : '';
   return `<div class="aviso-antecedente aviso-antecedente-activo" role="note">
       <p><strong>⚠ El reportante tiene ${lista.length === 1 ? 'un antecedente' : `${lista.length} antecedentes`} de reporte falso o abusivo.</strong>
-        Revisá este reporte con más cuidado. No se bloqueó nada: la alerta temprana a la zona salió igual.</p>
+        Revisá este reporte con más cuidado. La marca no bloquea nada${c.alertaTempranaEn ? ': la alerta temprana a la zona salió igual' : ''}.</p>
       <ul>${items}</ul>${marcar}
     </div>`;
 }
