@@ -5,6 +5,8 @@ import jwt from 'jsonwebtoken';
 import { createDatabase, initializeDatabase, seedAdministrator } from '../db.js';
 import { createApp } from '../server.js';
 import { processDueFollowups } from '../case-routes.js';
+import { DECLARACION_VERSION } from '../../public/js/declaracion.js';
+import { borrarUsuariosDePrueba } from '../ayuda-tests/limpieza.js';
 
 const secret = 'test-secret-with-at-least-thirty-two-characters';
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
@@ -89,7 +91,8 @@ test('el historial de localizados exige el rol de administrador', async () => {
     });
     assert.equal(adminResponse.status, 200);
     const historyQuery = app.queries.find(item => item.sql.includes('COUNT(*) OVER()'));
-    assert.match(historyQuery.sql, /c\.estado = 'LOCALIZADO'/);
+    // Localizados, también los que después se cerraron (a mano o por el cierre automático).
+    assert.match(historyQuery.sql, /c\.localizado_en IS NOT NULL AND c\.estado IN \('LOCALIZADO', 'CERRADO'\)/);
     assert.deepEqual(historyQuery.values.slice(0, 2), ['%Ana%', null]);
   } finally {
     await app.close();
@@ -339,7 +342,8 @@ test('al crear un caso se asocia al ciudadano y se notifica a administración', 
         numeroDenuncia: 'DEN-123',
         declaraMayorEdad: true,
         autorizacionParental: true,
-        avisoPrivacidadAceptado: true
+        avisoPrivacidadAceptado: true,
+        declaracionAceptada: true, declaracionVersion: DECLARACION_VERSION
       })
     });
     assert.equal(response.status, 201);
@@ -513,10 +517,11 @@ test('las pistas exigen sesión, se guardan con su autor y se publican anónimas
   }
 });
 
-test('el proceso de seguimiento envía la consulta tras 48 h y escala tras el reintento', async () => {
+test('el proceso de seguimiento envía la consulta tras 48 h, la repite a las 24 h y escala tras el segundo intento', async () => {
   const rows = [
-    { id: 'first', nombre_completo: 'Caso uno', reportado_por_usr_id: 10, estado: 'VALIDADO', seguimiento_etapa: 0 },
-    { id: 'retry', nombre_completo: 'Caso dos', reportado_por_usr_id: 11, estado: 'VALIDADO', seguimiento_etapa: 1 }
+    { id: 'first', nombre_completo: 'Caso uno', reportado_por_usr_id: 10, estado: 'VALIDADO', seguimiento_etapa: 0, seguimiento_intentos: 0 },
+    { id: 'second', nombre_completo: 'Caso dos', reportado_por_usr_id: 11, estado: 'VALIDADO', seguimiento_etapa: 1, seguimiento_intentos: 1 },
+    { id: 'retry', nombre_completo: 'Caso tres', reportado_por_usr_id: 12, estado: 'VALIDADO', seguimiento_etapa: 1, seguimiento_intentos: 2 }
   ];
   const statements = [];
   const db = {
@@ -532,7 +537,7 @@ test('el proceso de seguimiento envía la consulta tras 48 h y escala tras el re
     }
   };
   const result = await processDueFollowups(db);
-  assert.deepEqual(result, { consultasEnviadas: 1, casosEnSeguimiento: 1 });
+  assert.deepEqual(result, { consultasEnviadas: 1, segundasConsultas: 1, casosEnSeguimiento: 1 });
   assert.ok(statements.some(sql => sql.includes("INTERVAL '24 hours'")));
   assert.ok(statements.some(sql => sql.includes("SET estado = 'EN_SEGUIMIENTO'")));
   assert.ok(statements.some(sql => sql.includes("'SEGUIMIENTO')")));
@@ -554,7 +559,7 @@ test('el ciclo localizado permanece oculto tras 36 segundos y reiniciar Express'
   try {
     await initializeDatabase(db);
     const foundBefore = Number((await db.query(`
-      SELECT COUNT(*) AS total FROM casos WHERE estado IN ('LOCALIZADO', 'CERRADO')
+      SELECT COUNT(*) AS total FROM casos WHERE localizado_en IS NOT NULL AND estado IN ('LOCALIZADO', 'CERRADO')
     `)).rows[0].total);
     await seedAdministrator(db, adminEmail, adminPassword);
     adminId = (await db.query('SELECT id FROM usuarios WHERE correo = $1', [adminEmail])).rows[0].id;
@@ -649,7 +654,7 @@ test('el ciclo localizado permanece oculto tras 36 segundos y reiniciar Express'
       await db.query('DELETE FROM cambios_estado_caso WHERE caso_id = $1', [caseId]);
       await db.query('DELETE FROM pistas WHERE caso_id = $1', [caseId]);
       await db.query('DELETE FROM casos WHERE id = $1', [caseId]);
-      await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [[adminId, citizenId].filter(Boolean)]);
+      await borrarUsuariosDePrueba(db, 'id = ANY($1)', [[adminId, citizenId].filter(Boolean)]);
     }
     await db.end();
   }
@@ -773,7 +778,8 @@ test('solo se aceptan ubicaciones de la lista oficial de Paraguay', async () => 
       body: JSON.stringify({
         nombreCompleto: 'Persona', edad: 30, sexo: 'Otro', ciudad: 'Palermo', departamento: 'Buenos Aires',
         descripcionFisica: 'x', vestimenta: 'x', fechaHoraDesaparicion: new Date().toISOString(),
-        ubicacion: { lat: -25.2867, lng: -57.6333 }, declaraMayorEdad: true, avisoPrivacidadAceptado: true
+        ubicacion: { lat: -25.2867, lng: -57.6333 }, declaraMayorEdad: true, avisoPrivacidadAceptado: true,
+        declaracionAceptada: true, declaracionVersion: DECLARACION_VERSION
       })
     });
     assert.equal(response.status, 400);
@@ -875,7 +881,7 @@ test('paginación del listado público con PostgreSQL', {
     if (databaseInitialized) {
       await db.query('DELETE FROM pistas WHERE caso_id = ANY($1)', [ids]);
       await db.query('DELETE FROM casos WHERE id = ANY($1)', [ids]);
-      await db.query('DELETE FROM usuarios WHERE correo = $1', [adminEmail]);
+      await borrarUsuariosDePrueba(db, 'correo = $1', [adminEmail]);
     }
     await db.end();
   }
@@ -995,7 +1001,7 @@ test('fotos de pistas por URL con PostgreSQL', {
     if (databaseInitialized) {
       await db.query('DELETE FROM pistas WHERE caso_id = $1', [caseId]);
       await db.query('DELETE FROM casos WHERE id = $1', [caseId]);
-      await db.query('DELETE FROM usuarios WHERE correo = $1', [adminEmail]);
+      await borrarUsuariosDePrueba(db, 'correo = $1', [adminEmail]);
     }
     await db.end();
   }
@@ -1141,7 +1147,7 @@ test('sin sesión con PostgreSQL: pendientes, rechazados y pistas no validadas n
     if (databaseInitialized) {
       await db.query('DELETE FROM pistas WHERE id = ANY($1)', [Object.values(clueIds)]);
       await db.query('DELETE FROM casos WHERE id = ANY($1)', [Object.values(ids)]);
-      await db.query('DELETE FROM usuarios WHERE correo = $1 AND NOT EXISTS (SELECT 1 FROM casos WHERE reportado_por_usr_id = usuarios.id)', [INTERNAL_VALUES[1]]);
+      await borrarUsuariosDePrueba(db, 'correo = $1 AND NOT EXISTS (SELECT 1 FROM casos WHERE reportado_por_usr_id = usuarios.id)', [INTERNAL_VALUES[1]]);
     }
     await db.end();
   }

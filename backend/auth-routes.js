@@ -32,6 +32,19 @@ function codeMatches(code, storedHash, secret) {
   return candidate.length === expected.length && timingSafeEqual(candidate, expected);
 }
 
+// Toda respuesta 429 lleva reintentarEn: segundos hasta poder volver a intentar
+// (0 = ya, con un código nuevo). Solo informa; los límites no cambian. La pantalla
+// del código lo usa para mostrar la espera real en vez de un minuto fijo.
+export function segundosHasta(momento, ahora = Date.now()) {
+  const destino = momento instanceof Date ? momento.getTime() : Number(momento);
+  return Number.isFinite(destino) ? Math.max(0, Math.ceil((destino - ahora) / 1000)) : 0;
+}
+
+// Respuesta de express-rate-limit con el tiempo que falta para el próximo intento.
+export function respuestaLimite(req, res, _next, opciones) {
+  res.status(opciones.statusCode).json({ ...opciones.message, reintentarEn: segundosHasta(req.rateLimit?.resetTime) });
+}
+
 // Límites por IP pensados para un evento: ~100 celulares salen por la misma IP
 // (Wi-Fi del Workshop, NAT). Por correo ya hay un límite propio (sendCodeLimiter).
 function codeRateLimiter() {
@@ -40,7 +53,8 @@ function codeRateLimiter() {
     limit: 300,
     standardHeaders: 'draft-7',
     legacyHeaders: false,
-    message: { error: 'Demasiadas solicitudes. Intente nuevamente más tarde.' }
+    message: { error: 'Demasiadas solicitudes. Intente nuevamente más tarde.' },
+    handler: respuestaLimite
   });
 }
 
@@ -52,7 +66,8 @@ function loginRateLimiter() {
     windowMs: 15 * 60 * 1000,
     standardHeaders: 'draft-7',
     legacyHeaders: false,
-    message: { error: 'Demasiados intentos de inicio de sesión. Espere 15 minutos.' }
+    message: { error: 'Demasiados intentos de inicio de sesión. Espere 15 minutos.' },
+    handler: respuestaLimite
   };
   return [
     rateLimit({ ...common, limit: 300 }),
@@ -83,22 +98,27 @@ function sendCodeLimiter(db) {
     const email = rawInput.includes('@') ? normalizeEmail(rawInput) : rawInput;
     if (!email) return next();
 
-    const allowed = await withTransaction(db, async client => {
+    // libreEn: cuándo sale de la ventana de una hora el envío más viejo (se puede
+    // volver a pedir). Cuenta por correo exista o no la cuenta: no revela nada.
+    const { allowed, libreEn } = await withTransaction(db, async client => {
       await client.query("DELETE FROM solicitudes_codigo WHERE creado_en < NOW() - INTERVAL '1 hour'");
       const { rows } = await client.query(`
-        SELECT COUNT(*) AS total FROM solicitudes_codigo
+        SELECT COUNT(*) AS total, MIN(creado_en) + INTERVAL '1 hour' AS libre_en FROM solicitudes_codigo
         WHERE correo = $1 AND creado_en >= NOW() - INTERVAL '1 hour'
       `, [email]);
-      if (Number(rows[0].total) >= 5) return false;
+      if (Number(rows[0].total) >= 5) return { allowed: false, libreEn: rows[0].libre_en };
       await client.query(
         'INSERT INTO solicitudes_codigo (correo, proposito) VALUES ($1, $2)',
         [email, req.codePurpose]
       );
-      return true;
+      return { allowed: true };
     });
 
     if (!allowed) {
-      return res.status(429).json({ error: 'Se alcanzó el límite de 5 envíos por hora para este contacto.' });
+      return res.status(429).json({
+        error: 'Se alcanzó el límite de 5 envíos por hora para este contacto.',
+        reintentarEn: Math.max(1, segundosHasta(new Date(libreEn)))
+      });
     }
     next();
   });
@@ -206,7 +226,7 @@ export function createAuthRouter({ db, mailer, jwtSecret }) {
       return null;
     }
     if (pending.intentos >= 5) {
-      res.status(429).json({ error: 'Demasiados intentos. Solicite un código nuevo.' });
+      res.status(429).json({ error: 'Demasiados intentos. Solicite un código nuevo.', reintentarEn: 0 });
       return null;
     }
     if (!codeMatches(code, pending.codigo_hash, jwtSecret)) {
@@ -220,7 +240,8 @@ export function createAuthRouter({ db, mailer, jwtSecret }) {
           'DELETE FROM codigos_verificacion WHERE id = $1',
           [pending.id]
         );
-        res.status(429).json({ error: 'Demasiados intentos. Solicite un código nuevo.' });
+        // El código se borra: se puede pedir uno nuevo enseguida (reintentarEn 0).
+        res.status(429).json({ error: 'Demasiados intentos. Solicite un código nuevo.', reintentarEn: 0 });
       } else {
         res.status(400).json({ error: `Código incorrecto. Le quedan ${5 - attempts} intentos.` });
       }
@@ -293,7 +314,10 @@ export function createAuthRouter({ db, mailer, jwtSecret }) {
       return res.status(400).json({ error: 'No hay un registro pendiente. Complete el formulario de registro nuevamente.' });
     }
     if (Date.now() - Date.parse(pending.creado_en) < RESEND_INTERVAL_MS) {
-      return res.status(429).json({ error: 'Espere un minuto antes de pedir otro código.' });
+      return res.status(429).json({
+        error: 'Espere un minuto antes de pedir otro código.',
+        reintentarEn: Math.max(1, segundosHasta(Date.parse(pending.creado_en) + RESEND_INTERVAL_MS))
+      });
     }
 
     // Se conservan nombre, contraseña y aceptación del registro; solo cambia el código.

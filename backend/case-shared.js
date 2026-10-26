@@ -7,10 +7,33 @@ if (!Number.isFinite(LOCATED_WINDOW_HOURS) || LOCATED_WINDOW_HOURS < 0) {
   throw new Error('VENTANA_LOCALIZADOS_HORAS debe ser un número mayor o igual a cero.');
 }
 
+// Días tras los que un caso localizado se cierra solo (backend/followups.js). La
+// ficha pública se retira antes, a las VENTANA_LOCALIZADOS_HORAS.
+export function leerLimiteCierreLocalizado(valor) {
+  const dias = valor === undefined || valor === '' ? 7 : Number(valor);
+  if (!Number.isFinite(dias) || dias <= 0) {
+    throw new Error('LIMITE_CIERRE_LOCALIZADO_DIAS debe ser un número de días mayor que cero.');
+  }
+  return dias;
+}
+
+export const LIMITE_CIERRE_LOCALIZADO_DIAS = leerLimiteCierreLocalizado(process.env.LIMITE_CIERRE_LOCALIZADO_DIAS);
+
+// Encontrado = llegó a localizado. localizado_en se conserva al cerrar (a mano o
+// por el cierre automático), así sigue contando; un caso cerrado sin haber sido
+// localizado no cuenta. alias: prefijo de tabla en consultas con JOIN ('c.').
+export function casoEncontrado(alias = '') {
+  return `(${alias}localizado_en IS NOT NULL AND ${alias}estado IN ('LOCALIZADO', 'CERRADO'))`;
+}
+
+// Qué ve el público (listado, detalle, foto, pistas y alertas de zona): casos
+// activos y, por VENTANA_LOCALIZADOS_HORAS, los adultos localizados. Una persona
+// menor de edad localizada deja de mostrarse enseguida (sigue contando en las
+// estadísticas, que no usan este filtro).
 export const PUBLIC_CASE_FILTER = `
   (estado IN ('VALIDADO', 'EN_SEGUIMIENTO', 'LOCALIZADO')
     AND (estado <> 'LOCALIZADO'
-      OR (localizado_en IS NOT NULL
+      OR (edad >= 18 AND localizado_en IS NOT NULL
         AND CURRENT_TIMESTAMP < localizado_en + ($1 * INTERVAL '1 hour'))))
 `;
 
@@ -24,6 +47,7 @@ export function caseListColumns(alias = '') {
     'latitud', 'longitud', 'direccion', 'numero_denuncia', 'estado', 'motivo_rechazo',
     'reportado_por_usr_id', 'localizado_en', 'creado_en', 'proximo_seguimiento',
     'reportante_mayor_edad', 'autorizacion_parental', 'aviso_privacidad_aceptado',
+    'declaracion_aceptada_en', 'declaracion_version',
     'checklist_denuncia', 'checklist_coherencia', 'checklist_duplicados', 'checklist_menores',
     'motivo_cierre', 'seguimiento_etapa', 'alerta_campos', 'alerta_temprana_en'
   ].map(column => `${prefix}${column}`).join(', ') + `, (${prefix}foto <> '') AS tiene_foto`;
@@ -93,10 +117,15 @@ export function toPublicCase(row) {
 // número de denuncia y la fecha del próximo seguimiento. Nunca va en respuestas
 // públicas: GET /casos y /casos/:id se leen sin sesión (ROLES_Y_PERMISOS.txt).
 export function toOwnerCase(row) {
+  const localizado = row.estado === 'LOCALIZADO' && row.localizado_en ? new Date(row.localizado_en) : null;
   return {
     ...toPublicCase(row),
     numeroDenuncia: row.numero_denuncia,
-    proximoSeguimiento: row.proximo_seguimiento
+    proximoSeguimiento: row.proximo_seguimiento,
+    // Cuándo lo cerrará el cierre automático (solo mientras está localizado).
+    cierreAutomaticoEn: localizado && !Number.isNaN(localizado.getTime())
+      ? new Date(localizado.getTime() + LIMITE_CIERRE_LOCALIZADO_DIAS * 86_400_000).toISOString()
+      : null
   };
 }
 
@@ -108,7 +137,12 @@ export function toAdminCase(row) {
     motivoRechazo: row.motivo_rechazo,
     reportadoPorUsrId: row.reportado_por_usr_id,
     contactoReportante: row.contacto_reportante,
+    // Antecedentes activos del reportante (migración 008): solo en respuestas de administración.
+    antecedentesReportante: Array.isArray(row.antecedentes_reportante) ? row.antecedentes_reportante : [],
     reportanteMayorEdad: Boolean(row.reportante_mayor_edad),
+    // Declaración de responsabilidad (solo administración): cuándo y qué versión.
+    declaracionAceptadaEn: row.declaracion_aceptada_en || null,
+    declaracionVersion: row.declaracion_version || null,
     autorizacionParental: Boolean(row.autorizacion_parental),
     avisoPrivacidadAceptado: Boolean(row.aviso_privacidad_aceptado),
     checklistRevision: {
@@ -132,7 +166,7 @@ export function caseVisibilityParameters() {
 
 // PUBLIC_CASE_FILTER para consultas que unen pistas (p) con casos (c).
 export const PUBLIC_CASE_FILTER_JOINED = PUBLIC_CASE_FILTER
-  .replaceAll('estado', 'c.estado').replaceAll('localizado_en', 'c.localizado_en');
+  .replaceAll('estado', 'c.estado').replaceAll('localizado_en', 'c.localizado_en').replaceAll('edad', 'c.edad');
 
 export async function sendStoredPhoto(db, req, res, administrator) {
   const visibility = administrator ? '' : `AND ${PUBLIC_CASE_FILTER}`;

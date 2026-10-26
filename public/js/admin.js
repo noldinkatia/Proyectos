@@ -2,6 +2,7 @@
 import { CAMPOS_ALERTA } from './alerta-campos.js';
 import { apiRequest, loadProtectedPhotos } from './api.js';
 import { escapeHtml } from './config.js';
+import { confirmar, pedirMotivo } from './dialogo.js';
 import { statusLabel, timeSince } from './my-cases.js';
 import { navigateTo, syncUrl } from './router.js';
 import { getStore } from './store.js';
@@ -63,7 +64,7 @@ export function renderAdminView(history, clues = [], audit = []) {
         <p class="workflow-guidance"><strong>Flujo seguro:</strong> 1. Validar con la lista de control → 2. Aprobar y publicar. También podés rechazar con motivo; los cambios quedan registrados.</p>
         ${pending.length ? `<div class="table-scroll"><table><thead><tr><th>Caso</th><th>Estado</th><th>Validación</th><th>Reportado</th><th>Acciones</th></tr></thead><tbody>
           ${pending.map(c => `<tr>
-            <td data-label="Caso"><strong>${escapeHtml(c.nombreCompleto)}</strong><br><span class="muted">${escapeHtml(c.ciudad)}, ${Number(c.edad)} años</span></td>
+            <td data-label="Caso"><strong>${escapeHtml(c.nombreCompleto)}</strong><br><span class="muted">${escapeHtml(c.ciudad)}, ${Number(c.edad)} años</span>${avisoAntecedente(c)}</td>
             <td data-label="Estado"><span class="status-tag status-PENDIENTE">En revisión</span></td>
             <td data-label="Validación"><span class="validation-state">Sin validar</span></td>
             <td data-label="Reportado">${timeSince(c.fechaCreacion)}</td>
@@ -260,6 +261,58 @@ function alertFieldLabels(fields = []) {
   return labels.length ? labels.join(', ') : 'solo el aviso de caso en revisión';
 }
 
+// Antecedentes activos de quien reportó (solo el panel; el ciudadano nunca los ve).
+// No bloquean nada: avisan para revisar el reporte con más cuidado. En la fila de
+// la bandeja va una marca corta; en la revisión, el detalle con los botones.
+export function avisoAntecedente(c, { detalle = false } = {}) {
+  const lista = Array.isArray(c?.antecedentesReportante) ? c.antecedentesReportante : [];
+  if (!detalle) return lista.length ? '<br><span class="marca-antecedente">⚠ Reportante con antecedente</span>' : '';
+  const items = lista.map(a => `<li><strong>${escapeHtml(new Date(a.registradoEn).toLocaleDateString('es-PY'))}</strong> · ${escapeHtml(a.motivo)}${a.registradoPor ? ` <span class="muted">(marcó: ${escapeHtml(a.registradoPor)})</span>` : ''}
+        <button type="button" class="btn btn-outline btn-sm" data-antecedente-id="${escapeHtml(a.id)}" data-on-click="adminRetirarAntecedente(this.dataset.antecedenteId)">Retirar marca</button></li>`).join('');
+  const marcar = c?.reportadoPorUsrId
+    ? `<button type="button" class="btn btn-outline btn-sm" data-user-id="${Number(c.reportadoPorUsrId)}" data-on-click="adminMarcarAntecedente(this.dataset.userId)">Marcar antecedente del reportante</button>`
+    : '';
+  if (!lista.length) return marcar ? `<div class="aviso-antecedente">${marcar}</div>` : '';
+  return `<div class="aviso-antecedente aviso-antecedente-activo" role="note">
+      <p><strong>⚠ El reportante tiene ${lista.length === 1 ? 'un antecedente' : `${lista.length} antecedentes`} de reporte falso o abusivo.</strong>
+        Revisá este reporte con más cuidado. La marca no bloquea nada${c.alertaTempranaEn ? ': la alerta temprana a la zona salió igual' : ''}.</p>
+      <ul>${items}</ul>${marcar}
+    </div>`;
+}
+
+export async function adminMarcarAntecedente(usuarioId) {
+  const motivo = await pedirMotivo({
+    titulo: 'Marcar antecedente del reportante',
+    mensaje: 'Solo la administración lo ve. No bloquea a la persona: es un aviso al revisar sus reportes.',
+    etiqueta: 'Motivo (reporte falso o abusivo)', textoConfirmar: 'Marcar antecedente', peligro: true
+  });
+  if (motivo === null) return;
+  try {
+    await apiRequest(`/admin/usuarios/${encodeURIComponent(usuarioId)}/antecedentes`, { method: 'POST', body: { motivo } });
+    closeReviewChecklist();
+    showToast('Antecedente registrado', 'Se verá al revisar los reportes de esta persona.', 'success');
+    navigateTo('admin');
+  } catch (error) {
+    showToast('No se pudo registrar el antecedente', error.message, 'error');
+  }
+}
+
+export async function adminRetirarAntecedente(antecedenteId) {
+  const motivo = await pedirMotivo({
+    titulo: 'Retirar la marca', mensaje: 'El antecedente queda en el historial con el motivo del retiro.',
+    etiqueta: 'Motivo del retiro', textoConfirmar: 'Retirar marca'
+  });
+  if (motivo === null) return;
+  try {
+    await apiRequest(`/admin/antecedentes/${encodeURIComponent(antecedenteId)}/retirar`, { method: 'POST', body: { motivo } });
+    closeReviewChecklist();
+    showToast('Marca retirada', 'Quedó registrada en la auditoría.', 'success');
+    navigateTo('admin');
+  } catch (error) {
+    showToast('No se pudo retirar la marca', error.message, 'error');
+  }
+}
+
 export function adminAccept(caseId) {
   const form = document.getElementById('reviewChecklistForm');
   const selectedCase = getStore().casos.find(item => item.id === caseId);
@@ -272,6 +325,8 @@ export function adminAccept(caseId) {
     <span>Descripción: ${escapeHtml(selectedCase.descripcionFisica || 'Sin descripción')}</span>
     <span>Vestimenta: ${escapeHtml(selectedCase.vestimenta || 'Sin especificar')}</span>
     <span>Autorización parental: ${selectedCase.autorizacionParental ? 'Registrada' : 'No registrada / no aplica'}</span>
+    ${avisoAntecedente(selectedCase, { detalle: true })}
+    <span>Declaración de responsabilidad: ${selectedCase.declaracionAceptadaEn ? `aceptada el ${escapeHtml(new Date(selectedCase.declaracionAceptadaEn).toLocaleString('es-PY'))} (versión ${escapeHtml(selectedCase.declaracionVersion || '')})` : 'sin registro (reporte anterior a la declaración)'}</span>
     <span>Alerta temprana: ${selectedCase.alertaTempranaEn ? `enviada el ${escapeHtml(new Date(selectedCase.alertaTempranaEn).toLocaleString('es-PY'))}` : 'no enviada (posible duplicado o límite por reportante)'}. El reportante eligió mostrar: ${escapeHtml(alertFieldLabels(selectedCase.alertaCampos))}</span>
   ` : '<span>No se pudo cargar el detalle del caso. Actualizá el panel e intentá otra vez.</span>';
   form.reset();
@@ -310,8 +365,11 @@ export async function submitCaseReview(event) {
 }
 
 export async function adminReject(caseId) {
-  const motivo = prompt('Ingrese el motivo obligatorio del rechazo del caso:');
-  if (!motivo) return;
+  const motivo = await pedirMotivo({
+    titulo: 'Rechazar reporte', mensaje: 'El ciudadano recibe este motivo en su aviso.',
+    etiqueta: 'Motivo del rechazo', textoConfirmar: 'Rechazar reporte', peligro: true
+  });
+  if (motivo === null) return;
   try {
     await apiRequest(`/admin/casos/${encodeURIComponent(caseId)}/estado`, {
       method: 'POST', body: { estado: 'RECHAZADO', motivo }
@@ -324,7 +382,11 @@ export async function adminReject(caseId) {
 }
 
 export async function adminMarkLocated(caseId) {
-  if (!confirm('¿Confirmar que la persona ha sido localizada? La ficha permanecerá visible hasta 24 horas y luego se retirará del acceso público.')) return;
+  if (!await confirmar({
+    titulo: 'Marcar como localizada',
+    mensaje: 'La ficha permanecerá visible hasta 24 horas y luego se retirará del acceso público.',
+    textoConfirmar: 'Marcar como localizada'
+  })) return;
   try {
     await apiRequest(`/admin/casos/${encodeURIComponent(caseId)}/estado`, {
       method: 'POST', body: { estado: 'LOCALIZADO' }
@@ -337,11 +399,13 @@ export async function adminMarkLocated(caseId) {
 }
 
 export async function adminCloseCase(caseId) {
-  const motivo = prompt('Indique la justificación para cerrar este caso:');
-  if (!motivo?.trim()) return;
+  const motivo = await pedirMotivo({
+    titulo: 'Cerrar caso', etiqueta: 'Justificación del cierre', textoConfirmar: 'Cerrar caso', peligro: true
+  });
+  if (motivo === null) return;
   try {
     await apiRequest(`/admin/casos/${encodeURIComponent(caseId)}/estado`, {
-      method: 'POST', body: { estado: 'CERRADO', motivo: motivo.trim() }
+      method: 'POST', body: { estado: 'CERRADO', motivo }
     });
     showToast('Caso cerrado', 'Se registró la justificación de cierre.', 'success');
     navigateTo('admin');
@@ -351,11 +415,14 @@ export async function adminCloseCase(caseId) {
 }
 
 export async function adminReturnToReview(caseId) {
-  const motivo = prompt('Indique qué debe corregirse antes de volver a validar el caso:');
-  if (!motivo?.trim()) return;
+  const motivo = await pedirMotivo({
+    titulo: 'Devolver a revisión', mensaje: 'El ciudadano recibe este motivo para corregir el reporte.',
+    etiqueta: 'Qué debe corregirse', textoConfirmar: 'Devolver a revisión'
+  });
+  if (motivo === null) return;
   try {
     await apiRequest(`/admin/casos/${encodeURIComponent(caseId)}/estado`, {
-      method: 'POST', body: { estado: 'PENDIENTE', motivo: motivo.trim() }
+      method: 'POST', body: { estado: 'PENDIENTE', motivo }
     });
     showToast('Caso devuelto a revisión', 'Se notificó al ciudadano el motivo de la corrección.', 'success');
     navigateTo('admin');
@@ -377,12 +444,14 @@ export async function adminReopenCase(caseId) {
 }
 
 export async function adminModerateClue(clueId, state) {
-  const motivo = state === 'RECHAZADA' ? prompt('Indique el motivo para rechazar esta pista:') : '';
-  if (state === 'RECHAZADA' && !motivo?.trim()) return;
+  const motivo = state === 'RECHAZADA'
+    ? await pedirMotivo({ titulo: 'Rechazar pista', etiqueta: 'Motivo del rechazo', textoConfirmar: 'Rechazar pista', peligro: true })
+    : '';
+  if (motivo === null) return;
   try {
     await apiRequest(`/admin/pistas/${encodeURIComponent(clueId)}/estado`, {
       method: 'POST',
-      body: { estado: state, motivo: motivo?.trim() || '' }
+      body: { estado: state, motivo }
     });
     showToast('Moderación registrada', state === 'VALIDADA' ? 'La pista ya puede mostrarse públicamente.' : 'La pista quedó fuera de publicación.', 'success');
     navigateTo('admin');
@@ -396,7 +465,11 @@ export async function runTimeFastForward() {
     showToast('Acceso restringido', 'Solo un administrador puede ejecutar la simulación.', 'error');
     return;
   }
-  if (!confirm('Esta simulación fuerza el seguimiento de todos los casos activos y puede generar avisos y cambios de estado. ¿Continuar?')) return;
+  if (!await confirmar({
+    titulo: 'Simular avance de 48 horas',
+    mensaje: 'Esta simulación fuerza el seguimiento de todos los casos activos y puede generar avisos y cambios de estado.',
+    textoConfirmar: 'Simular', peligro: true
+  })) return;
   try {
     const result = await apiRequest('/admin/simulador/avanzar-48h', { method: 'POST' });
     document.getElementById('simTimeModal').classList.add('hidden');

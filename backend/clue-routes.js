@@ -2,7 +2,7 @@ import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { rateLimit } from 'express-rate-limit';
 import { avisarPistaAlReportante } from './alertas.js';
-import { asyncRoute } from './auth-routes.js';
+import { asyncRoute, respuestaLimite } from './auth-routes.js';
 import {
   caseVisibilityParameters,
   IMAGE_DATA_URL,
@@ -53,7 +53,8 @@ export function createClueRouter({ db, requireUser, requireAdmin, publicReadLimi
     keyGenerator: req => `usuario:${req.auth.id}`,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
-    message: { error: 'Se alcanzó el límite temporal de envíos de pistas. Intente nuevamente más tarde.' }
+    message: { error: 'Se alcanzó el límite temporal de envíos de pistas. Intente nuevamente más tarde.' },
+    handler: respuestaLimite
   });
 
   // Lectura pública (sin sesión): solo pistas VALIDADAS de casos visibles, sin autor.

@@ -12,6 +12,7 @@ import {
 } from './db.js';
 import { asyncRoute, authenticate, createAuthRouter, requireAdministrator } from './auth-routes.js';
 import { createCaseRouter, processDueFollowups } from './case-routes.js';
+import { processLocatedClosures } from './followups.js';
 import { enviarCorreo, modoCorreo } from './mailer.js';
 import { pushDesdeEntorno } from './push.js';
 
@@ -215,11 +216,14 @@ async function start() {
     jwtSecret: process.env.JWT_SECRET,
     appUrl: process.env.APP_URL
   });
-  const followupTimer = setInterval(() => {
+  // Cada minuto: consultas de seguimiento vencidas y cierre automático de localizados.
+  const tareasPeriodicas = () => {
     processDueFollowups(db).catch(error => console.error('No se pudo procesar el seguimiento automático:', error));
-  }, 60_000);
+    processLocatedClosures(db).catch(error => console.error('No se pudo procesar el cierre automático de localizados:', error));
+  };
+  const followupTimer = setInterval(tareasPeriodicas, 60_000);
   followupTimer.unref();
-  processDueFollowups(db).catch(error => console.error('No se pudo procesar el seguimiento inicial:', error));
+  tareasPeriodicas();
   const port = Number(process.env.PORT) || 3000;
   app.listen(port, '0.0.0.0', () => {
     console.log(`Servidor Rastreo PY disponible en el puerto ${port}.`);

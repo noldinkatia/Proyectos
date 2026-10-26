@@ -1,6 +1,6 @@
 // Un solo service worker en /sw.js (scope "/") para la web (/) y la app (/app/).
 // Al activarse borra los cachés rastreopy-shell-* anteriores (v6, v7, v8...).
-const CACHE_NAME = 'rastreopy-shell-v15';
+const CACHE_NAME = 'rastreopy-shell-v18';
 const OFFLINE_PAGE = '/offline.html';
 const APP_SHELL = [
   '/',
@@ -22,8 +22,11 @@ const APP_SHELL = [
   '/js/conexion.js',
   '/js/web.js',
   '/js/sesion.js',
+  '/js/verificacion.js',
   '/js/estado.js',
   '/js/config.js',
+  '/js/declaracion.js',
+  '/js/dialogo.js',
   '/js/api.js',
   '/js/store.js',
   '/js/ui.js',

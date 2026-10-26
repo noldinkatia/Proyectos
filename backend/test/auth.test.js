@@ -5,6 +5,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { createDatabase, ensureAdministrator, initializeDatabase, seedAdministrator } from '../db.js';
 import { createApp } from '../server.js';
+import { borrarUsuariosDePrueba } from '../ayuda-tests/limpieza.js';
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -259,7 +260,7 @@ test('registro, verificación, login persistente y autorización por rol', {
       const emails = [adminEmail, citizenEmail, pendingEmail, invalidEmail];
       await db.query('DELETE FROM solicitudes_codigo WHERE correo = ANY($1)', [emails]);
       await db.query('DELETE FROM codigos_verificacion WHERE correo = ANY($1)', [emails]);
-      await db.query('DELETE FROM usuarios WHERE correo = ANY($1)', [emails]);
+      await borrarUsuariosDePrueba(db, 'correo = ANY($1)', [emails]);
     }
     await db.end();
   }
@@ -398,7 +399,7 @@ test('restablecer contraseña cambia la clave con el código del correo', {
     if (databaseInitialized) {
       await db.query('DELETE FROM solicitudes_codigo WHERE correo = $1', [email]);
       await db.query('DELETE FROM codigos_verificacion WHERE correo = $1', [email]);
-      await db.query('DELETE FROM usuarios WHERE correo = $1', [email]);
+      await borrarUsuariosDePrueba(db, 'correo = $1', [email]);
     }
     await db.end();
   }
@@ -503,7 +504,7 @@ test('reenviar código de registro respeta el intervalo e invalida el código an
     if (databaseInitialized) {
       await db.query('DELETE FROM solicitudes_codigo WHERE correo = $1', [email]);
       await db.query('DELETE FROM codigos_verificacion WHERE correo = $1', [email]);
-      await db.query('DELETE FROM usuarios WHERE correo = $1', [email]);
+      await borrarUsuariosDePrueba(db, 'correo = $1', [email]);
     }
     await db.end();
   }
@@ -584,7 +585,7 @@ test('al arrancar se crea el administrador sin pisar su contraseña; crear-admin
     assert.equal(await bcrypt.compare('Clave-reseteada-789', reset.contrasena_hash), true);
     assert.equal(reset.sesion_version, repaired.sesion_version + 1);
   } finally {
-    if (databaseInitialized) await db.query('DELETE FROM usuarios WHERE correo = $1', [email]);
+    if (databaseInitialized) await borrarUsuariosDePrueba(db, 'correo = $1', [email]);
     await db.end();
   }
 });

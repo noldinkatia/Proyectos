@@ -1,5 +1,9 @@
 import express from 'express';
 import { asyncRoute } from './auth-routes.js';
+import { casoEncontrado } from './case-shared.js';
+
+// Localizados: los que llegaron a localizado, aunque después se hayan cerrado.
+const ENCONTRADO = casoEncontrado();
 
 // Estadísticas públicas: solo agregados, nunca registros personales.
 export function createStatsRouter({ db, publicReadLimiter }) {
@@ -9,22 +13,22 @@ export function createStatsRouter({ db, publicReadLimiter }) {
     const { rows } = await db.query(`
       SELECT
         COUNT(*) FILTER (WHERE estado IN ('VALIDADO', 'EN_SEGUIMIENTO', 'LOCALIZADO', 'CERRADO')) AS total,
-        COUNT(*) FILTER (WHERE estado IN ('LOCALIZADO', 'CERRADO')) AS encontrados,
+        COUNT(*) FILTER (WHERE ${ENCONTRADO}) AS encontrados,
         COUNT(*) FILTER (WHERE estado IN ('VALIDADO', 'EN_SEGUIMIENTO')) AS activos,
-        COUNT(*) FILTER (WHERE estado = 'LOCALIZADO') AS localizados,
+        COUNT(*) FILTER (WHERE ${ENCONTRADO}) AS localizados,
         COUNT(*) FILTER (WHERE estado = 'CERRADO') AS cerrados
       FROM casos
     `);
     const [porMes, porCiudad, porSexo, porEdad, casosPorCiudad, casosPorEdad, casosPorEstado, casosPorDepartamento] = await Promise.all([
       db.query(`SELECT TO_CHAR(DATE_TRUNC('month', localizado_en), 'YYYY-MM') AS periodo, COUNT(*) AS total
-        FROM casos WHERE estado = 'LOCALIZADO' GROUP BY 1 ORDER BY 1`),
+        FROM casos WHERE ${ENCONTRADO} GROUP BY 1 ORDER BY 1`),
       db.query(`SELECT ciudad AS categoria, COUNT(*) AS total FROM casos
-        WHERE estado = 'LOCALIZADO' GROUP BY ciudad ORDER BY total DESC`),
+        WHERE ${ENCONTRADO} GROUP BY ciudad ORDER BY total DESC`),
       db.query(`SELECT sexo AS categoria, COUNT(*) AS total FROM casos
-        WHERE estado = 'LOCALIZADO' GROUP BY sexo ORDER BY sexo`),
+        WHERE ${ENCONTRADO} GROUP BY sexo ORDER BY sexo`),
       db.query(`SELECT CASE WHEN edad < 18 THEN '0-17' WHEN edad < 30 THEN '18-29'
         WHEN edad < 60 THEN '30-59' ELSE '60+' END AS categoria, COUNT(*) AS total
-        FROM casos WHERE estado = 'LOCALIZADO' GROUP BY 1 ORDER BY 1`),
+        FROM casos WHERE ${ENCONTRADO} GROUP BY 1 ORDER BY 1`),
       db.query(`SELECT ciudad AS categoria, departamento, COUNT(*) AS total
         FROM casos
         WHERE estado IN ('VALIDADO', 'EN_SEGUIMIENTO', 'LOCALIZADO', 'CERRADO')

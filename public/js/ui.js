@@ -76,7 +76,9 @@ export const NOTICE_TONES = {
   ALERTA_OFICIAL: 'danger',
   ALERTA_RETRACTADA: 'info',
   ALERTA_LOCALIZADO: 'success',
-  ALERTA_CERRADO: 'info'
+  ALERTA_CERRADO: 'info',
+  LOCALIZADO_REGISTRADO: 'success',
+  CIERRE_AUTOMATICO: 'info'
 };
 
 const relativeTimeFormatter = new Intl.RelativeTimeFormat('es', { numeric: 'auto' });

@@ -843,6 +843,19 @@ form.card { width: 100%; }
 .notice-success { border-color: var(--green-border); background: var(--green-soft); }
 .notice-success::before { color: var(--green); content: "Listo"; }
 .notice-info { padding: .8rem .9rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-info); color: var(--text-2); font-size: .74rem; }
+/* Recuperación (#/recuperar) */
+.auth-form-title { margin: 0 0 .35rem; color: var(--text-strong); font: 700 1.05rem/1.3 Sora, Inter, sans-serif; }
+.auth-form-help { margin: 0 0 1rem; color: var(--muted); font-size: .85rem; }
+.auth-panel form .btn-primary + .auth-volver { display: block; margin-top: .6rem; }
+
+/* Pantalla del código (#/verificar) */
+.otp-view .card { width: min(100%, 520px); margin-inline: auto; }
+.otp-view h3 { margin-top: 0; }
+.otp-ayuda { color: var(--muted); font-size: .82rem; }
+.otp-view form .btn-primary { width: 100%; justify-content: center; }
+.otp-acciones { display: grid; gap: .5rem; margin-top: .75rem; }
+.otp-acciones .btn { width: 100%; justify-content: center; }
+#otpFeedback .btn { margin-top: .5rem; }
 #authFeedback, #otpFeedback, #termsSaveError, #reportPhotoError { margin: .75rem 0; padding: .8rem .95rem; border: 1px solid var(--info-border); border-radius: var(--radius-sm); background: var(--info-soft); color: var(--text); font-size: .82rem; }
 #termsSaveError, #reportPhotoError { border-color: var(--red-border); background: var(--red-soft); }
 #termsSaveError .btn { margin-top: .5rem; }
@@ -852,9 +865,21 @@ form.card { width: 100%; }
 .auth-view > div:first-child p, .legal-view > div:first-child > div:first-child p { color: var(--muted); font-size: .85rem; }
 .auth-view h1, .legal-view h1 { color: var(--text) !important; font: 800 clamp(1.5rem,3vw,2rem)/1.2 Sora, Inter, sans-serif; }
 .auth-panel { width: 100%; max-width: 520px; align-self: center; padding: clamp(1.2rem,4vw,2rem); }
-.auth-panel form .form-group > div:has(> input[type="password"]) { display: flex; align-items: center; gap: .45rem; }
-.auth-panel form .form-group > div:has(> input[type="password"]) .form-control { flex: 1; }
-.auth-panel form button[type="button"]:not(.link-inline) { padding: .5rem; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--info); cursor: pointer; font-size: .8rem; font-weight: 600; }
+/* Contraseña con el ojo adentro del campo (auth.js, campoContrasena). Por clase y no
+   por input[type="password"]: al mostrarla el campo pasa a type="text". */
+.campo-contrasena { position: relative; }
+.campo-contrasena .form-control { width: 100%; padding-right: 3rem; }
+/* Edge agrega su propio ojo al campo: quedaban dos. Queda solo el accesible. */
+.campo-contrasena .form-control::-ms-reveal, .campo-contrasena .form-control::-ms-clear { display: none; }
+.boton-ojo { position: absolute; top: 50%; right: .25rem; display: grid; width: 2.6rem; height: 2.6rem; place-items: center; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer; transform: translateY(-50%); -webkit-tap-highlight-color: transparent; }
+/* Solo con mouse: en pantallas táctiles el :hover queda pegado después del toque */
+@media (hover: hover) { .boton-ojo:hover { color: var(--text-strong); background: var(--surface-2); } }
+.boton-ojo:focus-visible { outline: 3px solid var(--info); outline-offset: 1px; }
+.boton-ojo-activo { color: var(--info); }
+/* Tachado solo mientras la contraseña se ve */
+.icono-ojo-tachado { display: none; }
+.boton-ojo-activo .icono-ojo-tachado { display: inline; }
+.auth-panel form button[type="button"]:not(.link-inline):not(.boton-ojo) { padding: .5rem; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--info); cursor: pointer; font-size: .8rem; font-weight: 600; }
 .auth-tabs { display: flex; gap: .25rem; padding: .28rem; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2) !important; }
 .auth-tabs button { flex: 1; min-height: 40px; border: 0 !important; border-radius: 9px !important; background: transparent !important; color: var(--muted) !important; cursor: pointer; font-size: .86rem !important; }
 .auth-tabs button.active { background: var(--surface) !important; color: var(--accent) !important; box-shadow: var(--shadow-xs); }
@@ -1098,6 +1123,31 @@ table tr:hover td { background: var(--surface-2); }
 #notifModal .modal-header > span, #simTimeModal .modal-header > span, #installGuideModal .modal-header > span { min-width: 0; flex: 1 1 auto; font-weight: 700; }
 #notifModal .modal-footer, #simTimeModal .modal-footer { display: flex; justify-content: flex-end; padding: .8rem 1.2rem; border-top: 1px solid var(--border); background: var(--surface); }
 #simTimeModal .modal-body, #installGuideModal .modal-body { margin: 0; padding: 1rem 1.2rem; color: var(--muted); font-size: .85rem; line-height: 1.5; }
+/* Antecedente del reportante (solo panel del administrador, admin.js) */
+.marca-antecedente { display: inline-block; margin-top: .3rem; padding: .1rem .45rem; border-radius: var(--radius-pill); background: var(--amber-soft); color: var(--amber); font-size: .72rem; font-weight: 800; }
+.aviso-antecedente { display: grid; gap: .5rem; justify-items: start; }
+.aviso-antecedente-activo { padding: .75rem .85rem; border: 1px solid var(--amber-border); border-radius: var(--radius-sm); background: var(--amber-soft); color: var(--text); }
+.aviso-antecedente p { margin: 0; font-size: .84rem; line-height: 1.45; }
+.aviso-antecedente ul { display: grid; gap: .45rem; margin: 0; padding-left: 1.1rem; font-size: .82rem; }
+.aviso-antecedente li .btn { margin-left: .35rem; }
+
+/* Cuadros propios en lugar de prompt()/confirm() (dialogo.js): <dialog> nativo */
+.dialogo { width: min(100% - 2rem, 480px); max-height: 90vh; padding: 0; overflow: auto; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: var(--shadow-overlay); }
+.dialogo::backdrop { background: var(--overlay); backdrop-filter: blur(4px); }
+.dialogo-formulario { display: grid; gap: .7rem; padding: 1.2rem; }
+.dialogo-titulo { margin: 0; color: var(--text-strong); font: 700 1.05rem/1.3 Sora, Inter, sans-serif; }
+.dialogo-texto { color: var(--text-2); font-size: .9rem; line-height: 1.5; }
+.dialogo-texto p { margin: 0 0 .5rem; }
+.dialogo-texto ul { margin: 0; padding-left: 1.2rem; }
+.dialogo-texto li { margin-bottom: .45rem; }
+.dialogo-etiqueta { color: var(--text); font-size: .85rem; font-weight: 700; }
+.dialogo-ayuda { margin: -.35rem 0 0; color: var(--muted); font-size: .8rem; }
+.dialogo-motivo { min-height: 5.5rem; resize: vertical; }
+.dialogo-motivo[aria-invalid="true"] { border-color: var(--red); }
+.dialogo-error { min-height: 1.2em; margin: 0; color: var(--red); font-size: .84rem; font-weight: 700; }
+.dialogo-error:empty { min-height: 0; }
+.dialogo-botones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+
 /* Bases y condiciones desde el registro (auth.js): <dialog> nativo, mismo aspecto que los otros modales */
 .bases-modal { width: min(100% - 2rem, 560px); max-height: 85vh; padding: 0; overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: var(--shadow-overlay); }
 .bases-modal[open] { display: flex; flex-direction: column; }
@@ -1193,10 +1243,15 @@ table tr:hover td { background: var(--surface-2); }
   .feed-filters.advanced-feed-filters { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .feed-filters.advanced-feed-filters > :first-child { grid-column: 1 / -1; }
   .stats-analytics-layout { grid-template-columns: 1fr; }
-  .my-cases-layout { grid-template-columns: 1fr; }
+  /* minmax(0, …): con 1fr (= minmax(auto, 1fr)) la columna no baja del ancho mínimo de
+     .table-actions (auto-fill llena su max-width: ~630 px) y las tarjetas se salían. */
+  .my-cases-layout { grid-template-columns: minmax(0, 1fr); }
   .admin-metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 560px) {
+  /* Cuadros de dialogo.js: botones a todo el ancho, el principal arriba */
+  .dialogo-botones { flex-direction: column-reverse; }
+  .dialogo-botones .btn { width: 100%; justify-content: center; }
   /* Celulares: siempre queda una franja de la página a la vista (tocarla cierra el menú) */
   .drawer { width: clamp(240px, 78vw, 300px); }
   #topHeader { flex-wrap: wrap; gap: .15rem .45rem; padding-inline: .65rem; }

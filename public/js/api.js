@@ -62,6 +62,8 @@ export async function apiRequest(path, options = {}) {
     const requestError = new Error(payload.error || `Error del servidor (${response.status}).`);
     requestError.status = response.status;
     requestError.endpoint = `${API_BASE}${path}`;
+    // 429: segundos hasta poder volver a intentar (0 = ya, con un código nuevo).
+    if (Number.isFinite(payload.reintentarEn)) requestError.reintentarEn = payload.reintentarEn;
     throw requestError;
   }
   return payload;

@@ -4,7 +4,7 @@ import { rateLimit } from 'express-rate-limit';
 import { createAdminRouter } from './admin-routes.js';
 import { createAlertRouter } from './alertas-routes.js';
 import { alertasPorCambioDeEstado, enviarAlertaTemprana } from './alertas.js';
-import { asyncRoute, authenticate, isAdministrator, requireAdministrator } from './auth-routes.js';
+import { asyncRoute, authenticate, isAdministrator, requireAdministrator, respuestaLimite } from './auth-routes.js';
 import {
   caseListColumns,
   caseVisibilityParameters,
@@ -23,6 +23,9 @@ import { createNotificationRouter } from './notification-routes.js';
 import { createStatsRouter } from './stats-routes.js';
 import { ubicacionValida } from './ubicaciones.js';
 import { normalizarCamposAlerta } from '../public/js/alerta-campos.js';
+import { DECLARACION_VERSION } from '../public/js/declaracion.js';
+
+import { avisoLocalizadoAlReportante } from './followups.js';
 
 export { processDueFollowups } from './followups.js';
 
@@ -49,7 +52,8 @@ export function createCaseRouter({ db, jwtSecret, push }) {
     limit: Number(process.env.LIMITE_LECTURA_PUBLICA_POR_MINUTO) || 3000,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
-    message: { error: 'Demasiadas consultas desde esta red. Intente nuevamente en un minuto.' }
+    message: { error: 'Demasiadas consultas desde esta red. Intente nuevamente en un minuto.' },
+    handler: respuestaLimite
   });
 
   router.use((_req, res, next) => {
@@ -118,6 +122,14 @@ export function createCaseRouter({ db, jwtSecret, push }) {
       || (body.edad < 18 && body.autorizacionParental !== true)) {
       return res.status(400).json({ error: 'Los datos del caso están incompletos o no son válidos.' });
     }
+    // Declaración de responsabilidad: obligatoria y de la versión vigente. La hora
+    // la pone el servidor (CURRENT_TIMESTAMP al insertar), no el navegador.
+    if (body.declaracionAceptada !== true) {
+      return res.status(400).json({ error: 'Para publicar el reporte tenés que aceptar la declaración de responsabilidad.' });
+    }
+    if (body.declaracionVersion !== DECLARACION_VERSION) {
+      return res.status(400).json({ error: 'La declaración de responsabilidad cambió. Recargá la página para leer la versión vigente.' });
+    }
     const barrio = typeof body.barrio === 'string' ? body.barrio.trim() : '';
     if (!ubicacionValida(body.departamento, body.ciudad, barrio)) {
       return res.status(400).json({ error: 'Elegí un departamento, ciudad y barrio de la lista de Paraguay.' });
@@ -136,8 +148,10 @@ export function createCaseRouter({ db, jwtSecret, push }) {
           id, nombre_completo, edad, sexo, ciudad, departamento, barrio, descripcion_fisica, vestimenta,
           senas_particulares, fecha_hora_desaparicion, foto, latitud, longitud, direccion,
           numero_denuncia, estado, reportado_por_usr_id, proximo_seguimiento,
-          reportante_mayor_edad, autorizacion_parental, aviso_privacidad_aceptado, alerta_campos
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+          reportante_mayor_edad, autorizacion_parental, aviso_privacidad_aceptado, alerta_campos,
+          declaracion_aceptada_en, declaracion_version
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
+          CURRENT_TIMESTAMP, $24)
         RETURNING *
       `, [
         id, body.nombreCompleto.trim(), Number(body.edad), body.sexo.trim(), body.ciudad.trim(),
@@ -147,7 +161,8 @@ export function createCaseRouter({ db, jwtSecret, push }) {
         req.auth.id, new Date(Date.now() + 48 * 60 * 60 * 1000),
         body.declaraMayorEdad, body.autorizacionParental === true, body.avisoPrivacidadAceptado,
         // Qué muestra la alerta temprana: solo de la lista permitida (la foto, solo de adultos).
-        JSON.stringify(normalizarCamposAlerta(body.alertaCampos, { edad: Number(body.edad), tieneFoto: Boolean(body.foto) }))
+        JSON.stringify(normalizarCamposAlerta(body.alertaCampos, { edad: Number(body.edad), tieneFoto: Boolean(body.foto) })),
+        DECLARACION_VERSION
       ]);
       await client.query(
         'INSERT INTO suscripciones_caso (caso_id, usuario_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
@@ -157,11 +172,21 @@ export function createCaseRouter({ db, jwtSecret, push }) {
         'INSERT INTO cambios_estado_caso (caso_id, estado_nuevo, cambiado_por) VALUES ($1, $2, $3)',
         [id, rows[0].estado, req.auth.id]
       );
+      // Aviso solo para la administración: si quien reporta tiene un antecedente
+      // activo, se menciona (no se bloquea nada; la alerta temprana sale igual).
+      const { rows: antecedentes } = await client.query(
+        'SELECT COUNT(*)::int AS total FROM antecedentes_usuario WHERE usuario_id = $1 AND retirado_en IS NULL',
+        [req.auth.id]
+      );
+      const total = Number(antecedentes[0]?.total) || 0;
+      const conAntecedente = total
+        ? ` Atención: quien lo reportó tiene ${total === 1 ? 'un antecedente' : `${total} antecedentes`} de reporte falso o abusivo. La marca no bloquea el reporte ni la alerta temprana.`
+        : '';
       await client.query(`
         INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo)
         SELECT id, $1, 'Nuevo reporte para validar', $2, 'CASO_PENDIENTE'
         FROM usuarios WHERE rol = 'administrador'
-      `, [id, `Se recibió un reporte de ${body.nombreCompleto.trim()} y espera validación.`]);
+      `, [id, `Se recibió un reporte de ${body.nombreCompleto.trim()} y espera validación.${conAntecedente}`]);
       alertasPush = (await enviarAlertaTemprana(client, rows[0], { push })).notificaciones;
       return rows[0];
     });
@@ -172,7 +197,9 @@ export function createCaseRouter({ db, jwtSecret, push }) {
   router.post('/casos/:id/seguimiento', ...requireCitizen, asyncRoute(async (req, res) => {
     const action = req.body?.accion;
     const reason = typeof req.body?.motivo === 'string' ? req.body.motivo.trim() : '';
-    if (!['SIGUE_ACTIVA', 'LOCALIZADO', 'PRORROGA', 'CERRAR'].includes(action)) {
+    // Respuestas posibles (consulta de seguimiento o "Mis casos"): sigue activo,
+    // persona localizada o cerrar. No hay prórroga.
+    if (!['SIGUE_ACTIVA', 'LOCALIZADO', 'CERRAR'].includes(action)) {
       return res.status(400).json({ error: 'La respuesta de seguimiento no es válida.' });
     }
     if (action === 'CERRAR' && !reason) {
@@ -193,16 +220,17 @@ export function createCaseRouter({ db, jwtSecret, push }) {
         : action === 'CERRAR' ? 'CERRADO' : 'VALIDADO';
       const { rows: updatedRows } = await client.query(`
         UPDATE casos SET estado = $2,
-          localizado_en = CASE WHEN $2 = 'LOCALIZADO' THEN CURRENT_TIMESTAMP ELSE NULL END,
+          localizado_en = CASE WHEN $2 = 'LOCALIZADO' THEN CURRENT_TIMESTAMP
+            WHEN $2 = 'CERRADO' THEN localizado_en ELSE NULL END,
           motivo_cierre = CASE WHEN $2 = 'CERRADO' THEN $3 ELSE motivo_cierre END,
           seguimiento_etapa = CASE WHEN $2 IN ('LOCALIZADO', 'CERRADO') THEN 2 ELSE 0 END,
+          seguimiento_intentos = 0,
           proximo_seguimiento = CASE
             WHEN $2 IN ('LOCALIZADO', 'CERRADO') THEN NULL
-            WHEN $4 = 'PRORROGA' THEN CURRENT_TIMESTAMP + INTERVAL '24 hours'
             ELSE CURRENT_TIMESTAMP + INTERVAL '48 hours'
           END
         WHERE id = $1 RETURNING *
-      `, [req.params.id, state, reason || null, action]);
+      `, [req.params.id, state, reason || null]);
 
       if (current.estado !== state) {
         await client.query(`
@@ -217,6 +245,7 @@ export function createCaseRouter({ db, jwtSecret, push }) {
           SELECT usuario_id, $1, 'Caso resuelto', $2, 'CASO_LOCALIZADO'
           FROM suscripciones_caso WHERE caso_id = $1
         `, [req.params.id, `El familiar informó que ${current.nombre_completo} fue localizado.`]);
+        await avisoLocalizadoAlReportante(client, current);
       }
       return updatedRows[0];
     });

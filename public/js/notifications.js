@@ -2,6 +2,7 @@
 import { apiRequest } from './api.js';
 import { escapeHtml } from './config.js';
 import { estado } from './estado.js';
+import { prepararRespuestaSeguimiento } from './my-cases.js';
 import { buildRoute, navigateTo } from './router.js';
 import { getStore, saveStore } from './store.js';
 import { NOTICE_TONES, formatRelativeTime, showToast } from './ui.js';
@@ -43,9 +44,11 @@ function alertaZonaHtml(n) {
 }
 
 // No salen como aviso del sistema por el polling: lo que ya llegó por push (no se
-// repite) y lo que va solo al centro de notificaciones (retractación y cierre).
+// repite) y lo que va solo al centro de notificaciones (retractación, cierre, y la
+// localización y el cierre automático avisados al reportante).
+const SOLO_CENTRO = ['ALERTA_RETRACTADA', 'ALERTA_CERRADO', 'LOCALIZADO_REGISTRADO', 'CIERRE_AUTOMATICO'];
 export function mostrarComoAvisoDelSistema(item) {
-  return item.canal !== 'push' && !['ALERTA_RETRACTADA', 'ALERTA_CERRADO'].includes(item.tipo);
+  return item.canal !== 'push' && !SOLO_CENTRO.includes(item.tipo);
 }
 
 export async function renderNotifList() {
@@ -63,24 +66,30 @@ export async function renderNotifList() {
     container.innerHTML = '<div class="notif-empty"><strong>Todo al día</strong><p>No tenés notificaciones por ahora.</p></div>';
     return;
   }
-  container.innerHTML = store.notificaciones.map(n => renderNoticeItem(n, alertaZonaHtml(n) ||
-      (['SEGUIMIENTO', 'SEGUIMIENTO_VENCIDO'].includes(n.tipo) && n.casoId ? `
+  container.innerHTML = store.notificaciones.map(n => renderNoticeItem(n, alertaZonaHtml(n) || seguimientoHtml(n))).join('');
+}
+
+// Opciones de la consulta de seguimiento (la primera, la segunda y el aviso de
+// "Sin actualizar"): solo acá, en el centro de notificaciones. "Mis casos" no las
+// repite. Un único "Sigue activo": no hay prórroga.
+export function seguimientoHtml(n) {
+  if (!['SEGUIMIENTO', 'SEGUIMIENTO_VENCIDO'].includes(n.tipo) || !n.casoId) return '';
+  const caso = escapeHtml(n.casoId);
+  return `
         <div class="table-actions">
-          <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(n.casoId)}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'SIGUE_ACTIVA')">Sigue activa</button>
-          <button type="button" class="btn btn-success btn-sm" data-case-id="${escapeHtml(n.casoId)}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'LOCALIZADO')">Persona localizada</button>
-          <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(n.casoId)}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'PRORROGA')">Solicitar prórroga</button>
-          <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(n.casoId)}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'CERRAR')">Cerrar caso</button>
-        </div>` : ''))).join('');
+          <button type="button" class="btn btn-outline btn-sm" data-case-id="${caso}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'SIGUE_ACTIVA')">Sigue activo</button>
+          <button type="button" class="btn btn-success btn-sm" data-case-id="${caso}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'LOCALIZADO')">Persona localizada</button>
+          <button type="button" class="btn btn-outline btn-sm" data-case-id="${caso}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'CERRAR')">Cerrar caso</button>
+        </div>`;
 }
 
 export async function respondToCaseFollowup(caseId, action) {
-  if (action === 'LOCALIZADO' && !confirm('¿Confirma que la persona fue localizada?')) return;
-  const motivo = action === 'CERRAR' ? prompt('Indique el motivo para cerrar el caso:') : '';
-  if (action === 'CERRAR' && !motivo?.trim()) return;
+  const extra = await prepararRespuestaSeguimiento(action);
+  if (!extra) return;
   try {
     await apiRequest(`/casos/${encodeURIComponent(caseId)}/seguimiento`, {
       method: 'POST',
-      body: { accion: action, motivo: motivo?.trim() || '' }
+      body: { accion: action, motivo: extra.motivo || '' }
     });
     document.getElementById('notifModal').classList.add('hidden');
     showToast('Respuesta registrada', 'Se actualizó el seguimiento del caso.', 'success');

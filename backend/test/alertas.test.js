@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { DECLARACION_VERSION } from '../../public/js/declaracion.js';
 import jwt from 'jsonwebtoken';
 import {
   CAMPOS_POR_DEFECTO,
@@ -15,6 +16,7 @@ import { createDatabase, initializeDatabase, seedAdministrator } from '../db.js'
 import { dentroDelRadio, distanciaKm, RADIO_ALERTA_KM, ubicacionAproximada } from '../geocerca.js';
 import { cargaPush, cargaPushAgrupada, crearPush } from '../push.js';
 import { createApp } from '../server.js';
+import { borrarUsuariosDePrueba } from '../ayuda-tests/limpieza.js';
 
 const secret = 'test-secret-with-at-least-thirty-two-characters';
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
@@ -197,7 +199,7 @@ test('alertas de zona con PostgreSQL: radio, retractación, oficial, localizado,
         nombreCompleto: nombre, edad, sexo: 'Femenino', departamento: 'Capital', ciudad: 'Asunción',
         descripcionFisica: 'Descripción de prueba', vestimenta: 'Campera azul',
         fechaHoraDesaparicion: new Date().toISOString(), ubicacion: { lat: lat0, lng: lng0 },
-        declaraMayorEdad: true, autorizacionParental: edad < 18, avisoPrivacidadAceptado: true, ...extra
+        declaraMayorEdad: true, autorizacionParental: edad < 18, avisoPrivacidadAceptado: true, declaracionAceptada: true, declaracionVersion: DECLARACION_VERSION, ...extra
       });
       assert.equal(result.status, 201, JSON.stringify(result.body));
       caseIds.push(result.body.caso.id);
@@ -369,7 +371,7 @@ test('alertas de zona con PostgreSQL: radio, retractación, oficial, localizado,
     await db.query('DELETE FROM suscripciones_caso WHERE caso_id = ANY($1)', [caseIds]);
     await db.query('DELETE FROM cambios_estado_caso WHERE caso_id = ANY($1)', [caseIds]);
     await db.query('DELETE FROM casos WHERE id = ANY($1)', [caseIds]);
-    await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [userIds]);
+    await borrarUsuariosDePrueba(db, 'id = ANY($1)', [userIds]);
     await db.end();
   }
 });
@@ -422,7 +424,7 @@ test('push con PostgreSQL: más alertas tempranas por hora que el límite llegan
         nombreCompleto: `${nombre} Agrupada ${suffix}`, edad: 30 + indice * 10, sexo: 'Femenino', departamento: 'Central',
         ciudad: 'Luque', descripcionFisica: 'Descripción', vestimenta: 'Vestimenta',
         fechaHoraDesaparicion: new Date().toISOString(), ubicacion: { lat: lat0, lng: lng0 + 0.1 },
-        declaraMayorEdad: true, autorizacionParental: false, avisoPrivacidadAceptado: true
+        declaraMayorEdad: true, autorizacionParental: false, avisoPrivacidadAceptado: true, declaracionAceptada: true, declaracionVersion: DECLARACION_VERSION
       });
       assert.equal(creado.status, 201, JSON.stringify(creado.body));
       caseIds.push(creado.body.caso.id);
@@ -463,7 +465,7 @@ test('push con PostgreSQL: más alertas tempranas por hora que el límite llegan
     await db.query('DELETE FROM suscripciones_caso WHERE caso_id = ANY($1)', [caseIds]);
     await db.query('DELETE FROM cambios_estado_caso WHERE caso_id = ANY($1)', [caseIds]);
     await db.query('DELETE FROM casos WHERE id = ANY($1)', [caseIds]);
-    await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [userIds]);
+    await borrarUsuariosDePrueba(db, 'id = ANY($1)', [userIds]);
     await db.end();
   }
 });
@@ -524,6 +526,7 @@ test('sin claves VAPID con PostgreSQL: las alertas quedan en el centro (canal ap
       nombreCompleto: `Menor Prueba ${suffix}`, edad: 15, sexo: 'Otro', departamento: 'Capital', ciudad: 'Asunción',
       descripcionFisica: 'Descripción', vestimenta: 'Vestimenta', fechaHoraDesaparicion: new Date().toISOString(),
       ubicacion: { lat: lat0, lng: lng0 }, declaraMayorEdad: true, autorizacionParental: true, avisoPrivacidadAceptado: true,
+      declaracionAceptada: true, declaracionVersion: DECLARACION_VERSION,
       foto: 'data:image/jpeg;base64,/9j/2Q==', alertaCampos: ['foto', 'ciudad']
     });
     assert.equal(creado.status, 201);
@@ -548,7 +551,7 @@ test('sin claves VAPID con PostgreSQL: las alertas quedan en el centro (canal ap
       await db.query('DELETE FROM casos WHERE id = $1', [casoId]);
     }
     await db.query('DELETE FROM notificaciones WHERE usuario_id = ANY($1)', [userIds]);
-    await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [userIds]);
+    await borrarUsuariosDePrueba(db, 'id = ANY($1)', [userIds]);
     await db.end();
   }
 });
@@ -676,7 +679,7 @@ test('baja del dispositivo con PostgreSQL: solo ese endpoint, solo de su cuenta,
     assert.equal((await db.query('SELECT 1 FROM alertas_zona WHERE usuario_id = $1', [dueno])).rows.length, 1, 'las alertas de zona siguen activas');
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));
-    await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [userIds]);
+    await borrarUsuariosDePrueba(db, 'id = ANY($1)', [userIds]);
     await db.end();
   }
 });
