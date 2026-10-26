@@ -1,3 +1,4 @@
+import { LIMITE_CIERRE_LOCALIZADO_DIAS } from './case-shared.js';
 import { withTransaction } from './db.js';
 
 // Seguimiento automático en dos intentos (seguimiento_intentos, migración 006):
@@ -72,5 +73,37 @@ export async function processDueFollowups(db) {
       result.casosEnSeguimiento += 1;
     }
     return result;
+  });
+}
+
+// Cierre automático: un caso localizado hace LIMITE_CIERRE_LOCALIZADO_DIAS días
+// (7 por defecto) pasa a CERRADO, con la geocerca apagada y el cambio en el
+// historial (sin autor: lo hizo el sistema). localizado_en se conserva, así sigue
+// contando como encontrado. La ficha pública ya se había retirado a las
+// VENTANA_LOCALIZADOS_HORAS. Lo ejecuta server.js cada minuto.
+export async function processLocatedClosures(db, { dias = LIMITE_CIERRE_LOCALIZADO_DIAS } = {}) {
+  return withTransaction(db, async client => {
+    const { rows: vencidos } = await client.query(`
+      SELECT id, nombre_completo, reportado_por_usr_id
+      FROM casos
+      WHERE estado = 'LOCALIZADO' AND localizado_en IS NOT NULL
+        AND localizado_en + ($1 * INTERVAL '1 day') <= CURRENT_TIMESTAMP
+      ORDER BY localizado_en
+      LIMIT 50
+      FOR UPDATE SKIP LOCKED
+    `, [dias]);
+    for (const caso of vencidos) {
+      await client.query(`
+        UPDATE casos SET estado = 'CERRADO', geocerca_activa = FALSE,
+          motivo_cierre = $2, proximo_seguimiento = NULL,
+          seguimiento_etapa = 2, seguimiento_intentos = 0
+        WHERE id = $1
+      `, [caso.id, `Cierre automático: ${dias} ${dias === 1 ? 'día' : 'días'} después de que la persona fue localizada.`]);
+      await client.query(`
+        INSERT INTO cambios_estado_caso (caso_id, estado_anterior, estado_nuevo)
+        VALUES ($1, 'LOCALIZADO', 'CERRADO')
+      `, [caso.id]);
+    }
+    return { casosCerrados: vencidos.length };
   });
 }

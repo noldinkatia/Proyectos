@@ -7,6 +7,25 @@ if (!Number.isFinite(LOCATED_WINDOW_HOURS) || LOCATED_WINDOW_HOURS < 0) {
   throw new Error('VENTANA_LOCALIZADOS_HORAS debe ser un número mayor o igual a cero.');
 }
 
+// Días tras los que un caso localizado se cierra solo (backend/followups.js). La
+// ficha pública se retira antes, a las VENTANA_LOCALIZADOS_HORAS.
+export function leerLimiteCierreLocalizado(valor) {
+  const dias = valor === undefined || valor === '' ? 7 : Number(valor);
+  if (!Number.isFinite(dias) || dias <= 0) {
+    throw new Error('LIMITE_CIERRE_LOCALIZADO_DIAS debe ser un número de días mayor que cero.');
+  }
+  return dias;
+}
+
+export const LIMITE_CIERRE_LOCALIZADO_DIAS = leerLimiteCierreLocalizado(process.env.LIMITE_CIERRE_LOCALIZADO_DIAS);
+
+// Encontrado = llegó a localizado. localizado_en se conserva al cerrar (a mano o
+// por el cierre automático), así sigue contando; un caso cerrado sin haber sido
+// localizado no cuenta. alias: prefijo de tabla en consultas con JOIN ('c.').
+export function casoEncontrado(alias = '') {
+  return `(${alias}localizado_en IS NOT NULL AND ${alias}estado IN ('LOCALIZADO', 'CERRADO'))`;
+}
+
 export const PUBLIC_CASE_FILTER = `
   (estado IN ('VALIDADO', 'EN_SEGUIMIENTO', 'LOCALIZADO')
     AND (estado <> 'LOCALIZADO'
@@ -93,10 +112,15 @@ export function toPublicCase(row) {
 // número de denuncia y la fecha del próximo seguimiento. Nunca va en respuestas
 // públicas: GET /casos y /casos/:id se leen sin sesión (ROLES_Y_PERMISOS.txt).
 export function toOwnerCase(row) {
+  const localizado = row.estado === 'LOCALIZADO' && row.localizado_en ? new Date(row.localizado_en) : null;
   return {
     ...toPublicCase(row),
     numeroDenuncia: row.numero_denuncia,
-    proximoSeguimiento: row.proximo_seguimiento
+    proximoSeguimiento: row.proximo_seguimiento,
+    // Cuándo lo cerrará el cierre automático (solo mientras está localizado).
+    cierreAutomaticoEn: localizado && !Number.isNaN(localizado.getTime())
+      ? new Date(localizado.getTime() + LIMITE_CIERRE_LOCALIZADO_DIAS * 86_400_000).toISOString()
+      : null
   };
 }
 

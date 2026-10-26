@@ -30,6 +30,7 @@ export function renderMyCasesView(cases, notifications) {
                 <span class="status-tag status-${escapeHtml(c.estado)}">${escapeHtml(statusLabel(c.estado))}</span></div>
               <p class="my-case-meta">Reportado ${new Date(c.fechaCreacion).toLocaleString('es-PY')}</p>
               ${c.estado === 'PENDIENTE' ? '<p class="my-case-notice">Tu reporte está en revisión. Recibirás un aviso cuando se actualice.</p>' : ''}
+              ${c.estado === 'LOCALIZADO' ? `<p class="my-case-notice">La persona fue localizada.${fechaCierre(c.cierreAutomaticoEn)}</p>` : ''}
               ${c.estado === 'RECHAZADO' ? `<p class="my-case-notice">${escapeHtml(c.motivoRechazo || 'El reporte no fue aprobado. Contactá a soporte para más información.')}</p>` : ''}
               ${activo ? `<div class="my-case-actions table-actions">
                 <button type="button" class="btn btn-success btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="respondToFollowup(this.dataset.caseId, 'LOCALIZADO')">Persona localizada</button>
@@ -45,6 +46,13 @@ export function renderMyCasesView(cases, notifications) {
         </aside>
       </div>
     </section>`;
+}
+
+// Fecha del cierre automático de un caso localizado (backend/followups.js).
+function fechaCierre(valor) {
+  const fecha = valor ? new Date(valor) : null;
+  if (!fecha || Number.isNaN(fecha.getTime())) return '';
+  return ` El caso se cerrará automáticamente el ${escapeHtml(fecha.toLocaleDateString('es-PY', { day: 'numeric', month: 'long' }))}.`;
 }
 
 export function statusLabel(status) {

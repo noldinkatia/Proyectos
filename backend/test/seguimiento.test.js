@@ -3,7 +3,9 @@ import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import jwt from 'jsonwebtoken';
 import { createDatabase, initializeDatabase, seedAdministrator } from '../db.js';
-import { processDueFollowups } from '../followups.js';
+import { execFileSync } from 'node:child_process';
+import { leerLimiteCierreLocalizado } from '../case-shared.js';
+import { processDueFollowups, processLocatedClosures } from '../followups.js';
 import { createApp } from '../server.js';
 
 // Seguimiento de casos con PostgreSQL: consultas en dos intentos, respuestas del
@@ -166,4 +168,73 @@ test('la migración 006 deja los casos que esperaban la primera respuesta en el 
   const c = await caso(id);
   assert.equal(c.estado, 'VALIDADO', 'recibe la segunda pregunta, no pasa directo a "Sin actualizar"');
   assert.equal(c.seguimiento_intentos, 2);
+}));
+
+// Casos localizados hace `dias` días (± segundos).
+const haceDias = (dias, segundos = 0) => new Date(Date.now() - dias * 86_400_000 - segundos * 1000);
+
+test('cierre automático: un localizado se cierra a los 7 días, apaga la geocerca y queda en el historial', conPostgres, () => escenario(async ({ db, pedir, tokens, crearCaso, caso }) => {
+  const vencido = await crearCaso({ estado: 'LOCALIZADO', localizado_en: haceDias(7, 5), geocerca_activa: true, proximo_seguimiento: null });
+  const reciente = await crearCaso({ estado: 'LOCALIZADO', localizado_en: haceDias(7, -60), proximo_seguimiento: null });
+  const encontradosAntes = Number((await pedir('GET', '/api/estadisticas')).data.encontrados);
+
+  const resultado = await processLocatedClosures(db);
+  assert.ok(resultado.casosCerrados >= 1);
+  const cerrado = await caso(vencido);
+  assert.equal(cerrado.estado, 'CERRADO');
+  assert.equal(cerrado.geocerca_activa, false, 'geocerca apagada');
+  assert.ok(cerrado.localizado_en, 'conserva la fecha de localizado');
+  assert.equal(cerrado.motivo_cierre, 'Cierre automático: 7 días después de que la persona fue localizada.');
+  assert.equal((await caso(reciente)).estado, 'LOCALIZADO', 'a 7 días menos un minuto sigue localizado');
+  const historial = (await db.query('SELECT estado_anterior, estado_nuevo, cambiado_por FROM cambios_estado_caso WHERE caso_id = $1', [vencido])).rows;
+  assert.deepEqual(historial, [{ estado_anterior: 'LOCALIZADO', estado_nuevo: 'CERRADO', cambiado_por: null }]);
+
+  // Sigue contando como encontrado y en el historial de localizados del administrador.
+  assert.equal(Number((await pedir('GET', '/api/estadisticas')).data.encontrados), encontradosAntes);
+  const ficha = await pedir('GET', `/api/admin/historial-localizados/${vencido}`, { token: tokens.admin });
+  assert.equal(ficha.status, 200);
+  assert.ok(ficha.data.caso.cambiosEstado.some(cambio => cambio.estadoNuevo === 'CERRADO' && cambio.nombreAdministrador === null));
+  // Repetir no lo vuelve a procesar.
+  await processLocatedClosures(db);
+  assert.equal((await db.query('SELECT COUNT(*)::int AS n FROM cambios_estado_caso WHERE caso_id = $1', [vencido])).rows[0].n, 1);
+}));
+
+test('cierre automático con LIMITE_CIERRE_LOCALIZADO_DIAS configurable', conPostgres, () => escenario(async ({ db, crearCaso, caso }) => {
+  const tres = await crearCaso({ estado: 'LOCALIZADO', localizado_en: haceDias(3, 5), proximo_seguimiento: null });
+  const dos = await crearCaso({ estado: 'LOCALIZADO', localizado_en: haceDias(2), proximo_seguimiento: null });
+  await processLocatedClosures(db, { dias: 3 });
+  assert.equal((await caso(tres)).estado, 'CERRADO');
+  assert.equal((await caso(tres)).motivo_cierre, 'Cierre automático: 3 días después de que la persona fue localizada.');
+  assert.equal((await caso(dos)).estado, 'LOCALIZADO');
+}));
+
+test('LIMITE_CIERRE_LOCALIZADO_DIAS: 7 por defecto, se lee del entorno y rechaza valores inválidos', () => {
+  assert.equal(leerLimiteCierreLocalizado(undefined), 7);
+  assert.equal(leerLimiteCierreLocalizado(''), 7);
+  assert.equal(leerLimiteCierreLocalizado('3'), 3);
+  assert.equal(leerLimiteCierreLocalizado('0.5'), 0.5);
+  for (const invalido of ['0', '-1', 'siete']) {
+    assert.throws(() => leerLimiteCierreLocalizado(invalido), /LIMITE_CIERRE_LOCALIZADO_DIAS/, invalido);
+  }
+  // El valor del proceso sale de la variable de entorno.
+  const leido = execFileSync(process.execPath, ['--input-type=module', '-e',
+    "const m = await import('./case-shared.js'); process.stdout.write(String(m.LIMITE_CIERRE_LOCALIZADO_DIAS))"],
+  { cwd: new URL('..', import.meta.url), env: { ...process.env, LIMITE_CIERRE_LOCALIZADO_DIAS: '12' } }).toString();
+  assert.equal(leido, '12');
+});
+
+test('"Cerrar caso" conserva la fecha de localizado; cerrado sin localizar no cuenta como encontrado', conPostgres, () => escenario(async ({ pedir, tokens, crearCaso, caso }) => {
+  const encontrados = async () => Number((await pedir('GET', '/api/estadisticas')).data.encontrados);
+  const antes = await encontrados();
+  const localizado = await crearCaso({ estado: 'LOCALIZADO', localizado_en: haceDias(1), proximo_seguimiento: null });
+  const activo = await crearCaso();
+  assert.equal(await encontrados(), antes + 1);
+
+  const cierre = { estado: 'CERRADO', motivo: 'Cierre de prueba' };
+  assert.equal((await pedir('POST', `/api/admin/casos/${localizado}/estado`, { token: tokens.admin, body: cierre })).status, 200);
+  assert.ok((await caso(localizado)).localizado_en, 'cerrar no borra localizado_en');
+  const cerrarActivo = await pedir('POST', `/api/casos/${activo}/seguimiento`, { token: tokens.citizen, body: { accion: 'CERRAR', motivo: 'Ya no se busca' } });
+  assert.equal(cerrarActivo.status, 200);
+  assert.equal((await caso(activo)).localizado_en, null);
+  assert.equal(await encontrados(), antes + 1, 'el localizado sigue contando; el cerrado sin localizar no');
 }));

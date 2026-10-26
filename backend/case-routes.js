@@ -195,7 +195,8 @@ export function createCaseRouter({ db, jwtSecret, push }) {
         : action === 'CERRAR' ? 'CERRADO' : 'VALIDADO';
       const { rows: updatedRows } = await client.query(`
         UPDATE casos SET estado = $2,
-          localizado_en = CASE WHEN $2 = 'LOCALIZADO' THEN CURRENT_TIMESTAMP ELSE NULL END,
+          localizado_en = CASE WHEN $2 = 'LOCALIZADO' THEN CURRENT_TIMESTAMP
+            WHEN $2 = 'CERRADO' THEN localizado_en ELSE NULL END,
           motivo_cierre = CASE WHEN $2 = 'CERRADO' THEN $3 ELSE motivo_cierre END,
           seguimiento_etapa = CASE WHEN $2 IN ('LOCALIZADO', 'CERRADO') THEN 2 ELSE 0 END,
           seguimiento_intentos = 0,

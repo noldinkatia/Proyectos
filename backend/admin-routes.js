@@ -3,6 +3,7 @@ import { alertasPorCambioDeEstado } from './alertas.js';
 import { asyncRoute } from './auth-routes.js';
 import {
   caseListColumns,
+  casoEncontrado,
   paginatedBody,
   paginationFromQuery,
   sendStoredPhoto,
@@ -91,7 +92,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
           LEFT JOIN usuarios a ON a.id = h.cambiado_por WHERE h.caso_id = c.id) AS cambios_estado,
         COUNT(*) OVER() AS total_registros
       FROM casos c LEFT JOIN usuarios u ON u.id = c.reportado_por_usr_id
-      WHERE c.estado = 'LOCALIZADO'
+      WHERE ${casoEncontrado('c.')}
         AND ($1 = '%%' OR c.nombre_completo ILIKE $1 OR c.ciudad ILIKE $1)
         AND ($2::date IS NULL OR c.localizado_en >= $2::date)
         AND ($3::date IS NULL OR c.localizado_en < $3::date + INTERVAL '1 day')
@@ -123,7 +124,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
         ) ORDER BY h.cambiado_en), '[]'::json) FROM cambios_estado_caso h
           LEFT JOIN usuarios a ON a.id = h.cambiado_por WHERE h.caso_id = c.id) AS cambios_estado
       FROM casos c LEFT JOIN usuarios u ON u.id = c.reportado_por_usr_id
-      WHERE c.id = $1 AND c.estado = 'LOCALIZADO'
+      WHERE c.id = $1 AND ${casoEncontrado('c.')}
     `, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Caso no disponible' });
     res.json({ caso: toAdminCase(rows[0]) });
@@ -160,7 +161,9 @@ export function createAdminRouter({ db, requireAdmin, push }) {
       if (current.estado === state) return current;
       const { rows: updatedRows } = await client.query(`
         UPDATE casos SET estado = $2,
-          localizado_en = CASE WHEN $2 = 'LOCALIZADO' THEN CURRENT_TIMESTAMP ELSE NULL END,
+          -- Al cerrar se conserva la fecha de localizado: sigue contando como encontrado.
+          localizado_en = CASE WHEN $2 = 'LOCALIZADO' THEN CURRENT_TIMESTAMP
+            WHEN $2 = 'CERRADO' THEN localizado_en ELSE NULL END,
           motivo_rechazo = CASE WHEN $2 = 'RECHAZADO' THEN $3 ELSE motivo_rechazo END,
           motivo_cierre = CASE WHEN $2 = 'CERRADO' THEN $3 ELSE motivo_cierre END,
           numero_denuncia = CASE WHEN $2 = 'VALIDADO' AND $4 <> '' THEN $4 ELSE numero_denuncia END,

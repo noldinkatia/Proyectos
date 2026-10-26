@@ -56,3 +56,9 @@ test('"Mis casos": cada caso activo ofrece solo "Persona localizada" y "Cerrar c
   // en el panel de avisos aunque haya una consulta pendiente.
   assert.doesNotMatch(html, /SIGUE_ACTIVA|Sigue activ|PRORROGA|prórroga|respondToCaseFollowup/i);
 });
+
+test('"Mis casos": un caso localizado avisa cuándo se cierra automáticamente, sin botones', () => {
+  const html = renderMyCasesView([{ ...caso('localizado', 'LOCALIZADO'), cierreAutomaticoEn: '2026-11-02T15:00:00Z' }], []);
+  assert.match(html, /La persona fue localizada\. El caso se cerrará automáticamente el 2 de noviembre\./);
+  assert.deepEqual(accionesPorCaso(html), { localizado: [] });
+});

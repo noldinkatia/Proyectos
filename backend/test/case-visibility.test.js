@@ -89,7 +89,8 @@ test('el historial de localizados exige el rol de administrador', async () => {
     });
     assert.equal(adminResponse.status, 200);
     const historyQuery = app.queries.find(item => item.sql.includes('COUNT(*) OVER()'));
-    assert.match(historyQuery.sql, /c\.estado = 'LOCALIZADO'/);
+    // Localizados, también los que después se cerraron (a mano o por el cierre automático).
+    assert.match(historyQuery.sql, /c\.localizado_en IS NOT NULL AND c\.estado IN \('LOCALIZADO', 'CERRADO'\)/);
     assert.deepEqual(historyQuery.values.slice(0, 2), ['%Ana%', null]);
   } finally {
     await app.close();
@@ -555,7 +556,7 @@ test('el ciclo localizado permanece oculto tras 36 segundos y reiniciar Express'
   try {
     await initializeDatabase(db);
     const foundBefore = Number((await db.query(`
-      SELECT COUNT(*) AS total FROM casos WHERE estado IN ('LOCALIZADO', 'CERRADO')
+      SELECT COUNT(*) AS total FROM casos WHERE localizado_en IS NOT NULL AND estado IN ('LOCALIZADO', 'CERRADO')
     `)).rows[0].total);
     await seedAdministrator(db, adminEmail, adminPassword);
     adminId = (await db.query('SELECT id FROM usuarios WHERE correo = $1', [adminEmail])).rows[0].id;
