@@ -63,7 +63,7 @@ Antes de ir a Render, tené a mano estos valores:
 | `JWT_SECRET` | Un texto aleatorio largo (ver abajo cómo generarlo). |
 | `ADMIN_IDENTIFICADOR` | El correo de la cuenta administradora. |
 | `ADMIN_PASSWORD` | Una contraseña segura para el administrador (mínimo 8 caracteres). |
-| `APP_URL` | La dirección pública de la app en Render (ver paso 5). Para empezar: `https://rastreo-py.onrender.com` |
+| `APP_URL` | La dirección pública de la app en Render (ver paso 5). La del proyecto: `https://proyectos-6cbt.onrender.com` |
 | `VAPID_PUBLIC_KEY` | Clave pública de las notificaciones push (ver [Notificaciones push](#notificaciones-push-vapid)). Opcional. |
 | `VAPID_PRIVATE_KEY` | Clave privada del mismo par. **Es un secreto.** Opcional. |
 | `VAPID_SUBJECT` | Contacto del responsable: `mailto:` + el correo del proyecto. Opcional. |
@@ -228,9 +228,9 @@ Render vuelve a arrancar la app solo.
 
 ## 5. Poner la `APP_URL` correcta
 
-1. Arriba, en la página del servicio, Render muestra su dirección, por ejemplo
-   `https://rastreo-py.onrender.com` (si ese nombre ya estaba usado, Render le agrega
-   letras: `https://rastreo-py-abcd.onrender.com`).
+1. Arriba, en la página del servicio, Render muestra su dirección. La del proyecto es
+   `https://proyectos-6cbt.onrender.com`: Render la arma con el nombre del servicio y,
+   si ese nombre ya estaba usado, le agrega letras al final (`-6cbt`).
 2. Si es distinta a la que pusiste, andá a **Environment**, cambiá `APP_URL` y guardá.
 3. Reglas para `APP_URL`:
    - Tiene que empezar con **`https://`**.
@@ -333,7 +333,7 @@ Render. Esto se comprueba así:
 ## 8. Probar la instalación en un celular real
 
 La app instalable vive en **`APP_URL/app/`** (por ejemplo
-`https://rastreo-py.onrender.com/app/`). Instalar una app web **solo funciona por
+`https://proyectos-6cbt.onrender.com/app/`). Instalar una app web **solo funciona por
 HTTPS**; Render ya lo da.
 
 **Android (Chrome):**
