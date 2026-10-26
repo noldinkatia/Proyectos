@@ -2,6 +2,8 @@
 import { CAMPOS_ALERTA, ETIQUETA_NO_VERIFICADA, avisoPushAlertaTemprana, datosAlerta, fotoPermitida } from './alerta-campos.js';
 import { apiRequest } from './api.js';
 import { escapeHtml } from './config.js';
+import { DECLARACION_CASILLA, DECLARACION_PUNTOS, DECLARACION_TITULO, DECLARACION_VERSION } from './declaracion.js';
+import { confirmar } from './dialogo.js';
 import { estado } from './estado.js';
 import { addBaseTiles, addTextMapZoomControl } from './map.js';
 import { RADIO_ALERTA_KM } from './radio-alerta.js';
@@ -553,6 +555,11 @@ export async function handleReportSubmit(e) {
     alertaCampos: camposElegidos()
   };
 
+  // Último paso: la declaración de responsabilidad, con casilla obligatoria.
+  if (!await pedirDeclaracion()) return;
+  newCase.declaracionAceptada = true;
+  newCase.declaracionVersion = DECLARACION_VERSION;
+
   try {
     await apiRequest('/casos', { method: 'POST', body: newCase });
   } catch (error) {
@@ -561,6 +568,18 @@ export async function handleReportSubmit(e) {
   }
   showToast('Reporte recibido', 'El caso quedó en revisión y ya aparece en Mis casos.', 'success');
   await navigateTo('my-cases');
+}
+
+// Modal de responsabilidad antes de publicar (texto en declaracion.js). true si se
+// marcó la casilla y se eligió publicar.
+export function pedirDeclaracion() {
+  return confirmar({
+    titulo: DECLARACION_TITULO,
+    contenidoHtml: `<ul>${DECLARACION_PUNTOS.map(punto => `<li>${escapeHtml(punto)}</li>`).join('')}</ul>`,
+    casilla: DECLARACION_CASILLA,
+    textoConfirmar: 'Publicar reporte',
+    textoCancelar: 'Volver a revisar'
+  });
 }
 
 export function updateMinorAuthorization() {

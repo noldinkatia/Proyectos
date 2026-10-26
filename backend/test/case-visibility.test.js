@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { createDatabase, initializeDatabase, seedAdministrator } from '../db.js';
 import { createApp } from '../server.js';
 import { processDueFollowups } from '../case-routes.js';
+import { DECLARACION_VERSION } from '../../public/js/declaracion.js';
 
 const secret = 'test-secret-with-at-least-thirty-two-characters';
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
@@ -340,7 +341,8 @@ test('al crear un caso se asocia al ciudadano y se notifica a administración', 
         numeroDenuncia: 'DEN-123',
         declaraMayorEdad: true,
         autorizacionParental: true,
-        avisoPrivacidadAceptado: true
+        avisoPrivacidadAceptado: true,
+        declaracionAceptada: true, declaracionVersion: DECLARACION_VERSION
       })
     });
     assert.equal(response.status, 201);
@@ -775,7 +777,8 @@ test('solo se aceptan ubicaciones de la lista oficial de Paraguay', async () => 
       body: JSON.stringify({
         nombreCompleto: 'Persona', edad: 30, sexo: 'Otro', ciudad: 'Palermo', departamento: 'Buenos Aires',
         descripcionFisica: 'x', vestimenta: 'x', fechaHoraDesaparicion: new Date().toISOString(),
-        ubicacion: { lat: -25.2867, lng: -57.6333 }, declaraMayorEdad: true, avisoPrivacidadAceptado: true
+        ubicacion: { lat: -25.2867, lng: -57.6333 }, declaraMayorEdad: true, avisoPrivacidadAceptado: true,
+        declaracionAceptada: true, declaracionVersion: DECLARACION_VERSION
       })
     });
     assert.equal(response.status, 400);

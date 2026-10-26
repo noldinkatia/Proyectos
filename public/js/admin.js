@@ -273,6 +273,7 @@ export function adminAccept(caseId) {
     <span>Descripción: ${escapeHtml(selectedCase.descripcionFisica || 'Sin descripción')}</span>
     <span>Vestimenta: ${escapeHtml(selectedCase.vestimenta || 'Sin especificar')}</span>
     <span>Autorización parental: ${selectedCase.autorizacionParental ? 'Registrada' : 'No registrada / no aplica'}</span>
+    <span>Declaración de responsabilidad: ${selectedCase.declaracionAceptadaEn ? `aceptada el ${escapeHtml(new Date(selectedCase.declaracionAceptadaEn).toLocaleString('es-PY'))} (versión ${escapeHtml(selectedCase.declaracionVersion || '')})` : 'sin registro (reporte anterior a la declaración)'}</span>
     <span>Alerta temprana: ${selectedCase.alertaTempranaEn ? `enviada el ${escapeHtml(new Date(selectedCase.alertaTempranaEn).toLocaleString('es-PY'))}` : 'no enviada (posible duplicado o límite por reportante)'}. El reportante eligió mostrar: ${escapeHtml(alertFieldLabels(selectedCase.alertaCampos))}</span>
   ` : '<span>No se pudo cargar el detalle del caso. Actualizá el panel e intentá otra vez.</span>';
   form.reset();

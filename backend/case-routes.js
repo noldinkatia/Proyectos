@@ -23,6 +23,7 @@ import { createNotificationRouter } from './notification-routes.js';
 import { createStatsRouter } from './stats-routes.js';
 import { ubicacionValida } from './ubicaciones.js';
 import { normalizarCamposAlerta } from '../public/js/alerta-campos.js';
+import { DECLARACION_VERSION } from '../public/js/declaracion.js';
 
 import { avisoLocalizadoAlReportante } from './followups.js';
 
@@ -121,6 +122,14 @@ export function createCaseRouter({ db, jwtSecret, push }) {
       || (body.edad < 18 && body.autorizacionParental !== true)) {
       return res.status(400).json({ error: 'Los datos del caso están incompletos o no son válidos.' });
     }
+    // Declaración de responsabilidad: obligatoria y de la versión vigente. La hora
+    // la pone el servidor (CURRENT_TIMESTAMP al insertar), no el navegador.
+    if (body.declaracionAceptada !== true) {
+      return res.status(400).json({ error: 'Para publicar el reporte tenés que aceptar la declaración de responsabilidad.' });
+    }
+    if (body.declaracionVersion !== DECLARACION_VERSION) {
+      return res.status(400).json({ error: 'La declaración de responsabilidad cambió. Recargá la página para leer la versión vigente.' });
+    }
     const barrio = typeof body.barrio === 'string' ? body.barrio.trim() : '';
     if (!ubicacionValida(body.departamento, body.ciudad, barrio)) {
       return res.status(400).json({ error: 'Elegí un departamento, ciudad y barrio de la lista de Paraguay.' });
@@ -139,8 +148,10 @@ export function createCaseRouter({ db, jwtSecret, push }) {
           id, nombre_completo, edad, sexo, ciudad, departamento, barrio, descripcion_fisica, vestimenta,
           senas_particulares, fecha_hora_desaparicion, foto, latitud, longitud, direccion,
           numero_denuncia, estado, reportado_por_usr_id, proximo_seguimiento,
-          reportante_mayor_edad, autorizacion_parental, aviso_privacidad_aceptado, alerta_campos
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+          reportante_mayor_edad, autorizacion_parental, aviso_privacidad_aceptado, alerta_campos,
+          declaracion_aceptada_en, declaracion_version
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
+          CURRENT_TIMESTAMP, $24)
         RETURNING *
       `, [
         id, body.nombreCompleto.trim(), Number(body.edad), body.sexo.trim(), body.ciudad.trim(),
@@ -150,7 +161,8 @@ export function createCaseRouter({ db, jwtSecret, push }) {
         req.auth.id, new Date(Date.now() + 48 * 60 * 60 * 1000),
         body.declaraMayorEdad, body.autorizacionParental === true, body.avisoPrivacidadAceptado,
         // Qué muestra la alerta temprana: solo de la lista permitida (la foto, solo de adultos).
-        JSON.stringify(normalizarCamposAlerta(body.alertaCampos, { edad: Number(body.edad), tieneFoto: Boolean(body.foto) }))
+        JSON.stringify(normalizarCamposAlerta(body.alertaCampos, { edad: Number(body.edad), tieneFoto: Boolean(body.foto) })),
+        DECLARACION_VERSION
       ]);
       await client.query(
         'INSERT INTO suscripciones_caso (caso_id, usuario_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',

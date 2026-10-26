@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { DECLARACION_VERSION } from '../../public/js/declaracion.js';
 import jwt from 'jsonwebtoken';
 import {
   CAMPOS_POR_DEFECTO,
@@ -197,7 +198,7 @@ test('alertas de zona con PostgreSQL: radio, retractación, oficial, localizado,
         nombreCompleto: nombre, edad, sexo: 'Femenino', departamento: 'Capital', ciudad: 'Asunción',
         descripcionFisica: 'Descripción de prueba', vestimenta: 'Campera azul',
         fechaHoraDesaparicion: new Date().toISOString(), ubicacion: { lat: lat0, lng: lng0 },
-        declaraMayorEdad: true, autorizacionParental: edad < 18, avisoPrivacidadAceptado: true, ...extra
+        declaraMayorEdad: true, autorizacionParental: edad < 18, avisoPrivacidadAceptado: true, declaracionAceptada: true, declaracionVersion: DECLARACION_VERSION, ...extra
       });
       assert.equal(result.status, 201, JSON.stringify(result.body));
       caseIds.push(result.body.caso.id);
@@ -422,7 +423,7 @@ test('push con PostgreSQL: más alertas tempranas por hora que el límite llegan
         nombreCompleto: `${nombre} Agrupada ${suffix}`, edad: 30 + indice * 10, sexo: 'Femenino', departamento: 'Central',
         ciudad: 'Luque', descripcionFisica: 'Descripción', vestimenta: 'Vestimenta',
         fechaHoraDesaparicion: new Date().toISOString(), ubicacion: { lat: lat0, lng: lng0 + 0.1 },
-        declaraMayorEdad: true, autorizacionParental: false, avisoPrivacidadAceptado: true
+        declaraMayorEdad: true, autorizacionParental: false, avisoPrivacidadAceptado: true, declaracionAceptada: true, declaracionVersion: DECLARACION_VERSION
       });
       assert.equal(creado.status, 201, JSON.stringify(creado.body));
       caseIds.push(creado.body.caso.id);
@@ -524,6 +525,7 @@ test('sin claves VAPID con PostgreSQL: las alertas quedan en el centro (canal ap
       nombreCompleto: `Menor Prueba ${suffix}`, edad: 15, sexo: 'Otro', departamento: 'Capital', ciudad: 'Asunción',
       descripcionFisica: 'Descripción', vestimenta: 'Vestimenta', fechaHoraDesaparicion: new Date().toISOString(),
       ubicacion: { lat: lat0, lng: lng0 }, declaraMayorEdad: true, autorizacionParental: true, avisoPrivacidadAceptado: true,
+      declaracionAceptada: true, declaracionVersion: DECLARACION_VERSION,
       foto: 'data:image/jpeg;base64,/9j/2Q==', alertaCampos: ['foto', 'ciudad']
     });
     assert.equal(creado.status, 201);

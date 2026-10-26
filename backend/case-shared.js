@@ -47,6 +47,7 @@ export function caseListColumns(alias = '') {
     'latitud', 'longitud', 'direccion', 'numero_denuncia', 'estado', 'motivo_rechazo',
     'reportado_por_usr_id', 'localizado_en', 'creado_en', 'proximo_seguimiento',
     'reportante_mayor_edad', 'autorizacion_parental', 'aviso_privacidad_aceptado',
+    'declaracion_aceptada_en', 'declaracion_version',
     'checklist_denuncia', 'checklist_coherencia', 'checklist_duplicados', 'checklist_menores',
     'motivo_cierre', 'seguimiento_etapa', 'alerta_campos', 'alerta_temprana_en'
   ].map(column => `${prefix}${column}`).join(', ') + `, (${prefix}foto <> '') AS tiene_foto`;
@@ -137,6 +138,9 @@ export function toAdminCase(row) {
     reportadoPorUsrId: row.reportado_por_usr_id,
     contactoReportante: row.contacto_reportante,
     reportanteMayorEdad: Boolean(row.reportante_mayor_edad),
+    // Declaración de responsabilidad (solo administración): cuándo y qué versión.
+    declaracionAceptadaEn: row.declaracion_aceptada_en || null,
+    declaracionVersion: row.declaracion_version || null,
     autorizacionParental: Boolean(row.autorizacion_parental),
     avisoPrivacidadAceptado: Boolean(row.aviso_privacidad_aceptado),
     checklistRevision: {

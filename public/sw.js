@@ -25,6 +25,7 @@ const APP_SHELL = [
   '/js/verificacion.js',
   '/js/estado.js',
   '/js/config.js',
+  '/js/declaracion.js',
   '/js/dialogo.js',
   '/js/api.js',
   '/js/store.js',
