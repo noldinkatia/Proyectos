@@ -44,12 +44,13 @@ export function createApp({ db, mailer, jwtSecret, appUrl = process.env.APP_URL,
         defaultSrc: ["'self'"],
         // Sin 'unsafe-inline': el JS vive en public/js/ y los eventos usan
         // data-on-*="..." (public/js/eventos.js), no on*="...".
-        scriptSrc: ["'self'", 'https://unpkg.com'],
+        // Leaflet se sirve desde la propia app (public/vendor/leaflet): sin unpkg.
+        scriptSrc: ["'self'"],
         scriptSrcAttr: ["'none'"],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://unpkg.com'],
+        styleSrc: ["'self'", "'unsafe-inline'"],
         styleSrcAttr: ["'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:', 'blob:', 'https://unpkg.com', 'https://images.unsplash.com', 'https://tile.openstreetmap.org'],
-        fontSrc: ["'self'", 'data:', 'https://unpkg.com'],
+        imgSrc: ["'self'", 'data:', 'blob:', 'https://images.unsplash.com', 'https://tile.openstreetmap.org'],
+        fontSrc: ["'self'", 'data:'],
         connectSrc: ["'self'", 'https://nominatim.openstreetmap.org']
       }
     },
