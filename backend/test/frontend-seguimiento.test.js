@@ -62,3 +62,11 @@ test('"Mis casos": un caso localizado avisa cuándo se cierra automáticamente, 
   assert.match(html, /La persona fue localizada\. El caso se cerrará automáticamente el 2 de noviembre\./);
   assert.deepEqual(accionesPorCaso(html), { localizado: [] });
 });
+
+test('los avisos de localizado y cierre automático al reportante no salen como aviso del sistema', async () => {
+  const { mostrarComoAvisoDelSistema } = await import(new URL('js/notifications.js', publicDir));
+  for (const tipo of ['LOCALIZADO_REGISTRADO', 'CIERRE_AUTOMATICO']) {
+    assert.equal(mostrarComoAvisoDelSistema({ tipo, canal: 'app' }), false, tipo);
+  }
+  assert.equal(mostrarComoAvisoDelSistema({ tipo: 'SEGUIMIENTO', canal: 'app' }), true, 'la consulta de seguimiento sí');
+});

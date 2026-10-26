@@ -43,9 +43,11 @@ function alertaZonaHtml(n) {
 }
 
 // No salen como aviso del sistema por el polling: lo que ya llegó por push (no se
-// repite) y lo que va solo al centro de notificaciones (retractación y cierre).
+// repite) y lo que va solo al centro de notificaciones (retractación, cierre, y la
+// localización y el cierre automático avisados al reportante).
+const SOLO_CENTRO = ['ALERTA_RETRACTADA', 'ALERTA_CERRADO', 'LOCALIZADO_REGISTRADO', 'CIERRE_AUTOMATICO'];
 export function mostrarComoAvisoDelSistema(item) {
-  return item.canal !== 'push' && !['ALERTA_RETRACTADA', 'ALERTA_CERRADO'].includes(item.tipo);
+  return item.canal !== 'push' && !SOLO_CENTRO.includes(item.tipo);
 }
 
 export async function renderNotifList() {

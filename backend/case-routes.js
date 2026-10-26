@@ -24,6 +24,8 @@ import { createStatsRouter } from './stats-routes.js';
 import { ubicacionValida } from './ubicaciones.js';
 import { normalizarCamposAlerta } from '../public/js/alerta-campos.js';
 
+import { avisoLocalizadoAlReportante } from './followups.js';
+
 export { processDueFollowups } from './followups.js';
 
 // Router de /api: define los permisos comunes y las rutas de casos del ciudadano,
@@ -220,6 +222,7 @@ export function createCaseRouter({ db, jwtSecret, push }) {
           SELECT usuario_id, $1, 'Caso resuelto', $2, 'CASO_LOCALIZADO'
           FROM suscripciones_caso WHERE caso_id = $1
         `, [req.params.id, `El familiar informó que ${current.nombre_completo} fue localizado.`]);
+        await avisoLocalizadoAlReportante(client, current);
       }
       return updatedRows[0];
     });

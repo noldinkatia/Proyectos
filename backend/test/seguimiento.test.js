@@ -16,7 +16,7 @@ const conPostgres = { skip: !testDatabaseUrl && 'Defina TEST_DATABASE_URL para e
 
 // Administrador, ciudadano reportante y un servidor Express de prueba. crearCaso()
 // agrega casos del ciudadano; todo se borra al terminar.
-async function escenario(fn) {
+async function escenario(fn, { push } = {}) {
   const db = createDatabase(testDatabaseUrl);
   const suffix = randomUUID().replaceAll('-', '');
   const casos = [];
@@ -32,7 +32,7 @@ async function escenario(fn) {
       INSERT INTO usuarios (nombre_completo, correo, contrasena_hash, rol, verificado, acepto_terminos)
       VALUES ('Reportante de prueba', $1, 'sin-uso', 'ciudadano', TRUE, TRUE) RETURNING id
     `, [`seguimiento.citizen.${suffix}@gmail.com`])).rows[0].id;
-    server = createApp({ db, mailer: { sendMail: async () => {} }, jwtSecret: secret, appUrl: 'http://127.0.0.1' })
+    server = createApp({ db, mailer: { sendMail: async () => {} }, jwtSecret: secret, appUrl: 'http://127.0.0.1', ...(push ? { push } : {}) })
       .listen(0, '127.0.0.1');
     await new Promise(resolve => server.once('listening', resolve));
     const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -298,3 +298,42 @@ test('menores localizados: fuera de toda ruta pública (listado, detalle, foto, 
   const menores = s => Number(s.porEdad.find(fila => fila.categoria === '0-17')?.total || 0);
   assert.equal(menores(stats), menores(statsAntes) + 1, 'el menor localizado cuenta en "por edad"');
 }));
+
+// Push "activo" que solo registra lo que se mandaría.
+function pushDePrueba() {
+  const enviadas = [];
+  return { enviadas, push: { disponible: true, programar: (_db, notificaciones) => enviadas.push(...notificaciones) } };
+}
+
+test('avisos al reportante: localizado (por la administración o por el reportante) y cierre automático, solo en el centro de notificaciones', conPostgres, () => {
+  const { enviadas, push } = pushDePrueba();
+  return escenario(async ({ db, pedir, tokens, crearCaso, avisos, citizenId }) => {
+    const porAdmin = await crearCaso();
+    const porReportante = await crearCaso();
+    assert.equal((await pedir('POST', `/api/admin/casos/${porAdmin}/estado`, { token: tokens.admin, body: { estado: 'LOCALIZADO' } })).status, 200);
+    assert.equal((await pedir('POST', `/api/casos/${porReportante}/seguimiento`, { token: tokens.citizen, body: { accion: 'LOCALIZADO' } })).status, 200);
+    for (const id of [porAdmin, porReportante]) {
+      const aviso = (await avisos(id)).find(a => a.tipo === 'LOCALIZADO_REGISTRADO');
+      assert.ok(aviso, id);
+      assert.equal(aviso.titulo, 'Persona localizada');
+      assert.match(aviso.mensaje, /figura como localizada. El caso se cerrará automáticamente en 7 días./);
+      assert.equal(aviso.canal, 'app', 'sin push');
+    }
+
+    await db.query("UPDATE casos SET localizado_en = CURRENT_TIMESTAMP - INTERVAL '8 days' WHERE id = ANY($1)", [[porAdmin, porReportante]]);
+    await processLocatedClosures(db);
+    for (const id of [porAdmin, porReportante]) {
+      const cierre = (await avisos(id)).find(a => a.tipo === 'CIERRE_AUTOMATICO');
+      assert.ok(cierre, id);
+      assert.equal(cierre.titulo, 'Caso cerrado automáticamente');
+      assert.match(cierre.mensaje, /se cerró 7 días después de la localización/);
+      assert.equal(cierre.canal, 'app', 'sin push');
+    }
+    // Nada de esto pasó por el push (que estaba disponible).
+    const propias = (await db.query(
+      "SELECT id FROM notificaciones WHERE usuario_id = $1 AND tipo IN ('LOCALIZADO_REGISTRADO', 'CIERRE_AUTOMATICO')", [citizenId]
+    )).rows.map(fila => String(fila.id));
+    assert.equal(propias.length, 4);
+    assert.deepEqual(enviadas.filter(n => propias.includes(String(n.id))), []);
+  }, { push });
+});

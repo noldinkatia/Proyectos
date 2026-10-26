@@ -11,7 +11,7 @@ import {
   validDateFilter
 } from './case-shared.js';
 import { withTransaction } from './db.js';
-import { processDueFollowups } from './followups.js';
+import { avisoLocalizadoAlReportante, processDueFollowups } from './followups.js';
 
 // Panel de administración: listado y moderación de casos, auditoría, historial
 // de localizados y simulador de seguimiento. Todas las rutas exigen administrador.
@@ -230,6 +230,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
           SELECT usuario_id, $1, 'Caso resuelto', $2, 'CASO_LOCALIZADO'
           FROM suscripciones_caso WHERE caso_id = $1
         `, [req.params.id, `El caso de ${current.nombre_completo} fue resuelto: la persona fue localizada.`]);
+        await avisoLocalizadoAlReportante(client, current);
       }
       return updatedRows[0];
     });
