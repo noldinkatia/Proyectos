@@ -50,14 +50,14 @@ const APP_SHELL = [
   '/js/app.js',
   // Las que declara styles.css (@font-face): sin ellas offline.html se ve con la
   // tipografía del sistema.
-  '/fonts/Inter-400.ttf',
-  '/fonts/Inter-500.ttf',
-  '/fonts/Inter-600.ttf',
-  '/fonts/Inter-700.ttf',
-  '/fonts/Inter-800.ttf',
-  '/fonts/Sora-600.ttf',
-  '/fonts/Sora-700.ttf',
-  '/fonts/Sora-800.ttf'
+  '/fonts/Inter-400.woff2',
+  '/fonts/Inter-500.woff2',
+  '/fonts/Inter-600.woff2',
+  '/fonts/Inter-700.woff2',
+  '/fonts/Inter-800.woff2',
+  '/fonts/Sora-600.woff2',
+  '/fonts/Sora-700.woff2',
+  '/fonts/Sora-800.woff2'
 ];
 
 // PENDIENTE (sin cambiar por ahora): el middleware cors de backend/server.js

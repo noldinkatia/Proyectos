@@ -25,14 +25,21 @@
 /* ==========================================================================
    1. Tipografía
    ========================================================================== */
-@font-face { font-family: Inter; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/Inter-400.ttf") format("truetype"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/Inter-500.ttf") format("truetype"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/Inter-600.ttf") format("truetype"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/Inter-700.ttf") format("truetype"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 800; font-display: swap; src: url("/fonts/Inter-800.ttf") format("truetype"); }
-@font-face { font-family: Sora; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/Sora-600.ttf") format("truetype"); }
-@font-face { font-family: Sora; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/Sora-700.ttf") format("truetype"); }
-@font-face { font-family: Sora; font-style: normal; font-weight: 800; font-display: swap; src: url("/fonts/Sora-800.ttf") format("truetype"); }
+/* Fuentes en WOFF2 con solo los caracteres latinos (unos 28 KB cada Inter y 17 KB cada
+   Sora, contra 320 y 45 KB de los TTF): Latin-1 y Latin Extendido-A, vocales nasales del
+   guaraní (ẽ ĩ ũ ỹ, g̃) y diacríticos combinables, puso (ʼ), signos tipográficos
+   (U+2010-2027, €, ™) y los símbolos que usa la interfaz (⌂ ⌖ ▤ ♧ ⚠ › ← → …). Se
+   generan desde los TTF (que quedan como alternativa) con la herramienta subset-font;
+   si se agrega un símbolo nuevo a la interfaz, hay que volver a generarlas. Inter y
+   Sora: licencia SIL Open Font License 1.1, que permite reducirlas así. */
+@font-face { font-family: Inter; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/Inter-400.woff2") format("woff2"), url("/fonts/Inter-400.ttf") format("truetype"); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/Inter-500.woff2") format("woff2"), url("/fonts/Inter-500.ttf") format("truetype"); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/Inter-600.woff2") format("woff2"), url("/fonts/Inter-600.ttf") format("truetype"); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/Inter-700.woff2") format("woff2"), url("/fonts/Inter-700.ttf") format("truetype"); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 800; font-display: swap; src: url("/fonts/Inter-800.woff2") format("woff2"), url("/fonts/Inter-800.ttf") format("truetype"); }
+@font-face { font-family: Sora; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/Sora-600.woff2") format("woff2"), url("/fonts/Sora-600.ttf") format("truetype"); }
+@font-face { font-family: Sora; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/Sora-700.woff2") format("woff2"), url("/fonts/Sora-700.ttf") format("truetype"); }
+@font-face { font-family: Sora; font-style: normal; font-weight: 800; font-display: swap; src: url("/fonts/Sora-800.woff2") format("woff2"), url("/fonts/Sora-800.ttf") format("truetype"); }
 
 *, *::before, *::after { box-sizing: border-box; }
 
