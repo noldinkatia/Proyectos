@@ -48,6 +48,7 @@ async function escenario(fn) {
       });
       return { status: response.status, data: await response.json().catch(() => null) };
     };
+    pedir.base = baseUrl;
     const crearCaso = async ({ edad = 30, estado = 'VALIDADO', ...columnas } = {}) => {
       const id = `case_${suffix}_${casos.length}`;
       casos.push(id);
@@ -237,4 +238,63 @@ test('"Cerrar caso" conserva la fecha de localizado; cerrado sin localizar no cu
   assert.equal(cerrarActivo.status, 200);
   assert.equal((await caso(activo)).localizado_en, null);
   assert.equal(await encontrados(), antes + 1, 'el localizado sigue contando; el cerrado sin localizar no');
+}));
+
+test('menores localizados: fuera de toda ruta pública (listado, detalle, foto, pistas, alertas) pero dentro de las estadísticas', conPostgres, () => escenario(async ({ db, pedir, tokens, crearCaso, citizenId }) => {
+  const statsAntes = (await pedir('GET', '/api/estadisticas')).data;
+  const menorLocalizado = await crearCaso({ edad: 15, estado: 'LOCALIZADO', localizado_en: new Date(), proximo_seguimiento: null });
+  const adultoLocalizado = await crearCaso({ edad: 34, estado: 'LOCALIZADO', localizado_en: new Date(), proximo_seguimiento: null });
+  const menorActivo = await crearCaso({ edad: 15 });
+  const foto = 'data:image/jpeg;base64,/9j/2Q==';
+  for (const id of [menorLocalizado, adultoLocalizado]) {
+    await db.query(`
+      INSERT INTO pistas (id, caso_id, usuario_id, descripcion, fecha_hora_avistamiento, latitud, longitud, estado, fotos)
+      VALUES ($1, $2, $3, 'Pista validada', CURRENT_TIMESTAMP, -25.29, -57.63, 'VALIDADA', ARRAY[$4])
+    `, [`pista_${id}`, id, citizenId, foto]);
+    // Alerta de zona que el ciudadano recibió por el caso.
+    await db.query(`
+      INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo, distancia_km)
+      VALUES ($1, $2, 'Alerta', 'Caso cerca', 'ALERTA_OFICIAL', 3)
+    `, [citizenId, id]);
+  }
+
+  // Listado público (sin paginar y paginado).
+  const listado = (await pedir('GET', '/api/casos')).data.casos.map(c => c.id);
+  assert.ok(listado.includes(adultoLocalizado), 'el adulto localizado sigue visible sus 24 h');
+  assert.ok(listado.includes(menorActivo), 'un menor con búsqueda activa se ve');
+  assert.ok(!listado.includes(menorLocalizado), 'listado');
+  const paginado = (await pedir('GET', '/api/casos?page=1&limit=100')).data.casos.map(c => c.id);
+  assert.ok(!paginado.includes(menorLocalizado), 'listado paginado');
+  // Detalle por id y foto, con y sin sesión.
+  for (const token of [undefined, tokens.citizen]) {
+    assert.equal((await pedir('GET', `/api/casos/${menorLocalizado}`, { token })).status, 404, 'detalle');
+    assert.equal((await pedir('GET', `/api/casos/${adultoLocalizado}`, { token })).status, 200);
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    assert.equal((await fetch(`${pedir.base}/api/casos/${menorLocalizado}/foto`, { headers })).status, 404, 'foto');
+    assert.equal((await fetch(`${pedir.base}/api/casos/${adultoLocalizado}/foto`, { headers })).status, 200);
+  }
+  // Pistas públicas y sus fotos.
+  const pistas = (await pedir('GET', '/api/pistas')).data.pistas.map(p => p.casoId ?? p.caso_id);
+  assert.ok(pistas.includes(adultoLocalizado));
+  assert.ok(!pistas.includes(menorLocalizado), 'pistas');
+  assert.equal((await fetch(`${pedir.base}/api/pistas/pista_${menorLocalizado}/fotos/0`)).status, 404, 'foto de pista');
+  assert.equal((await fetch(`${pedir.base}/api/pistas/pista_${adultoLocalizado}/fotos/0`)).status, 200);
+  // Alertas de zona: sin datos ni foto del menor.
+  const alerta = await pedir('GET', `/api/alertas/${menorLocalizado}`, { token: tokens.citizen });
+  assert.equal(alerta.status, 200);
+  assert.deepEqual(alerta.data, { casoId: menorLocalizado, estado: 'FINALIZADA' });
+  assert.equal((await pedir('GET', `/api/alertas/${adultoLocalizado}`, { token: tokens.citizen })).data.estado, 'PUBLICO');
+  assert.equal((await pedir('GET', `/api/alertas/${menorLocalizado}/foto`, { token: tokens.citizen })).status, 404, 'foto de alerta');
+  // Ningún dato del menor localizado en las respuestas públicas.
+  const nombreMenor = (await db.query('SELECT nombre_completo FROM casos WHERE id = $1', [menorLocalizado])).rows[0].nombre_completo;
+  for (const ruta of ['/api/casos', '/api/pistas', '/api/estadisticas']) {
+    assert.ok(!JSON.stringify((await pedir('GET', ruta)).data).includes(nombreMenor), ruta);
+  }
+
+  // Estadísticas: los dos localizados cuentan, también el menor.
+  const stats = (await pedir('GET', '/api/estadisticas')).data;
+  assert.equal(Number(stats.encontrados), Number(statsAntes.encontrados) + 2);
+  assert.equal(Number(stats.localizados), Number(statsAntes.localizados) + 2);
+  const menores = s => Number(s.porEdad.find(fila => fila.categoria === '0-17')?.total || 0);
+  assert.equal(menores(stats), menores(statsAntes) + 1, 'el menor localizado cuenta en "por edad"');
 }));

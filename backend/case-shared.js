@@ -26,10 +26,14 @@ export function casoEncontrado(alias = '') {
   return `(${alias}localizado_en IS NOT NULL AND ${alias}estado IN ('LOCALIZADO', 'CERRADO'))`;
 }
 
+// Qué ve el público (listado, detalle, foto, pistas y alertas de zona): casos
+// activos y, por VENTANA_LOCALIZADOS_HORAS, los adultos localizados. Una persona
+// menor de edad localizada deja de mostrarse enseguida (sigue contando en las
+// estadísticas, que no usan este filtro).
 export const PUBLIC_CASE_FILTER = `
   (estado IN ('VALIDADO', 'EN_SEGUIMIENTO', 'LOCALIZADO')
     AND (estado <> 'LOCALIZADO'
-      OR (localizado_en IS NOT NULL
+      OR (edad >= 18 AND localizado_en IS NOT NULL
         AND CURRENT_TIMESTAMP < localizado_en + ($1 * INTERVAL '1 hour'))))
 `;
 
@@ -156,7 +160,7 @@ export function caseVisibilityParameters() {
 
 // PUBLIC_CASE_FILTER para consultas que unen pistas (p) con casos (c).
 export const PUBLIC_CASE_FILTER_JOINED = PUBLIC_CASE_FILTER
-  .replaceAll('estado', 'c.estado').replaceAll('localizado_en', 'c.localizado_en');
+  .replaceAll('estado', 'c.estado').replaceAll('localizado_en', 'c.localizado_en').replaceAll('edad', 'c.edad');
 
 export async function sendStoredPhoto(db, req, res, administrator) {
   const visibility = administrator ? '' : `AND ${PUBLIC_CASE_FILTER}`;
