@@ -279,19 +279,33 @@ export function filterFeedCases(resetPage = true) {
   });
 }
 
+// El botón "Mostrar/Ocultar mapa" refleja el panel, se abra desde él o desde la
+// pestaña "Mapa" de la app.
+function marcarBotonMapa(isVisible) {
+  const toggle = document.getElementById('feedMapToggle');
+  if (!toggle) return;
+  toggle.setAttribute('aria-expanded', String(isVisible));
+  toggle.innerHTML = isVisible ? '⌖ Ocultar mapa' : '⌖ Mostrar mapa';
+}
+
 export function setFeedView(view) {
   document.getElementById('feedMapPanel').classList.toggle('hidden', view === 'list');
   document.getElementById('feedCaseList').classList.toggle('hidden', view === 'map');
+  marcarBotonMapa(view !== 'list');
   if (view !== 'list' && estado.activeMap) setTimeout(() => estado.activeMap.invalidateSize(), 0);
 }
 
+// En la web el mapa se muestra junto a la lista. Al ocultarlo se vuelve a la lista,
+// que en la vista "Mapa" de la app estaba oculta (si no, la página quedaba vacía).
 export function toggleFeedMap() {
   const panel = document.getElementById('feedMapPanel');
-  const toggle = document.getElementById('feedMapToggle');
-  const isVisible = panel.classList.toggle('hidden') === false;
-  toggle.setAttribute('aria-expanded', String(isVisible));
-  toggle.innerHTML = isVisible ? '⌖ Ocultar mapa' : '⌖ Mostrar mapa';
-  if (isVisible && estado.activeMap) requestAnimationFrame(() => estado.activeMap.invalidateSize());
+  if (!panel.classList.contains('hidden')) {
+    setFeedView('list');
+    return;
+  }
+  panel.classList.remove('hidden');
+  marcarBotonMapa(true);
+  if (estado.activeMap) requestAnimationFrame(() => estado.activeMap.invalidateSize());
 }
 
 export function openCaseDetail(caseId, options = {}) {

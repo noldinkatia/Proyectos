@@ -630,7 +630,8 @@ button { touch-action: manipulation; }
 .explorer-description { margin: .35rem 0 0; color: var(--muted); font-size: .78rem; }
 .results-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: .85rem 0 .7rem; }
 .results-count { margin: 0; color: var(--text); font-size: .84rem; font-weight: 800; }
-.home-map-card { margin-top: 1rem; }
+/* scroll-margin: al llevar la vista al mapa (pestaña "Mapa" de la app) no queda bajo el encabezado fijo */
+.home-map-card { margin-top: 1rem; scroll-margin-top: calc(var(--header-h) + env(safe-area-inset-top) + .75rem); }
 .home-map-card > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: .8rem; margin-bottom: .8rem; color: var(--text); font-weight: 700; }
 .home-map-card > div:first-child > div { display: flex; gap: .4rem; }
 .feed-empty-state { margin: .6rem 0; padding: 1.4rem; border: 1px dashed var(--border-strong); border-radius: var(--radius); color: var(--muted); text-align: center; }
