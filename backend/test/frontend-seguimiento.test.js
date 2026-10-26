@@ -70,3 +70,12 @@ test('los avisos de localizado y cierre automático al reportante no salen como 
   }
   assert.equal(mostrarComoAvisoDelSistema({ tipo: 'SEGUIMIENTO', canal: 'app' }), true, 'la consulta de seguimiento sí');
 });
+
+test('"Mis casos" en celulares: la columna puede achicarse (minmax(0, 1fr)) y las tarjetas no se salen', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const css = (await readFile(new URL('styles.css', publicDir), 'utf8')).replace(/\r\n/g, '\n');
+  const celulares = css.slice(css.indexOf('@media (max-width: 780px) {'));
+  const bloque = celulares.slice(0, celulares.indexOf('\n}'));
+  assert.match(bloque, /\.my-cases-layout \{ grid-template-columns: minmax\(0, 1fr\); \}/);
+  assert.doesNotMatch(bloque, /\.my-cases-layout \{ grid-template-columns: 1fr; \}/);
+});

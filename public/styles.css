@@ -1193,7 +1193,9 @@ table tr:hover td { background: var(--surface-2); }
   .feed-filters.advanced-feed-filters { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .feed-filters.advanced-feed-filters > :first-child { grid-column: 1 / -1; }
   .stats-analytics-layout { grid-template-columns: 1fr; }
-  .my-cases-layout { grid-template-columns: 1fr; }
+  /* minmax(0, …): con 1fr (= minmax(auto, 1fr)) la columna no baja del ancho mínimo de
+     .table-actions (auto-fill llena su max-width: ~630 px) y las tarjetas se salían. */
+  .my-cases-layout { grid-template-columns: minmax(0, 1fr); }
   .admin-metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 560px) {
