@@ -172,7 +172,9 @@ export function createCaseRouter({ db, jwtSecret, push }) {
   router.post('/casos/:id/seguimiento', ...requireCitizen, asyncRoute(async (req, res) => {
     const action = req.body?.accion;
     const reason = typeof req.body?.motivo === 'string' ? req.body.motivo.trim() : '';
-    if (!['SIGUE_ACTIVA', 'LOCALIZADO', 'PRORROGA', 'CERRAR'].includes(action)) {
+    // Respuestas posibles (consulta de seguimiento o "Mis casos"): sigue activo,
+    // persona localizada o cerrar. No hay prórroga.
+    if (!['SIGUE_ACTIVA', 'LOCALIZADO', 'CERRAR'].includes(action)) {
       return res.status(400).json({ error: 'La respuesta de seguimiento no es válida.' });
     }
     if (action === 'CERRAR' && !reason) {
@@ -196,13 +198,13 @@ export function createCaseRouter({ db, jwtSecret, push }) {
           localizado_en = CASE WHEN $2 = 'LOCALIZADO' THEN CURRENT_TIMESTAMP ELSE NULL END,
           motivo_cierre = CASE WHEN $2 = 'CERRADO' THEN $3 ELSE motivo_cierre END,
           seguimiento_etapa = CASE WHEN $2 IN ('LOCALIZADO', 'CERRADO') THEN 2 ELSE 0 END,
+          seguimiento_intentos = 0,
           proximo_seguimiento = CASE
             WHEN $2 IN ('LOCALIZADO', 'CERRADO') THEN NULL
-            WHEN $4 = 'PRORROGA' THEN CURRENT_TIMESTAMP + INTERVAL '24 hours'
             ELSE CURRENT_TIMESTAMP + INTERVAL '48 hours'
           END
         WHERE id = $1 RETURNING *
-      `, [req.params.id, state, reason || null, action]);
+      `, [req.params.id, state, reason || null]);
 
       if (current.estado !== state) {
         await client.query(`

@@ -513,10 +513,11 @@ test('las pistas exigen sesión, se guardan con su autor y se publican anónimas
   }
 });
 
-test('el proceso de seguimiento envía la consulta tras 48 h y escala tras el reintento', async () => {
+test('el proceso de seguimiento envía la consulta tras 48 h, la repite a las 24 h y escala tras el segundo intento', async () => {
   const rows = [
-    { id: 'first', nombre_completo: 'Caso uno', reportado_por_usr_id: 10, estado: 'VALIDADO', seguimiento_etapa: 0 },
-    { id: 'retry', nombre_completo: 'Caso dos', reportado_por_usr_id: 11, estado: 'VALIDADO', seguimiento_etapa: 1 }
+    { id: 'first', nombre_completo: 'Caso uno', reportado_por_usr_id: 10, estado: 'VALIDADO', seguimiento_etapa: 0, seguimiento_intentos: 0 },
+    { id: 'second', nombre_completo: 'Caso dos', reportado_por_usr_id: 11, estado: 'VALIDADO', seguimiento_etapa: 1, seguimiento_intentos: 1 },
+    { id: 'retry', nombre_completo: 'Caso tres', reportado_por_usr_id: 12, estado: 'VALIDADO', seguimiento_etapa: 1, seguimiento_intentos: 2 }
   ];
   const statements = [];
   const db = {
@@ -532,7 +533,7 @@ test('el proceso de seguimiento envía la consulta tras 48 h y escala tras el re
     }
   };
   const result = await processDueFollowups(db);
-  assert.deepEqual(result, { consultasEnviadas: 1, casosEnSeguimiento: 1 });
+  assert.deepEqual(result, { consultasEnviadas: 1, segundasConsultas: 1, casosEnSeguimiento: 1 });
   assert.ok(statements.some(sql => sql.includes("INTERVAL '24 hours'")));
   assert.ok(statements.some(sql => sql.includes("SET estado = 'EN_SEGUIMIENTO'")));
   assert.ok(statements.some(sql => sql.includes("'SEGUIMIENTO')")));

@@ -32,7 +32,6 @@ export function renderMyCasesView(cases, notifications) {
               ${needsResponse ? `<div class="my-case-actions table-actions">
                 <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="respondToFollowup(this.dataset.caseId, 'SIGUE_ACTIVA')">Sigue activa</button>
                 <button type="button" class="btn btn-success btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="respondToFollowup(this.dataset.caseId, 'LOCALIZADO')">Persona localizada</button>
-                <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="respondToFollowup(this.dataset.caseId, 'PRORROGA')">Solicitar prórroga</button>
                 <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="respondToFollowup(this.dataset.caseId, 'CERRAR')">Cerrar caso</button>
               </div>` : ''}
             </article>`;

@@ -1,12 +1,15 @@
 import { withTransaction } from './db.js';
 
-// Seguimiento automático: a las 48 h consulta al reportante si la búsqueda sigue
-// activa y, sin respuesta en 24 h, pasa el caso a EN_SEGUIMIENTO y avisa a la
-// administración. Lo ejecuta server.js cada minuto y el simulador del admin.
+// Seguimiento automático en dos intentos (seguimiento_intentos, migración 006):
+//   48 h después de publicado (o de la última respuesta) → primera pregunta.
+//   24 h sin respuesta → segunda pregunta, con las mismas opciones.
+//   24 h más sin respuesta → EN_SEGUIMIENTO "Sin actualizar" y aviso a la
+//   administración.
+// Lo ejecuta server.js cada minuto y el simulador del admin (un paso por vez).
 export async function processDueFollowups(db) {
   return withTransaction(db, async client => {
     const { rows: dueCases } = await client.query(`
-      SELECT id, nombre_completo, reportado_por_usr_id, estado, seguimiento_etapa
+      SELECT id, nombre_completo, reportado_por_usr_id, estado, seguimiento_etapa, seguimiento_intentos
       FROM casos
       WHERE proximo_seguimiento <= CURRENT_TIMESTAMP
         AND estado IN ('VALIDADO', 'EN_SEGUIMIENTO')
@@ -15,26 +18,32 @@ export async function processDueFollowups(db) {
       LIMIT 50
       FOR UPDATE SKIP LOCKED
     `);
-    const result = { consultasEnviadas: 0, casosEnSeguimiento: 0 };
+    const result = { consultasEnviadas: 0, segundasConsultas: 0, casosEnSeguimiento: 0 };
 
     for (const caso of dueCases) {
-      if (caso.seguimiento_etapa === 0) {
+      const intentos = Number(caso.seguimiento_intentos) || 0;
+      if (caso.seguimiento_etapa === 0 || intentos < 2) {
+        const segunda = caso.seguimiento_etapa === 1;
         await client.query(`
-          UPDATE casos SET seguimiento_etapa = 1,
+          UPDATE casos SET seguimiento_etapa = 1, seguimiento_intentos = $2,
             proximo_seguimiento = CURRENT_TIMESTAMP + INTERVAL '24 hours'
           WHERE id = $1
-        `, [caso.id]);
+        `, [caso.id, segunda ? 2 : 1]);
         if (caso.reportado_por_usr_id) {
           await client.query(`
             INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo)
-            VALUES ($1, $2, 'Consulta de seguimiento', $3, 'SEGUIMIENTO')
+            VALUES ($1, $2, $3, $4, 'SEGUIMIENTO')
           `, [
             caso.reportado_por_usr_id,
             caso.id,
-            `¿La búsqueda de ${caso.nombre_completo} continúa activa? Responda dentro de las próximas 24 horas.`
+            segunda ? 'Segunda consulta de seguimiento' : 'Consulta de seguimiento',
+            segunda
+              ? `Todavía no recibimos tu respuesta: ¿la búsqueda de ${caso.nombre_completo} continúa activa? Si no respondés en 24 horas, el caso quedará como sin actualizar.`
+              : `¿La búsqueda de ${caso.nombre_completo} continúa activa? Responda dentro de las próximas 24 horas.`
           ]);
         }
-        result.consultasEnviadas += 1;
+        if (segunda) result.segundasConsultas += 1;
+        else result.consultasEnviadas += 1;
         continue;
       }
 
@@ -59,7 +68,7 @@ export async function processDueFollowups(db) {
         INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo)
         SELECT id, $1, 'Caso sin actualizar', $2, 'CASO_SIN_ACTUALIZAR'
         FROM usuarios WHERE rol = 'administrador'
-      `, [caso.id, `El caso de ${caso.nombre_completo} no recibió respuesta al seguimiento.`]);
+      `, [caso.id, `El caso de ${caso.nombre_completo} no recibió respuesta a las dos consultas de seguimiento.`]);
       result.casosEnSeguimiento += 1;
     }
     return result;

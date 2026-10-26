@@ -180,6 +180,13 @@ export function createAdminRouter({ db, requireAdmin, push }) {
               AND $9 NOT IN ('VALIDADO', 'EN_SEGUIMIENTO') THEN 0
             WHEN $2 IN ('LOCALIZADO', 'CERRADO', 'RECHAZADO', 'PENDIENTE') THEN 2
             ELSE seguimiento_etapa
+          END,
+          -- Entre VALIDADO y EN_SEGUIMIENTO la consulta en curso sigue; cualquier
+          -- otro cambio la reinicia.
+          seguimiento_intentos = CASE
+            WHEN $2 IN ('VALIDADO', 'EN_SEGUIMIENTO')
+              AND $9 IN ('VALIDADO', 'EN_SEGUIMIENTO') THEN seguimiento_intentos
+            ELSE 0
           END
         WHERE id = $1 RETURNING *
       `, [
@@ -235,13 +242,16 @@ export function createAdminRouter({ db, requireAdmin, push }) {
         AND seguimiento_etapa IN (0, 1)
         AND proximo_seguimiento IS NOT NULL
     `);
-    const result = { consultasEnviadas: 0, casosEnSeguimiento: 0 };
+    // Un paso por vez: la primera pregunta, la segunda y "Sin actualizar" salen en
+    // tres simulaciones seguidas (cada una vence el próximo plazo pendiente).
+    const result = { consultasEnviadas: 0, segundasConsultas: 0, casosEnSeguimiento: 0 };
     let batch;
     do {
       batch = await processDueFollowups(db);
       result.consultasEnviadas += batch.consultasEnviadas;
+      result.segundasConsultas += batch.segundasConsultas;
       result.casosEnSeguimiento += batch.casosEnSeguimiento;
-    } while (batch.consultasEnviadas + batch.casosEnSeguimiento === 50);
+    } while (batch.consultasEnviadas + batch.segundasConsultas + batch.casosEnSeguimiento === 50);
     res.json({ mensaje: 'Simulación completada.', ...result });
   }));
 

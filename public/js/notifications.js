@@ -63,14 +63,21 @@ export async function renderNotifList() {
     container.innerHTML = '<div class="notif-empty"><strong>Todo al día</strong><p>No tenés notificaciones por ahora.</p></div>';
     return;
   }
-  container.innerHTML = store.notificaciones.map(n => renderNoticeItem(n, alertaZonaHtml(n) ||
-      (['SEGUIMIENTO', 'SEGUIMIENTO_VENCIDO'].includes(n.tipo) && n.casoId ? `
+  container.innerHTML = store.notificaciones.map(n => renderNoticeItem(n, alertaZonaHtml(n) || seguimientoHtml(n))).join('');
+}
+
+// Opciones de la consulta de seguimiento (la primera, la segunda y el aviso de
+// "Sin actualizar"): solo acá, en el centro de notificaciones. "Mis casos" no las
+// repite. Un único "Sigue activo": no hay prórroga.
+export function seguimientoHtml(n) {
+  if (!['SEGUIMIENTO', 'SEGUIMIENTO_VENCIDO'].includes(n.tipo) || !n.casoId) return '';
+  const caso = escapeHtml(n.casoId);
+  return `
         <div class="table-actions">
-          <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(n.casoId)}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'SIGUE_ACTIVA')">Sigue activa</button>
-          <button type="button" class="btn btn-success btn-sm" data-case-id="${escapeHtml(n.casoId)}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'LOCALIZADO')">Persona localizada</button>
-          <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(n.casoId)}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'PRORROGA')">Solicitar prórroga</button>
-          <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(n.casoId)}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'CERRAR')">Cerrar caso</button>
-        </div>` : ''))).join('');
+          <button type="button" class="btn btn-outline btn-sm" data-case-id="${caso}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'SIGUE_ACTIVA')">Sigue activo</button>
+          <button type="button" class="btn btn-success btn-sm" data-case-id="${caso}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'LOCALIZADO')">Persona localizada</button>
+          <button type="button" class="btn btn-outline btn-sm" data-case-id="${caso}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'CERRAR')">Cerrar caso</button>
+        </div>`;
 }
 
 export async function respondToCaseFollowup(caseId, action) {
