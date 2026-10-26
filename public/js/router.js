@@ -35,7 +35,8 @@ export function buildRoute(view, params = {}) {
     case 'my-cases': return '#/mis-casos';
     case 'alerts': return '#/alertas';
     case 'admin': return params.tab && params.tab !== 'overview' ? `#/panel/${encodeURIComponent(params.tab)}` : '#/panel';
-    case 'auth': return params.authMode === 'register' ? '#/crear-cuenta' : '#/ingresar';
+    case 'auth': return params.authMode === 'register' ? '#/crear-cuenta'
+      : params.authMode === 'recover' ? '#/recuperar' : '#/ingresar';
     case 'otp': return '#/verificar';
     case 'legal': return '#/bases';
     default: return '#/';
@@ -67,6 +68,7 @@ export function parseRoute(hash = location.hash) {
     case 'panel': return { view: 'admin', params: tail ? { tab: tail } : {} };
     case 'ingresar': return { view: 'auth', params: { authMode: 'login' } };
     case 'crear-cuenta': return { view: 'auth', params: { authMode: 'register' } };
+    case 'recuperar': return { view: 'auth', params: { authMode: 'recover' } };
     case 'verificar': return { view: 'otp', params: {} };
     case 'bases': return { view: 'legal', params: {} };
     default: return { view: 'feed', params: {} };

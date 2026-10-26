@@ -242,8 +242,35 @@ test('cada salida del flujo borra lo guardado: verificar, otro correo, volver, i
   }
   // Empezar otro flujo reemplaza lo guardado del anterior.
   assert.match(cuerpo('handleRegister'), /iniciarVerificacion\(email, 'registro'\)/);
-  assert.match(cuerpo('handleForgotPassword'), /iniciarVerificacion\(email, 'restablecer'\)/);
+  assert.match(cuerpo('handleRecoverRequest'), /iniciarVerificacion\(email, 'restablecer'\)/);
 });
+
+test('recuperación: formulario en pantalla (#/recuperar) en lugar de prompt()', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const fuente = await readFile(new URL('js/auth.js', publicDir), 'utf8');
+  assert.doesNotMatch(fuente, /prompt\('Ingresa tu Gmail/);
+  const html = auth.renderRecoverForm('ana@gmail.com');
+  assert.match(html, /<form data-on-submit="handleRecoverRequest\(event\)">/);
+  const campo = etiquetas(html, 'input').find(i => i.id === 'recoverEmail');
+  assert.equal(campo.type, 'email');
+  assert.equal(campo.value, 'ana@gmail.com', 'trae el correo escrito en el ingreso');
+  assert.equal(campo.list, 'recoverEmailSugerencias', 'con la sugerencia de @gmail.com');
+  assert.ok(etiquetas(html, 'label').some(l => l.for === 'recoverEmail'));
+  assert.match(html, /<button type="submit" class="btn btn-primary">Enviar código<\/button>/);
+  const { buildRoute, parseRoute } = await import(new URL('js/router.js', publicDir));
+  assert.equal(buildRoute('auth', { authMode: 'recover' }), '#/recuperar');
+  assert.deepEqual(parseRoute('#/recuperar'), { view: 'auth', params: { authMode: 'recover' } });
+});
+
+test('recuperación: misma respuesta exista o no la cuenta; con 429 muestra la espera', () => conServidorSimulado({
+  '/auth/restablecer/solicitar': [429, { error: 'Se alcanzó el límite de 5 envíos por hora para este contacto.', reintentarEn: 125 }]
+}, async ({ pedidos }) => {
+  const feedback = { textContent: '', classList: { remove() {} } };
+  globalThis.document = { getElementById: id => ({ recoverEmail: { value: ' Ana@Gmail.com ' }, authFeedback: feedback })[id] || null, querySelector: () => null };
+  await auth.handleRecoverRequest({ preventDefault() {} });
+  assert.deepEqual(pedidos.map(p => [p.ruta, p.cuerpo.correo]), [['/auth/restablecer/solicitar', 'ana@gmail.com']]);
+  assert.equal(feedback.textContent, 'Se alcanzó el límite de 5 envíos por hora para este contacto. Podés pedir otro código en 3 min.');
+}));
 
 // fetch simulado: responde según la ruta y registra lo pedido.
 function conServidorSimulado(respuestas, fn) {

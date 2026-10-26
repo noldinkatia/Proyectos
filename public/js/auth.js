@@ -195,11 +195,11 @@ export function renderAuthScreen(mode = 'login', identifier = '') {
 
       <div class="auth-tabs">
         <button class="${isLogin ? 'active' : ''}" data-on-click="navigateTo('auth', {authMode: 'login'})">Iniciar sesión</button>
-        <button class="${isLogin ? '' : 'active'}" data-on-click="navigateTo('auth', {authMode: 'register'})">Crear cuenta</button>
+        <button class="${mode === 'register' ? 'active' : ''}" data-on-click="navigateTo('auth', {authMode: 'register'})">Crear cuenta</button>
       </div>
 
       <div class="card auth-panel">
-        ${isLogin ? renderLoginForm(identifier) : renderRegisterForm()}
+        ${mode === 'recover' ? renderRecoverForm(identifier) : isLogin ? renderLoginForm(identifier) : renderRegisterForm()}
         <div id="authFeedback" class="${notice ? '' : 'hidden'}" role="status">${escapeHtml(notice)}</div>
       </div>
     </div>
@@ -388,19 +388,40 @@ export async function handleRegister(e) {
   }
 }
 
-export async function handleForgotPassword() {
-  const value = prompt('Ingresa tu Gmail para restablecer la contraseña:');
-  if (!value) return;
-  const email = value.trim().toLowerCase();
+// Recuperación (#/recuperar): formulario en pantalla en lugar de un prompt() del
+// navegador. Lleva el correo que se haya escrito en el ingreso.
+export function renderRecoverForm(identifier = '') {
+  return `
+    <form data-on-submit="handleRecoverRequest(event)">
+      <h2 class="auth-form-title">Recuperar la contraseña</h2>
+      <p class="auth-form-help">Te enviaremos un código para crear una contraseña nueva.</p>${campoCorreo({ id: 'recoverEmail', valor: identifier.includes('@') ? identifier : '', etiqueta: 'Correo Gmail de tu cuenta' })}
+      <button type="submit" class="btn btn-primary">Enviar código</button>
+      <button type="button" class="auth-volver" data-on-click="navigateTo('auth', {authMode: 'login'})">Volver al inicio de sesión</button>
+    </form>
+  `;
+}
+
+export function handleForgotPassword() {
+  const escrito = document.getElementById('loginEmail')?.value.trim() || '';
+  navigateTo('auth', { authMode: 'recover', identifier: escrito });
+}
+
+export async function handleRecoverRequest(e) {
+  e?.preventDefault?.();
+  const email = document.getElementById('recoverEmail').value.trim().toLowerCase();
   if (!/^[^\s@]+@gmail\.com$/i.test(email)) {
     showAuthFeedback('Ingrese una cuenta de Gmail válida (terminada en @gmail.com).');
     return;
   }
   try {
+    // La respuesta es la misma exista o no la cuenta.
     await apiRequest('/auth/restablecer/solicitar', { method: 'POST', body: { correo: email } });
     iniciarVerificacion(email, 'restablecer');
   } catch (error) {
-    handleAuthError(error);
+    const espera = Number(error.reintentarEn);
+    showAuthFeedback(error.status === 429 && espera > 0
+      ? `${error.message} Podés pedir otro código en ${textoEspera(espera)}.`
+      : error.message || 'No se pudo completar la solicitud.');
   }
 }
 
