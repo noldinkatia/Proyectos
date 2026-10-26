@@ -394,6 +394,9 @@ export function renderCasePhotos(cases) {
     const image = document.createElement('img');
     image.alt = `Fotografía de ${caseItem.nombreCompleto}`;
     image.className = 'case-photo-image';
+    // Perezosa: el navegador la pide recién cuando la tarjeta está por verse.
+    image.loading = 'lazy';
+    image.decoding = 'async';
     image.addEventListener('error', () => replaceWithMissingPhoto(image, caseItem.nombreCompleto), { once: true });
     // Foto pública de un caso visible: se pide sin token (consulta sin sesión).
     image.src = photo;
