@@ -117,7 +117,8 @@ test('router: #/bases ya no redirige al inicio y la pantalla obligatoria depende
   assert.doesNotMatch(router, /route\.view === 'legal'[^\n]*\n\s*route = \{ view: 'feed'/, 'antes #/bases mandaba al inicio');
   // La obligatoria se decide antes de dibujar cualquier vista; si no corresponde, 'legal' es la consulta.
   const obligatoria = router.indexOf('if (debeAceptarBases(store.currentUser)) {');
-  const consulta = router.indexOf("case 'legal':\n      main.innerHTML = renderBasesView();");
+  // \s+ y no "\n": en Windows (core.autocrlf) el archivo tiene CRLF en disco.
+  const consulta = router.search(/case 'legal':\s+main\.innerHTML = renderBasesView\(\);/);
   assert.ok(obligatoria > 0 && consulta > obligatoria);
   assert.doesNotMatch(router, /!store\.currentUser\.acepto_terminos/, 'nada mira acepto_terminos sin el rol');
 });
