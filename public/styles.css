@@ -906,7 +906,10 @@ form.card { width: 100%; }
 .map-legend { margin-top: .6rem; padding: .65rem .8rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--muted); font-size: .78rem; }
 .map-load-error { position: absolute; z-index: 500; inset: auto .6rem .6rem; padding: .65rem; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font-size: .8rem; }
 .leaflet-container { background: var(--surface-2) !important; color: var(--text); font-family: Inter, sans-serif !important; }
-[data-theme="dark"] .leaflet-tile-pane { filter: brightness(.72) saturate(.75) hue-rotate(175deg) invert(.88); }
+/* Mapa oscuro: se invierten solo las teselas de OpenStreetMap (sin otro proveedor ni
+   cambios en la CSP). hue-rotate devuelve agua y parques a su color; pines, círculos y
+   controles están en otras capas y no se tocan. Cambia en el acto al alternar el tema. */
+[data-theme="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.95) contrast(.9) saturate(.7); }
 .leaflet-popup-content-wrapper, .leaflet-popup-tip { border: 1px solid var(--border-strong); background: var(--surface) !important; color: var(--text) !important; }
 .leaflet-popup-content-wrapper { border-radius: 12px !important; }
 .leaflet-popup-content { margin: .75rem .9rem !important; font-size: .82rem !important; }

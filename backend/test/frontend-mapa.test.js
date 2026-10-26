@@ -95,3 +95,15 @@ test('app: la pestaña "Mapa" lleva la vista hasta el panel, sin quedar bajo el 
   const css = await readFile(new URL('styles.css', publicDir), 'utf8');
   assert.match(css, /\.home-map-card \{[^}]*scroll-margin-top:\s*calc\(var\(--header-h\)/);
 });
+
+test('mapa oscuro: filtro solo sobre las teselas y solo con el tema oscuro', async () => {
+  const css = await readFile(new URL('styles.css', publicDir), 'utf8');
+  assert.match(css, /\[data-theme="dark"\] \.leaflet-tile-pane \{ filter: invert\(1\) hue-rotate\(180deg\) brightness\(\.95\) contrast\(\.9\) saturate\(\.7\); \}/);
+  // Pines, círculos, popups y controles quedan sin filtro (otras capas de Leaflet).
+  for (const capa of ['leaflet-marker-pane', 'leaflet-overlay-pane', 'leaflet-popup-pane', 'leaflet-control']) {
+    assert.doesNotMatch(css, new RegExp(`\.${capa}[^{]*\{[^}]*filter:`), capa);
+  }
+  // Sin otro proveedor de teselas ni cambios en la CSP.
+  const mapa = await readFile(new URL('js/map.js', publicDir), 'utf8');
+  assert.match(mapa, /L\.tileLayer\('https:\/\/tile\.openstreetmap\.org\/\{z\}\/\{x\}\/\{y\}\.png'/);
+});
