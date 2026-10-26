@@ -849,7 +849,7 @@ form.card { width: 100%; }
 .auth-panel { width: 100%; max-width: 520px; align-self: center; padding: clamp(1.2rem,4vw,2rem); }
 .auth-panel form .form-group > div:has(> input[type="password"]) { display: flex; align-items: center; gap: .45rem; }
 .auth-panel form .form-group > div:has(> input[type="password"]) .form-control { flex: 1; }
-.auth-panel form button[type="button"] { padding: .5rem; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--info); cursor: pointer; font-size: .8rem; font-weight: 600; }
+.auth-panel form button[type="button"]:not(.link-inline) { padding: .5rem; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--info); cursor: pointer; font-size: .8rem; font-weight: 600; }
 .auth-tabs { display: flex; gap: .25rem; padding: .28rem; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2) !important; }
 .auth-tabs button { flex: 1; min-height: 40px; border: 0 !important; border-radius: 9px !important; background: transparent !important; color: var(--muted) !important; cursor: pointer; font-size: .86rem !important; }
 .auth-tabs button.active { background: var(--surface) !important; color: var(--accent) !important; box-shadow: var(--shadow-xs); }
@@ -1093,6 +1093,19 @@ table tr:hover td { background: var(--surface-2); }
 #notifModal .modal-header > span, #simTimeModal .modal-header > span, #installGuideModal .modal-header > span { min-width: 0; flex: 1 1 auto; font-weight: 700; }
 #notifModal .modal-footer, #simTimeModal .modal-footer { display: flex; justify-content: flex-end; padding: .8rem 1.2rem; border-top: 1px solid var(--border); background: var(--surface); }
 #simTimeModal .modal-body, #installGuideModal .modal-body { margin: 0; padding: 1rem 1.2rem; color: var(--muted); font-size: .85rem; line-height: 1.5; }
+/* Bases y condiciones desde el registro (auth.js): <dialog> nativo, mismo aspecto que los otros modales */
+.bases-modal { width: min(100% - 2rem, 560px); max-height: 85vh; padding: 0; overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: var(--shadow-overlay); }
+.bases-modal[open] { display: flex; flex-direction: column; }
+.bases-modal::backdrop { background: var(--overlay); backdrop-filter: blur(5px); }
+.bases-modal .modal-header { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: 1rem 1.2rem; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.bases-modal h2 { margin: 0; color: var(--text-strong); font: 700 1rem/1.3 Sora, Inter, sans-serif; }
+.bases-modal .modal-body { min-height: 0; overflow-y: auto; padding: 1rem 1.2rem; }
+.bases-texto p { margin: 0 0 .85rem; color: var(--text); font-size: .88rem; line-height: 1.55; }
+.bases-texto p:last-child { margin-bottom: 0; }
+.bases-texto strong { color: var(--accent); }
+/* Botón con aspecto de enlace dentro de un texto (el de las bases en el registro) */
+.link-inline { display: inline; padding: 0; border: 0; background: none; color: var(--info); cursor: pointer; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.link-inline:focus-visible { border-radius: 2px; outline: 3px solid var(--info); outline-offset: 2px; }
 #notifList { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; gap: .65rem; overflow: auto; padding: 1rem !important; }
 /* Aviso estándar (centro de notificaciones y "Mis casos") */
 .notif-list { display: grid; gap: .55rem; margin-bottom: .85rem; }
