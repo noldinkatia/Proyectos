@@ -205,20 +205,31 @@ export function renderAuthScreen(mode = 'login', identifier = '') {
   `;
 }
 
+// Ojo de mostrar/ocultar (SVG propio, sin librerías): ojo abierto con la contraseña
+// oculta y tachado cuando se ve. aria-hidden: lo que lee el lector es el botón.
+const ICONO_OJO = '<svg class="icono-ojo" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path class="icono-ojo-tachado" d="M4 4l16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+// Campo de contraseña con su etiqueta enlazada (for/id) y el botón del ojo. El botón
+// es un interruptor: nombre fijo "Mostrar contraseña" y aria-pressed="true" cuando
+// se ve (patrón de botón de alternancia de WAI-ARIA; el lector dice "presionado").
+export function campoContrasena({ id, etiqueta, autocomplete, placeholder = '', atributos = '', despues = '' }) {
+  return `
+      <div class="form-group">
+        <label for="${id}">${etiqueta}</label>
+        <div class="campo-contrasena">
+          <input type="password" id="${id}" name="${id}" autocomplete="${autocomplete}" ${atributos} placeholder="${escapeHtml(placeholder)}" class="form-control">
+          <button type="button" class="boton-ojo" aria-label="Mostrar contraseña" aria-pressed="false" aria-controls="${id}" data-on-click="togglePass('${id}')">${ICONO_OJO}</button>
+        </div>${despues}
+      </div>`;
+}
+
 export function renderLoginForm(identifier = '') {
   return `
     <form data-on-submit="handleLogin(event)">
       <div class="form-group">
-        <label>Correo Gmail</label>
-        <input type="email" id="loginEmail" required value="${escapeHtml(identifier.includes('@') ? identifier : '')}" placeholder="usuario@gmail.com" class="form-control">
-      </div>
-      <div class="form-group">
-        <label>Contraseña</label>
-        <div>
-          <input type="password" id="loginPassword" required placeholder="Contraseña" class="form-control">
-          <button type="button" data-on-click="togglePass('loginPassword')">Mostrar</button>
-        </div>
-      </div>
+        <label for="loginEmail">Correo Gmail</label>
+        <input type="email" id="loginEmail" name="email" autocomplete="email" required value="${escapeHtml(identifier.includes('@') ? identifier : '')}" placeholder="usuario@gmail.com" class="form-control">
+      </div>${campoContrasena({ id: 'loginPassword', etiqueta: 'Contraseña', autocomplete: 'current-password', placeholder: 'Contraseña', atributos: 'required' })}
       <div>
         <button type="button" data-on-click="handleForgotPassword()">¿Olvidaste tu contraseña?</button>
       </div>
@@ -231,28 +242,17 @@ export function renderRegisterForm() {
   return `
     <form data-on-submit="handleRegister(event)">
       <div class="form-group">
-        <label>Nombre Completo</label>
-        <input type="text" id="regName" required minlength="3" value="${escapeHtml(estado.pendingRegistration?.nombre_completo || '')}" placeholder="Ej: Juan Pérez" class="form-control">
+        <label for="regName">Nombre Completo</label>
+        <input type="text" id="regName" name="name" autocomplete="name" required minlength="3" value="${escapeHtml(estado.pendingRegistration?.nombre_completo || '')}" placeholder="Ej: Juan Pérez" class="form-control">
       </div>
       <div class="form-group">
-        <label>Correo Gmail</label>
-        <input type="email" id="regEmail" required value="${escapeHtml(estado.pendingRegistration?.correo || '')}" placeholder="usuario@gmail.com" class="form-control">
-      </div>
-      <div class="form-group">
-        <label>Contraseña (mínimo 8 caracteres)</label>
-        <div>
-          <input type="password" id="regPass" required minlength="8" data-on-input="updatePasswordStrength()" placeholder="Mínimo 8 caracteres" class="form-control">
-          <button type="button" data-on-click="togglePass('regPass')">Mostrar</button>
-        </div>
-        <div id="passwordStrength" aria-live="polite">Fortaleza de la contraseña: sin evaluar</div>
-      </div>
-      <div class="form-group">
-        <label>Confirmar contraseña</label>
-        <div>
-          <input type="password" id="regPassConfirm" required minlength="8" placeholder="Repita la contraseña" class="form-control">
-          <button type="button" data-on-click="togglePass('regPassConfirm')">Mostrar</button>
-        </div>
-      </div>
+        <label for="regEmail">Correo Gmail</label>
+        <input type="email" id="regEmail" name="email" autocomplete="email" required value="${escapeHtml(estado.pendingRegistration?.correo || '')}" placeholder="usuario@gmail.com" class="form-control">
+      </div>${campoContrasena({
+        id: 'regPass', etiqueta: 'Contraseña (mínimo 8 caracteres)', autocomplete: 'new-password', placeholder: 'Mínimo 8 caracteres',
+        atributos: 'required minlength="8" aria-describedby="passwordStrength" data-on-input="updatePasswordStrength()"',
+        despues: '\n        <div id="passwordStrength" aria-live="polite">Fortaleza de la contraseña: sin evaluar</div>'
+      })}${campoContrasena({ id: 'regPassConfirm', etiqueta: 'Confirmar contraseña', autocomplete: 'new-password', placeholder: 'Repita la contraseña', atributos: 'required minlength="8"' })}
       <!-- El enlace es un botón dentro de la etiqueta: tocarlo abre el modal y no tilda la casilla -->
       <label>
         <input type="checkbox" id="regTerms" required>
@@ -263,9 +263,15 @@ export function renderRegisterForm() {
   `;
 }
 
+// Muestra u oculta la contraseña y deja el botón del ojo en el estado correcto.
 export function togglePass(id) {
   const el = document.getElementById(id);
-  el.type = el.type === 'password' ? 'text' : 'password';
+  if (!el) return;
+  const visible = el.type === 'password';
+  el.type = visible ? 'text' : 'password';
+  const boton = document.querySelector(`.boton-ojo[aria-controls="${id}"]`);
+  boton?.setAttribute('aria-pressed', String(visible));
+  boton?.classList.toggle('boton-ojo-activo', visible);
 }
 
 export function showAuthFeedback(message) {
@@ -409,7 +415,7 @@ export function renderOTPView(params) {
         <h3>${isReset ? 'Restablecer contraseña' : 'Verificar correo'}</h3>
         <p>${introMessage}</p>
         <input type="text" id="otpInput" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" aria-label="Código de 6 dígitos" class="form-control">
-        ${isReset ? `<div class="form-group"><label>Nueva contraseña</label><input id="resetPassword" type="password" minlength="8" class="form-control" placeholder="Mínimo 8 caracteres"></div><div class="form-group"><label>Confirmar contraseña</label><input id="resetPasswordConfirm" type="password" minlength="8" class="form-control" placeholder="Repita la contraseña"></div>` : ''}
+        ${isReset ? `${campoContrasena({ id: 'resetPassword', etiqueta: 'Nueva contraseña', autocomplete: 'new-password', placeholder: 'Mínimo 8 caracteres', atributos: 'minlength="8"' })}${campoContrasena({ id: 'resetPasswordConfirm', etiqueta: 'Confirmar contraseña', autocomplete: 'new-password', placeholder: 'Repita la contraseña', atributos: 'minlength="8"' })}` : ''}
         <div id="otpFeedback" class="hidden" role="status"></div>
         <button data-on-click="verifyEmailCode()" class="btn btn-primary">${isReset ? 'Cambiar contraseña' : 'Verificar y crear cuenta'}</button>
         <button id="resendCodeButton" data-on-click="resendVerificationCode()" class="btn btn-outline" ${estado.resendSeconds > 0 ? 'disabled' : ''}>${estado.resendSeconds > 0 ? `Reenviar código (${estado.resendSeconds}s)` : 'Reenviar código'}</button>

@@ -22,9 +22,13 @@ function idsBuscados(source) {
   ];
 }
 
-// ids que un archivo crea en sus plantillas (id="x" sin ${...}).
+// ids que un archivo crea en sus plantillas (id="x" sin ${...}) y los de los campos
+// de contraseña que arma campoContrasena({ id: 'x', ... }) en auth.js.
 function idsCreados(source) {
-  return [...source.matchAll(/\bid="([^"$]+)"/g)].map(m => m[1]);
+  return [
+    ...[...source.matchAll(/\bid="([^"$]+)"/g)].map(m => m[1]),
+    ...[...source.matchAll(/campoContrasena\(\{\s*id: '([\w-]+)'/g)].map(m => m[1])
+  ];
 }
 
 async function jsDe(dir) {
