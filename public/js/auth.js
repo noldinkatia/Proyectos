@@ -94,6 +94,29 @@ export function renderLegalTerms() {
   `;
 }
 
+// Página de consulta #/bases: solo lectura, con o sin sesión (la pantalla para
+// aceptarlas es renderLegalTerms, solo para ciudadanos que no las aceptaron).
+export function renderBasesView() {
+  const usuario = getStore().currentUser;
+  const fecha = usuario?.acepto_terminos && usuario.fecha_aceptacion_terminos
+    ? new Date(usuario.fecha_aceptacion_terminos) : null;
+  const aceptadas = fecha && !Number.isNaN(fecha.getTime())
+    ? `<p class="notice">Aceptaste estas bases el ${escapeHtml(fecha.toLocaleDateString('es-PY', { day: 'numeric', month: 'long', year: 'numeric' }))}.</p>`
+    : '';
+  return `
+    <section class="bases-view">
+      <header class="page-heading">
+        <span class="section-kicker">Plataforma Rastreo PY</span>
+        <h1>Bases y condiciones de uso</h1>
+        <p>República del Paraguay · Condiciones que acepta cada ciudadano al crear su cuenta.</p>
+      </header>
+      ${aceptadas}
+      <div class="card bases-texto">${BASES_TEXTO}
+      </div>
+    </section>
+  `;
+}
+
 export function showTermsSaveError(error) {
   const errorBox = document.getElementById('termsSaveError');
   const errorText = document.getElementById('termsSaveErrorText');

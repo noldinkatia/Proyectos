@@ -76,3 +76,48 @@ test('las seis cláusulas están en un solo texto, compartido con la pantalla ob
   assert.equal((BASES_TEXTO.match(/<p><strong>\d\./g) || []).length, 6);
   assert.ok(renderLegalTerms().includes(BASES_TEXTO));
 });
+
+const { PUBLIC_VIEWS, buildRoute, parseRoute } = await import(new URL('js/router.js', publicDir));
+const { renderBasesView } = await import(new URL('js/auth.js', publicDir));
+
+function conUsuario(usuario, fn) {
+  const anteriores = { window: globalThis.window, localStorage: globalThis.localStorage, sessionStorage: globalThis.sessionStorage };
+  globalThis.window = { backendCurrentUser: usuario };
+  globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+  globalThis.sessionStorage = globalThis.localStorage;
+  try {
+    return fn();
+  } finally {
+    globalThis.window = anteriores.window;
+    globalThis.localStorage = anteriores.localStorage;
+    globalThis.sessionStorage = anteriores.sessionStorage;
+  }
+}
+
+test('#/bases: ruta propia y pública (se ve sin sesión)', () => {
+  assert.deepEqual(parseRoute('#/bases'), { view: 'legal', params: {} });
+  assert.equal(buildRoute('legal'), '#/bases');
+  assert.ok(PUBLIC_VIEWS.includes('legal'), 'sin sesión no lleva al login');
+});
+
+test('#/bases: página de solo lectura, sin casilla ni botones de aceptar', () => {
+  for (const usuario of [null, { rol: 'administrador', acepto_terminos: false }]) {
+    const html = conUsuario(usuario, renderBasesView);
+    assert.ok(html.includes(BASES_TEXTO));
+    assert.match(html, /<h1>Bases y condiciones de uso<\/h1>/);
+    assert.doesNotMatch(html, /checkTerms|acceptTerms|rejectTerms|Aceptaste/);
+  }
+  const ciudadano = conUsuario({ rol: 'ciudadano', acepto_terminos: true, fecha_aceptacion_terminos: '2026-10-18T12:00:00Z' }, renderBasesView);
+  assert.match(ciudadano, /Aceptaste estas bases el 18 de octubre de 2026\./);
+});
+
+test('router: #/bases ya no redirige al inicio y la pantalla obligatoria depende de debeAceptarBases', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const router = await readFile(new URL('js/router.js', publicDir), 'utf8');
+  assert.doesNotMatch(router, /route\.view === 'legal'[^\n]*\n\s*route = \{ view: 'feed'/, 'antes #/bases mandaba al inicio');
+  // La obligatoria se decide antes de dibujar cualquier vista; si no corresponde, 'legal' es la consulta.
+  const obligatoria = router.indexOf('if (debeAceptarBases(store.currentUser)) {');
+  const consulta = router.indexOf("case 'legal':\n      main.innerHTML = renderBasesView();");
+  assert.ok(obligatoria > 0 && consulta > obligatoria);
+  assert.doesNotMatch(router, /!store\.currentUser\.acepto_terminos/, 'nada mira acepto_terminos sin el rol');
+});

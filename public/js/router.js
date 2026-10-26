@@ -2,7 +2,7 @@
 import { loadAdminHistoryPhotos, renderAdminView, selectAdminTab } from './admin.js';
 import { renderAlertaView } from './alerta.js';
 import { apiRequest, loadProtectedPhotos } from './api.js';
-import { renderAuthScreen, renderLegalTerms, renderOTPView, updateHeaderUser } from './auth.js';
+import { renderAuthScreen, renderBasesView, renderLegalTerms, renderOTPView, updateHeaderUser } from './auth.js';
 import { API_BASE, escapeHtml } from './config.js';
 import { estado } from './estado.js';
 import { closeCaseDetail, filterFeedCases, openCaseDetail, renderFeedView } from './feed.js';
@@ -97,10 +97,8 @@ export async function applyCurrentRoute() {
   let route = parseRoute();
   const store = getStore();
 
-  // Las bases solo existen como pantalla mientras falte aceptarlas.
-  if (route.view === 'legal' && !debeAceptarBases(store.currentUser)) {
-    route = { view: 'feed', params: {} };
-  }
+  // #/bases siempre existe: para un ciudadano que falta aceptarlas es la pantalla
+  // obligatoria (navigateTo), para el resto la página de consulta.
   // La verificacion por codigo no se puede retomar en frio: el correo
   // vive en memoria y no se pone en la URL.
   if (route.view === 'otp' && !estado.activeOtpEmail) {
@@ -145,9 +143,10 @@ export async function applyCurrentRoute() {
 }
 
 // Pantallas visibles sin sesión (consulta pública, ROLES_Y_PERMISOS.txt): el feed
-// (con la ficha del caso y el mapa) y las estadísticas. Reportar, pista, mis casos,
-// alertas y el panel llevan al login y recuerdan la pantalla pedida.
-export const PUBLIC_VIEWS = ['feed', 'stats'];
+// (con la ficha del caso y el mapa), las estadísticas y las bases y condiciones.
+// Reportar, pista, mis casos, alertas y el panel llevan al login y recuerdan la
+// pantalla pedida.
+export const PUBLIC_VIEWS = ['feed', 'stats', 'legal'];
 
 export async function navigateTo(view, params = {}, options = {}) {
   // La app (/app/) no tiene panel de administración: se abre el de la web.
@@ -385,6 +384,9 @@ export async function navigateTo(view, params = {}, options = {}) {
       break;
     case 'stats':
       main.innerHTML = renderStatsView(statistics);
+      break;
+    case 'legal':
+      main.innerHTML = renderBasesView();
       break;
     case 'my-cases':
       main.innerHTML = renderMyCasesView(myCases, myNotifications);
