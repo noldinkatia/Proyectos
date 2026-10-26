@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import { DECLARACION_CASILLA, DECLARACION_PUNTOS, DECLARACION_VERSION } from '../../public/js/declaracion.js';
 import { createDatabase, initializeDatabase, seedAdministrator } from '../db.js';
 import { createApp } from '../server.js';
+import { borrarUsuariosDePrueba } from '../ayuda-tests/limpieza.js';
 
 // Declaración de responsabilidad al publicar un reporte (migración 007).
 const secret = 'test-secret-with-at-least-thirty-two-characters';
@@ -104,7 +105,7 @@ test('el servidor exige la declaración vigente y guarda hora del servidor y ver
     }
     await db.query('DELETE FROM casos WHERE id = ANY($1)', [ids]);
     await db.query('DELETE FROM notificaciones WHERE usuario_id = ANY($1)', [[adminId, citizenId].filter(Boolean)]);
-    await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [[adminId, citizenId].filter(Boolean)]);
+    await borrarUsuariosDePrueba(db, 'id = ANY($1)', [[adminId, citizenId].filter(Boolean)]);
     await db.end();
   }
 });

@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import { DECLARACION_VERSION } from '../../public/js/declaracion.js';
 import { createDatabase, initializeDatabase, seedAdministrator } from '../db.js';
 import { createApp } from '../server.js';
+import { borrarUsuariosDePrueba } from '../ayuda-tests/limpieza.js';
 
 // Antecedente de reporte falso o abusivo (migración 008): solo la administración lo
 // ve. Este test lo busca, por clave y por el texto del motivo, en todas las
@@ -157,7 +158,7 @@ test('antecedentes: marcar y retirar con motivo, auditoría y nunca en respuesta
       await db.query('DELETE FROM casos WHERE id = ANY($1)', [casos]);
       await db.query('DELETE FROM notificaciones WHERE usuario_id = ANY($1)', [usuarios]);
       await db.query('DELETE FROM antecedentes_usuario WHERE usuario_id = ANY($1)', [usuarios]);
-      await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [usuarios]);
+      await borrarUsuariosDePrueba(db, 'id = ANY($1)', [usuarios]);
     }
     await db.end();
   }

@@ -4,6 +4,7 @@ import test from 'node:test';
 import { respuestaLimite, segundosHasta } from '../auth-routes.js';
 import { createDatabase, initializeDatabase } from '../db.js';
 import { createApp } from '../server.js';
+import { borrarUsuariosDePrueba } from '../ayuda-tests/limpieza.js';
 
 // Respuestas 429 de la pantalla del código: reintentarEn (segundos hasta poder volver
 // a intentar) sin cambiar los límites, y sin revelar si un correo tiene cuenta.
@@ -49,7 +50,7 @@ async function conServidor(fn) {
     if (correos.length) {
       await db.query('DELETE FROM solicitudes_codigo WHERE correo = ANY($1)', [correos]);
       await db.query('DELETE FROM codigos_verificacion WHERE correo = ANY($1)', [correos]);
-      await db.query('DELETE FROM usuarios WHERE correo = ANY($1)', [correos]);
+      await borrarUsuariosDePrueba(db, 'correo = ANY($1)', [correos]);
     }
     await db.end();
   }

@@ -6,6 +6,7 @@ import { createDatabase, initializeDatabase, seedAdministrator } from '../db.js'
 import { createApp } from '../server.js';
 import { processDueFollowups } from '../case-routes.js';
 import { DECLARACION_VERSION } from '../../public/js/declaracion.js';
+import { borrarUsuariosDePrueba } from '../ayuda-tests/limpieza.js';
 
 const secret = 'test-secret-with-at-least-thirty-two-characters';
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
@@ -653,7 +654,7 @@ test('el ciclo localizado permanece oculto tras 36 segundos y reiniciar Express'
       await db.query('DELETE FROM cambios_estado_caso WHERE caso_id = $1', [caseId]);
       await db.query('DELETE FROM pistas WHERE caso_id = $1', [caseId]);
       await db.query('DELETE FROM casos WHERE id = $1', [caseId]);
-      await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [[adminId, citizenId].filter(Boolean)]);
+      await borrarUsuariosDePrueba(db, 'id = ANY($1)', [[adminId, citizenId].filter(Boolean)]);
     }
     await db.end();
   }
@@ -880,7 +881,7 @@ test('paginación del listado público con PostgreSQL', {
     if (databaseInitialized) {
       await db.query('DELETE FROM pistas WHERE caso_id = ANY($1)', [ids]);
       await db.query('DELETE FROM casos WHERE id = ANY($1)', [ids]);
-      await db.query('DELETE FROM usuarios WHERE correo = $1', [adminEmail]);
+      await borrarUsuariosDePrueba(db, 'correo = $1', [adminEmail]);
     }
     await db.end();
   }
@@ -1000,7 +1001,7 @@ test('fotos de pistas por URL con PostgreSQL', {
     if (databaseInitialized) {
       await db.query('DELETE FROM pistas WHERE caso_id = $1', [caseId]);
       await db.query('DELETE FROM casos WHERE id = $1', [caseId]);
-      await db.query('DELETE FROM usuarios WHERE correo = $1', [adminEmail]);
+      await borrarUsuariosDePrueba(db, 'correo = $1', [adminEmail]);
     }
     await db.end();
   }
@@ -1146,7 +1147,7 @@ test('sin sesión con PostgreSQL: pendientes, rechazados y pistas no validadas n
     if (databaseInitialized) {
       await db.query('DELETE FROM pistas WHERE id = ANY($1)', [Object.values(clueIds)]);
       await db.query('DELETE FROM casos WHERE id = ANY($1)', [Object.values(ids)]);
-      await db.query('DELETE FROM usuarios WHERE correo = $1 AND NOT EXISTS (SELECT 1 FROM casos WHERE reportado_por_usr_id = usuarios.id)', [INTERNAL_VALUES[1]]);
+      await borrarUsuariosDePrueba(db, 'correo = $1 AND NOT EXISTS (SELECT 1 FROM casos WHERE reportado_por_usr_id = usuarios.id)', [INTERNAL_VALUES[1]]);
     }
     await db.end();
   }

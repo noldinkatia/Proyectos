@@ -4,6 +4,7 @@ import test from 'node:test';
 import jwt from 'jsonwebtoken';
 import { createDatabase, initializeDatabase, seedAdministrator } from '../db.js';
 import { createApp } from '../server.js';
+import { borrarUsuariosDePrueba } from '../ayuda-tests/limpieza.js';
 
 // Motivos obligatorios en el servidor: uno de solo espacios se rechaza con 400 y
 // los válidos se guardan sin espacios de más (el diálogo de la interfaz hace lo mismo).
@@ -81,7 +82,7 @@ test('motivos de solo espacios: 400 en rechazo, cierre, devolución, pista y cie
       await db.query('DELETE FROM casos WHERE id = ANY($1)', [casos]);
     }
     await db.query('DELETE FROM notificaciones WHERE usuario_id = ANY($1)', [[adminId, citizenId].filter(Boolean)]);
-    await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [[adminId, citizenId].filter(Boolean)]);
+    await borrarUsuariosDePrueba(db, 'id = ANY($1)', [[adminId, citizenId].filter(Boolean)]);
     await db.end();
   }
 });

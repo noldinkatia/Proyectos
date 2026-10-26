@@ -16,6 +16,7 @@ import { createDatabase, initializeDatabase, seedAdministrator } from '../db.js'
 import { dentroDelRadio, distanciaKm, RADIO_ALERTA_KM, ubicacionAproximada } from '../geocerca.js';
 import { cargaPush, cargaPushAgrupada, crearPush } from '../push.js';
 import { createApp } from '../server.js';
+import { borrarUsuariosDePrueba } from '../ayuda-tests/limpieza.js';
 
 const secret = 'test-secret-with-at-least-thirty-two-characters';
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
@@ -370,7 +371,7 @@ test('alertas de zona con PostgreSQL: radio, retractación, oficial, localizado,
     await db.query('DELETE FROM suscripciones_caso WHERE caso_id = ANY($1)', [caseIds]);
     await db.query('DELETE FROM cambios_estado_caso WHERE caso_id = ANY($1)', [caseIds]);
     await db.query('DELETE FROM casos WHERE id = ANY($1)', [caseIds]);
-    await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [userIds]);
+    await borrarUsuariosDePrueba(db, 'id = ANY($1)', [userIds]);
     await db.end();
   }
 });
@@ -464,7 +465,7 @@ test('push con PostgreSQL: más alertas tempranas por hora que el límite llegan
     await db.query('DELETE FROM suscripciones_caso WHERE caso_id = ANY($1)', [caseIds]);
     await db.query('DELETE FROM cambios_estado_caso WHERE caso_id = ANY($1)', [caseIds]);
     await db.query('DELETE FROM casos WHERE id = ANY($1)', [caseIds]);
-    await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [userIds]);
+    await borrarUsuariosDePrueba(db, 'id = ANY($1)', [userIds]);
     await db.end();
   }
 });
@@ -550,7 +551,7 @@ test('sin claves VAPID con PostgreSQL: las alertas quedan en el centro (canal ap
       await db.query('DELETE FROM casos WHERE id = $1', [casoId]);
     }
     await db.query('DELETE FROM notificaciones WHERE usuario_id = ANY($1)', [userIds]);
-    await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [userIds]);
+    await borrarUsuariosDePrueba(db, 'id = ANY($1)', [userIds]);
     await db.end();
   }
 });
@@ -678,7 +679,7 @@ test('baja del dispositivo con PostgreSQL: solo ese endpoint, solo de su cuenta,
     assert.equal((await db.query('SELECT 1 FROM alertas_zona WHERE usuario_id = $1', [dueno])).rows.length, 1, 'las alertas de zona siguen activas');
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));
-    await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [userIds]);
+    await borrarUsuariosDePrueba(db, 'id = ANY($1)', [userIds]);
     await db.end();
   }
 });

@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { leerLimiteCierreLocalizado } from '../case-shared.js';
 import { processDueFollowups, processLocatedClosures } from '../followups.js';
 import { createApp } from '../server.js';
+import { borrarUsuariosDePrueba } from '../ayuda-tests/limpieza.js';
 
 // Seguimiento de casos con PostgreSQL: consultas en dos intentos, respuestas del
 // reportante y simulador del administrador.
@@ -84,7 +85,7 @@ async function escenario(fn, { push } = {}) {
       await db.query('DELETE FROM casos WHERE id = ANY($1)', [casos]);
     }
     await db.query('DELETE FROM notificaciones WHERE usuario_id = ANY($1)', [[adminId, citizenId].filter(Boolean)]);
-    await db.query('DELETE FROM usuarios WHERE id = ANY($1)', [[adminId, citizenId].filter(Boolean)]);
+    await borrarUsuariosDePrueba(db, 'id = ANY($1)', [[adminId, citizenId].filter(Boolean)]);
     await db.end();
   }
 }
