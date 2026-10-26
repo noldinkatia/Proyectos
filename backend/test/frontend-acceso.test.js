@@ -95,3 +95,45 @@ test('estilos del ojo: no dependen del tipo del campo y no hay un segundo ojo de
   assert.match(css, /\.boton-ojo:focus-visible \{ outline: 3px solid/, 'foco visible con teclado');
   assert.match(css, /\.auth-panel form button\[type="button"\]:not\(\.link-inline\):not\(\.boton-ojo\)/);
 });
+
+test('sugerencia de @gmail.com: ana, ana@gm, otro dominio y ya @gmail.com', () => {
+  const { sugerenciaGmail } = auth;
+  assert.equal(sugerenciaGmail('ana'), 'ana@gmail.com');
+  assert.equal(sugerenciaGmail('ana@gm'), 'ana@gmail.com');
+  assert.equal(sugerenciaGmail('ana@hotmail.com'), '', 'otro dominio: no molesta');
+  assert.equal(sugerenciaGmail('ana@gmail.com'), '', 'ya completo');
+  // Respeta lo escrito: el usuario no se toca (mayúsculas, puntos) y solo se completa el dominio.
+  assert.equal(sugerenciaGmail('Ana.Perez'), 'Ana.Perez@gmail.com');
+  assert.equal(sugerenciaGmail('ana@'), 'ana@gmail.com');
+  assert.equal(sugerenciaGmail('ana@GMA'), 'ana@gmail.com');
+  assert.equal(sugerenciaGmail('ana@GMAIL.COM'), '');
+  assert.equal(sugerenciaGmail('ana@gmx.net'), '');
+  for (const nada of ['', '   ', '@gm', 'ana perez', 'a@b@c', undefined]) assert.equal(sugerenciaGmail(nada), '', String(nada));
+});
+
+test('el campo de correo usa un datalist sin romper el autocompletado del navegador', () => {
+  for (const [html, id] of [[renderLoginForm(), 'loginEmail'], [renderRegisterForm(), 'regEmail']]) {
+    const campo = etiquetas(html, 'input').find(i => i.id === id);
+    assert.equal(campo.type, 'email');
+    assert.equal(campo.autocomplete, 'email', 'el navegador sigue ofreciendo sus correos');
+    assert.equal(campo.list, `${id}Sugerencias`);
+    assert.equal(campo['data-on-input'], 'sugerirGmail(this)');
+    assert.match(html, new RegExp(`<datalist id="${id}Sugerencias"></datalist>`));
+    assert.ok(etiquetas(html, 'label').some(l => l.for === id));
+  }
+  // Al escribir se actualiza la única opción (y se escapa lo escrito).
+  const lista = { innerHTML: 'previo' };
+  const anterior = globalThis.document;
+  globalThis.document = { getElementById: id => (id === 'regEmailSugerencias' ? lista : null) };
+  try {
+    const campo = valor => ({ value: valor, getAttribute: () => 'regEmailSugerencias' });
+    auth.sugerirGmail(campo('ana'));
+    assert.equal(lista.innerHTML, '<option value="ana@gmail.com"></option>');
+    auth.sugerirGmail(campo('ana@hotmail.com'));
+    assert.equal(lista.innerHTML, '');
+    auth.sugerirGmail(campo('"x"'));
+    assert.equal(lista.innerHTML, '<option value="&quot;x&quot;@gmail.com"></option>');
+  } finally {
+    globalThis.document = anterior;
+  }
+});

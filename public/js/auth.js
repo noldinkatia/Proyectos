@@ -223,13 +223,43 @@ export function campoContrasena({ id, etiqueta, autocomplete, placeholder = '', 
       </div>`;
 }
 
+// Sugerencia de @gmail.com mientras se escribe el correo: nunca cambia lo escrito,
+// solo ofrece una opción. Devuelve '' cuando no hay nada que sugerir:
+//   "ana" → "ana@gmail.com"; "ana@gm" → "ana@gmail.com";
+//   "ana@hotmail.com" (otro dominio) o "ana@gmail.com" (ya completo) → "".
+export function sugerenciaGmail(valor) {
+  const texto = String(valor || '').trim();
+  if (!texto || /\s/.test(texto)) return '';
+  const partes = texto.split('@');
+  if (partes.length > 2 || !partes[0]) return '';
+  const [usuario, dominio = ''] = partes;
+  const resto = dominio.toLowerCase();
+  if (resto === 'gmail.com' || !'gmail.com'.startsWith(resto)) return '';
+  return `${usuario}@gmail.com`;
+}
+
+// La sugerencia va en un <datalist> (lista nativa y accesible) que convive con el
+// autocompletado del navegador (autocomplete="email").
+export function sugerirGmail(campo) {
+  const lista = document.getElementById(campo?.getAttribute?.('list'));
+  if (!lista) return;
+  const sugerencia = sugerenciaGmail(campo.value);
+  lista.innerHTML = sugerencia ? `<option value="${escapeHtml(sugerencia)}"></option>` : '';
+}
+
+// Correo con su etiqueta enlazada y la lista de sugerencias.
+export function campoCorreo({ id, valor = '', etiqueta = 'Correo Gmail' }) {
+  return `
+      <div class="form-group">
+        <label for="${id}">${etiqueta}</label>
+        <input type="email" id="${id}" name="email" autocomplete="email" inputmode="email" required value="${escapeHtml(valor)}" placeholder="usuario@gmail.com" list="${id}Sugerencias" data-on-input="sugerirGmail(this)" class="form-control">
+        <datalist id="${id}Sugerencias"></datalist>
+      </div>`;
+}
+
 export function renderLoginForm(identifier = '') {
   return `
-    <form data-on-submit="handleLogin(event)">
-      <div class="form-group">
-        <label for="loginEmail">Correo Gmail</label>
-        <input type="email" id="loginEmail" name="email" autocomplete="email" required value="${escapeHtml(identifier.includes('@') ? identifier : '')}" placeholder="usuario@gmail.com" class="form-control">
-      </div>${campoContrasena({ id: 'loginPassword', etiqueta: 'Contraseña', autocomplete: 'current-password', placeholder: 'Contraseña', atributos: 'required' })}
+    <form data-on-submit="handleLogin(event)">${campoCorreo({ id: 'loginEmail', valor: identifier.includes('@') ? identifier : '' })}${campoContrasena({ id: 'loginPassword', etiqueta: 'Contraseña', autocomplete: 'current-password', placeholder: 'Contraseña', atributos: 'required' })}
       <div>
         <button type="button" data-on-click="handleForgotPassword()">¿Olvidaste tu contraseña?</button>
       </div>
@@ -245,10 +275,7 @@ export function renderRegisterForm() {
         <label for="regName">Nombre Completo</label>
         <input type="text" id="regName" name="name" autocomplete="name" required minlength="3" value="${escapeHtml(estado.pendingRegistration?.nombre_completo || '')}" placeholder="Ej: Juan Pérez" class="form-control">
       </div>
-      <div class="form-group">
-        <label for="regEmail">Correo Gmail</label>
-        <input type="email" id="regEmail" name="email" autocomplete="email" required value="${escapeHtml(estado.pendingRegistration?.correo || '')}" placeholder="usuario@gmail.com" class="form-control">
-      </div>${campoContrasena({
+${campoCorreo({ id: 'regEmail', valor: estado.pendingRegistration?.correo || '' })}${campoContrasena({
         id: 'regPass', etiqueta: 'Contraseña (mínimo 8 caracteres)', autocomplete: 'new-password', placeholder: 'Mínimo 8 caracteres',
         atributos: 'required minlength="8" aria-describedby="passwordStrength" data-on-input="updatePasswordStrength()"',
         despues: '\n        <div id="passwordStrength" aria-live="polite">Fortaleza de la contraseña: sin evaluar</div>'
