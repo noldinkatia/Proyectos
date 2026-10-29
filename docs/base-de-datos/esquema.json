@@ -1,0 +1,1200 @@
+{
+  "generado_desde": "backend/migrations/001_esquema_inicial.sql a 008_antecedentes_usuario.sql aplicadas sobre una base vacía",
+  "motor": "PostgreSQL 16",
+  "migraciones": [
+    "001_esquema_inicial.sql",
+    "002_geocerca_alertas.sql",
+    "003_suscripciones_push.sql",
+    "004_alerta_campos.sql",
+    "005_indice_localizados.sql",
+    "006_seguimiento_intentos.sql",
+    "007_declaracion_reporte.sql",
+    "008_antecedentes_usuario.sql"
+  ],
+  "tablas": [
+    {
+      "nombre": "alertas_zona",
+      "indices": [
+        {
+          "nombre": "alertas_zona_pkey",
+          "definicion": "CREATE UNIQUE INDEX alertas_zona_pkey ON public.alertas_zona USING btree (usuario_id)"
+        }
+      ],
+      "columnas": [
+        {
+          "nulo": false,
+          "tipo": "integer",
+          "nombre": "usuario_id",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "double precision",
+          "nombre": "latitud",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "double precision",
+          "nombre": "longitud",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "consentimiento_en",
+          "defecto": "CURRENT_TIMESTAMP"
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "actualizada_en",
+          "defecto": "CURRENT_TIMESTAMP"
+        }
+      ],
+      "disparadores": [],
+      "restricciones": [
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "alertas_zona_usuario_id_fkey",
+          "definicion": "FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE"
+        },
+        {
+          "tipo": "PRIMARY KEY",
+          "nombre": "alertas_zona_pkey",
+          "definicion": "PRIMARY KEY (usuario_id)"
+        }
+      ]
+    },
+    {
+      "nombre": "antecedentes_usuario",
+      "indices": [
+        {
+          "nombre": "antecedentes_usuario_pkey",
+          "definicion": "CREATE UNIQUE INDEX antecedentes_usuario_pkey ON public.antecedentes_usuario USING btree (id)"
+        },
+        {
+          "nombre": "idx_antecedentes_activos",
+          "definicion": "CREATE INDEX idx_antecedentes_activos ON public.antecedentes_usuario USING btree (usuario_id) WHERE (retirado_en IS NULL)"
+        }
+      ],
+      "columnas": [
+        {
+          "nulo": false,
+          "tipo": "bigint",
+          "nombre": "id",
+          "defecto": "nextval('antecedentes_usuario_id_seq'::regclass)"
+        },
+        {
+          "nulo": false,
+          "tipo": "integer",
+          "nombre": "usuario_id",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "motivo",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "integer",
+          "nombre": "registrado_por",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "registrado_en",
+          "defecto": "CURRENT_TIMESTAMP"
+        },
+        {
+          "nulo": true,
+          "tipo": "timestamp with time zone",
+          "nombre": "retirado_en",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "integer",
+          "nombre": "retirado_por",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "text",
+          "nombre": "motivo_retiro",
+          "defecto": null
+        }
+      ],
+      "disparadores": [],
+      "restricciones": [
+        {
+          "tipo": "CHECK",
+          "nombre": "antecedentes_usuario_check",
+          "definicion": "CHECK ((((retirado_en IS NULL) AND (retirado_por IS NULL) AND (motivo_retiro IS NULL)) OR ((retirado_en IS NOT NULL) AND (motivo_retiro IS NOT NULL) AND (length(btrim(motivo_retiro)) > 0))))"
+        },
+        {
+          "tipo": "CHECK",
+          "nombre": "antecedentes_usuario_motivo_check",
+          "definicion": "CHECK ((length(btrim(motivo)) > 0))"
+        },
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "antecedentes_usuario_registrado_por_fkey",
+          "definicion": "FOREIGN KEY (registrado_por) REFERENCES usuarios(id) ON DELETE SET NULL"
+        },
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "antecedentes_usuario_retirado_por_fkey",
+          "definicion": "FOREIGN KEY (retirado_por) REFERENCES usuarios(id) ON DELETE SET NULL"
+        },
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "antecedentes_usuario_usuario_id_fkey",
+          "definicion": "FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE"
+        },
+        {
+          "tipo": "PRIMARY KEY",
+          "nombre": "antecedentes_usuario_pkey",
+          "definicion": "PRIMARY KEY (id)"
+        }
+      ]
+    },
+    {
+      "nombre": "cambios_estado_caso",
+      "indices": [
+        {
+          "nombre": "cambios_estado_caso_pkey",
+          "definicion": "CREATE UNIQUE INDEX cambios_estado_caso_pkey ON public.cambios_estado_caso USING btree (id)"
+        },
+        {
+          "nombre": "idx_cambios_estado_caso",
+          "definicion": "CREATE INDEX idx_cambios_estado_caso ON public.cambios_estado_caso USING btree (caso_id, cambiado_en)"
+        }
+      ],
+      "columnas": [
+        {
+          "nulo": false,
+          "tipo": "bigint",
+          "nombre": "id",
+          "defecto": "nextval('cambios_estado_caso_id_seq'::regclass)"
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "caso_id",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "text",
+          "nombre": "estado_anterior",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "estado_nuevo",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "integer",
+          "nombre": "cambiado_por",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "cambiado_en",
+          "defecto": "CURRENT_TIMESTAMP"
+        }
+      ],
+      "disparadores": [],
+      "restricciones": [
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "cambios_estado_caso_cambiado_por_fkey",
+          "definicion": "FOREIGN KEY (cambiado_por) REFERENCES usuarios(id)"
+        },
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "cambios_estado_caso_caso_id_fkey",
+          "definicion": "FOREIGN KEY (caso_id) REFERENCES casos(id)"
+        },
+        {
+          "tipo": "PRIMARY KEY",
+          "nombre": "cambios_estado_caso_pkey",
+          "definicion": "PRIMARY KEY (id)"
+        }
+      ]
+    },
+    {
+      "nombre": "cambios_estado_pista",
+      "indices": [
+        {
+          "nombre": "cambios_estado_pista_pkey",
+          "definicion": "CREATE UNIQUE INDEX cambios_estado_pista_pkey ON public.cambios_estado_pista USING btree (id)"
+        }
+      ],
+      "columnas": [
+        {
+          "nulo": false,
+          "tipo": "bigint",
+          "nombre": "id",
+          "defecto": "nextval('cambios_estado_pista_id_seq'::regclass)"
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "pista_id",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "text",
+          "nombre": "estado_anterior",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "estado_nuevo",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "text",
+          "nombre": "motivo",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "integer",
+          "nombre": "cambiado_por",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "cambiado_en",
+          "defecto": "CURRENT_TIMESTAMP"
+        }
+      ],
+      "disparadores": [],
+      "restricciones": [
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "cambios_estado_pista_cambiado_por_fkey",
+          "definicion": "FOREIGN KEY (cambiado_por) REFERENCES usuarios(id)"
+        },
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "cambios_estado_pista_pista_id_fkey",
+          "definicion": "FOREIGN KEY (pista_id) REFERENCES pistas(id)"
+        },
+        {
+          "tipo": "PRIMARY KEY",
+          "nombre": "cambios_estado_pista_pkey",
+          "definicion": "PRIMARY KEY (id)"
+        }
+      ]
+    },
+    {
+      "nombre": "casos",
+      "indices": [
+        {
+          "nombre": "casos_pkey",
+          "definicion": "CREATE UNIQUE INDEX casos_pkey ON public.casos USING btree (id)"
+        },
+        {
+          "nombre": "idx_casos_creado_en",
+          "definicion": "CREATE INDEX idx_casos_creado_en ON public.casos USING btree (creado_en)"
+        },
+        {
+          "nombre": "idx_casos_estado_localizado",
+          "definicion": "CREATE INDEX idx_casos_estado_localizado ON public.casos USING btree (estado, localizado_en)"
+        },
+        {
+          "nombre": "idx_casos_localizados",
+          "definicion": "CREATE INDEX idx_casos_localizados ON public.casos USING btree (estado, localizado_en) WHERE (localizado_en IS NOT NULL)"
+        },
+        {
+          "nombre": "idx_casos_reportante_alerta",
+          "definicion": "CREATE INDEX idx_casos_reportante_alerta ON public.casos USING btree (reportado_por_usr_id, alerta_temprana_en) WHERE (alerta_temprana_en IS NOT NULL)"
+        },
+        {
+          "nombre": "idx_casos_seguimiento_due",
+          "definicion": "CREATE INDEX idx_casos_seguimiento_due ON public.casos USING btree (proximo_seguimiento) WHERE (proximo_seguimiento IS NOT NULL)"
+        }
+      ],
+      "columnas": [
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "id",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "nombre_completo",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "integer",
+          "nombre": "edad",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "sexo",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "ciudad",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "departamento",
+          "defecto": "''::text"
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "descripcion_fisica",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "vestimenta",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "senas_particulares",
+          "defecto": "''::text"
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "fecha_hora_desaparicion",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "foto",
+          "defecto": "''::text"
+        },
+        {
+          "nulo": false,
+          "tipo": "double precision",
+          "nombre": "latitud",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "double precision",
+          "nombre": "longitud",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "direccion",
+          "defecto": "''::text"
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "numero_denuncia",
+          "defecto": "''::text"
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "estado",
+          "defecto": "'PENDIENTE'::text"
+        },
+        {
+          "nulo": true,
+          "tipo": "text",
+          "nombre": "motivo_rechazo",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "integer",
+          "nombre": "reportado_por_usr_id",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "timestamp with time zone",
+          "nombre": "localizado_en",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "creado_en",
+          "defecto": "CURRENT_TIMESTAMP"
+        },
+        {
+          "nulo": true,
+          "tipo": "timestamp with time zone",
+          "nombre": "proximo_seguimiento",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "boolean",
+          "nombre": "reportante_mayor_edad",
+          "defecto": "false"
+        },
+        {
+          "nulo": false,
+          "tipo": "boolean",
+          "nombre": "autorizacion_parental",
+          "defecto": "false"
+        },
+        {
+          "nulo": false,
+          "tipo": "boolean",
+          "nombre": "aviso_privacidad_aceptado",
+          "defecto": "false"
+        },
+        {
+          "nulo": false,
+          "tipo": "boolean",
+          "nombre": "checklist_denuncia",
+          "defecto": "false"
+        },
+        {
+          "nulo": false,
+          "tipo": "boolean",
+          "nombre": "checklist_coherencia",
+          "defecto": "false"
+        },
+        {
+          "nulo": false,
+          "tipo": "boolean",
+          "nombre": "checklist_duplicados",
+          "defecto": "false"
+        },
+        {
+          "nulo": false,
+          "tipo": "boolean",
+          "nombre": "checklist_menores",
+          "defecto": "false"
+        },
+        {
+          "nulo": true,
+          "tipo": "text",
+          "nombre": "motivo_cierre",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "smallint",
+          "nombre": "seguimiento_etapa",
+          "defecto": "0"
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "barrio",
+          "defecto": "''::text"
+        },
+        {
+          "nulo": false,
+          "tipo": "boolean",
+          "nombre": "geocerca_activa",
+          "defecto": "true"
+        },
+        {
+          "nulo": true,
+          "tipo": "timestamp with time zone",
+          "nombre": "alerta_temprana_en",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "jsonb",
+          "nombre": "alerta_campos",
+          "defecto": "'[\"departamento\", \"ciudad\", \"barrio\"]'::jsonb"
+        },
+        {
+          "nulo": false,
+          "tipo": "smallint",
+          "nombre": "seguimiento_intentos",
+          "defecto": "0"
+        },
+        {
+          "nulo": true,
+          "tipo": "timestamp with time zone",
+          "nombre": "declaracion_aceptada_en",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "text",
+          "nombre": "declaracion_version",
+          "defecto": null
+        }
+      ],
+      "disparadores": [],
+      "restricciones": [
+        {
+          "tipo": "CHECK",
+          "nombre": "casos_seguimiento_intentos_check",
+          "definicion": "CHECK (((seguimiento_intentos >= 0) AND (seguimiento_intentos <= 2)))"
+        },
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "casos_reportado_por_usr_id_fkey",
+          "definicion": "FOREIGN KEY (reportado_por_usr_id) REFERENCES usuarios(id)"
+        },
+        {
+          "tipo": "PRIMARY KEY",
+          "nombre": "casos_pkey",
+          "definicion": "PRIMARY KEY (id)"
+        }
+      ]
+    },
+    {
+      "nombre": "codigos_verificacion",
+      "indices": [
+        {
+          "nombre": "codigos_verificacion_correo_proposito_key",
+          "definicion": "CREATE UNIQUE INDEX codigos_verificacion_correo_proposito_key ON public.codigos_verificacion USING btree (correo, proposito)"
+        },
+        {
+          "nombre": "codigos_verificacion_pkey",
+          "definicion": "CREATE UNIQUE INDEX codigos_verificacion_pkey ON public.codigos_verificacion USING btree (id)"
+        }
+      ],
+      "columnas": [
+        {
+          "nulo": false,
+          "tipo": "integer",
+          "nombre": "id",
+          "defecto": "nextval('codigos_verificacion_id_seq'::regclass)"
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "correo",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "codigo_hash",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "proposito",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "text",
+          "nombre": "nombre_completo",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "text",
+          "nombre": "contrasena_hash",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "boolean",
+          "nombre": "acepto_terminos",
+          "defecto": "false"
+        },
+        {
+          "nulo": true,
+          "tipo": "timestamp with time zone",
+          "nombre": "fecha_aceptacion_terminos",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "expira_en",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "integer",
+          "nombre": "intentos",
+          "defecto": "0"
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "creado_en",
+          "defecto": "CURRENT_TIMESTAMP"
+        }
+      ],
+      "disparadores": [],
+      "restricciones": [
+        {
+          "tipo": "CHECK",
+          "nombre": "codigos_verificacion_proposito_check",
+          "definicion": "CHECK ((proposito = ANY (ARRAY['registro'::text, 'restablecer'::text])))"
+        },
+        {
+          "tipo": "PRIMARY KEY",
+          "nombre": "codigos_verificacion_pkey",
+          "definicion": "PRIMARY KEY (id)"
+        },
+        {
+          "tipo": "UNIQUE",
+          "nombre": "codigos_verificacion_correo_proposito_key",
+          "definicion": "UNIQUE (correo, proposito)"
+        }
+      ]
+    },
+    {
+      "nombre": "notificaciones",
+      "indices": [
+        {
+          "nombre": "idx_notificaciones_caso_tipo",
+          "definicion": "CREATE INDEX idx_notificaciones_caso_tipo ON public.notificaciones USING btree (caso_id, tipo)"
+        },
+        {
+          "nombre": "notificaciones_pkey",
+          "definicion": "CREATE UNIQUE INDEX notificaciones_pkey ON public.notificaciones USING btree (id)"
+        },
+        {
+          "nombre": "uq_notificaciones_alerta_zona",
+          "definicion": "CREATE UNIQUE INDEX uq_notificaciones_alerta_zona ON public.notificaciones USING btree (usuario_id, caso_id, tipo) WHERE (tipo = ANY (ARRAY['ALERTA_TEMPRANA'::text, 'ALERTA_OFICIAL'::text, 'ALERTA_RETRACTADA'::text, 'ALERTA_LOCALIZADO'::text, 'ALERTA_CERRADO'::text]))"
+        }
+      ],
+      "columnas": [
+        {
+          "nulo": false,
+          "tipo": "bigint",
+          "nombre": "id",
+          "defecto": "nextval('notificaciones_id_seq'::regclass)"
+        },
+        {
+          "nulo": false,
+          "tipo": "integer",
+          "nombre": "usuario_id",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "text",
+          "nombre": "caso_id",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "titulo",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "mensaje",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "tipo",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "boolean",
+          "nombre": "leida",
+          "defecto": "false"
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "creada_en",
+          "defecto": "CURRENT_TIMESTAMP"
+        },
+        {
+          "nulo": true,
+          "tipo": "numeric(6,1)",
+          "nombre": "distancia_km",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "canal",
+          "defecto": "'app'::text"
+        },
+        {
+          "nulo": true,
+          "tipo": "text",
+          "nombre": "push_resultado",
+          "defecto": null
+        }
+      ],
+      "disparadores": [],
+      "restricciones": [
+        {
+          "tipo": "CHECK",
+          "nombre": "notificaciones_canal_check",
+          "definicion": "CHECK ((canal = ANY (ARRAY['app'::text, 'push'::text])))"
+        },
+        {
+          "tipo": "CHECK",
+          "nombre": "notificaciones_push_resultado_check",
+          "definicion": "CHECK ((push_resultado = ANY (ARRAY['enviado'::text, 'fallido'::text, 'caducado'::text, 'sin_dispositivo'::text])))"
+        },
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "notificaciones_caso_id_fkey",
+          "definicion": "FOREIGN KEY (caso_id) REFERENCES casos(id)"
+        },
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "notificaciones_usuario_id_fkey",
+          "definicion": "FOREIGN KEY (usuario_id) REFERENCES usuarios(id)"
+        },
+        {
+          "tipo": "PRIMARY KEY",
+          "nombre": "notificaciones_pkey",
+          "definicion": "PRIMARY KEY (id)"
+        }
+      ]
+    },
+    {
+      "nombre": "pistas",
+      "indices": [
+        {
+          "nombre": "idx_pistas_caso",
+          "definicion": "CREATE INDEX idx_pistas_caso ON public.pistas USING btree (caso_id, fecha_envio)"
+        },
+        {
+          "nombre": "pistas_pkey",
+          "definicion": "CREATE UNIQUE INDEX pistas_pkey ON public.pistas USING btree (id)"
+        }
+      ],
+      "columnas": [
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "id",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "caso_id",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "integer",
+          "nombre": "usuario_id",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "descripcion",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "fecha_hora_avistamiento",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "double precision",
+          "nombre": "latitud",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "double precision",
+          "nombre": "longitud",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "direccion",
+          "defecto": "''::text"
+        },
+        {
+          "nulo": false,
+          "tipo": "text[]",
+          "nombre": "fotos",
+          "defecto": "'{}'::text[]"
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "estado",
+          "defecto": "'PENDIENTE'::text"
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "fecha_envio",
+          "defecto": "CURRENT_TIMESTAMP"
+        }
+      ],
+      "disparadores": [],
+      "restricciones": [
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "pistas_caso_id_fkey",
+          "definicion": "FOREIGN KEY (caso_id) REFERENCES casos(id)"
+        },
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "pistas_usuario_id_fkey",
+          "definicion": "FOREIGN KEY (usuario_id) REFERENCES usuarios(id)"
+        },
+        {
+          "tipo": "PRIMARY KEY",
+          "nombre": "pistas_pkey",
+          "definicion": "PRIMARY KEY (id)"
+        }
+      ]
+    },
+    {
+      "nombre": "schema_migrations",
+      "indices": [
+        {
+          "nombre": "schema_migrations_pkey",
+          "definicion": "CREATE UNIQUE INDEX schema_migrations_pkey ON public.schema_migrations USING btree (version)"
+        }
+      ],
+      "columnas": [
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "version",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "archivo",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "aplicada_en",
+          "defecto": "CURRENT_TIMESTAMP"
+        }
+      ],
+      "disparadores": [],
+      "restricciones": [
+        {
+          "tipo": "PRIMARY KEY",
+          "nombre": "schema_migrations_pkey",
+          "definicion": "PRIMARY KEY (version)"
+        }
+      ]
+    },
+    {
+      "nombre": "solicitudes_codigo",
+      "indices": [
+        {
+          "nombre": "idx_solicitudes_correo_fecha",
+          "definicion": "CREATE INDEX idx_solicitudes_correo_fecha ON public.solicitudes_codigo USING btree (correo, creado_en)"
+        },
+        {
+          "nombre": "solicitudes_codigo_pkey",
+          "definicion": "CREATE UNIQUE INDEX solicitudes_codigo_pkey ON public.solicitudes_codigo USING btree (id)"
+        }
+      ],
+      "columnas": [
+        {
+          "nulo": false,
+          "tipo": "integer",
+          "nombre": "id",
+          "defecto": "nextval('solicitudes_codigo_id_seq'::regclass)"
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "correo",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "proposito",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "creado_en",
+          "defecto": "CURRENT_TIMESTAMP"
+        }
+      ],
+      "disparadores": [],
+      "restricciones": [
+        {
+          "tipo": "CHECK",
+          "nombre": "solicitudes_codigo_proposito_check",
+          "definicion": "CHECK ((proposito = ANY (ARRAY['registro'::text, 'restablecer'::text])))"
+        },
+        {
+          "tipo": "PRIMARY KEY",
+          "nombre": "solicitudes_codigo_pkey",
+          "definicion": "PRIMARY KEY (id)"
+        }
+      ]
+    },
+    {
+      "nombre": "suscripciones_caso",
+      "indices": [
+        {
+          "nombre": "suscripciones_caso_pkey",
+          "definicion": "CREATE UNIQUE INDEX suscripciones_caso_pkey ON public.suscripciones_caso USING btree (caso_id, usuario_id)"
+        }
+      ],
+      "columnas": [
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "caso_id",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "integer",
+          "nombre": "usuario_id",
+          "defecto": null
+        }
+      ],
+      "disparadores": [],
+      "restricciones": [
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "suscripciones_caso_caso_id_fkey",
+          "definicion": "FOREIGN KEY (caso_id) REFERENCES casos(id)"
+        },
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "suscripciones_caso_usuario_id_fkey",
+          "definicion": "FOREIGN KEY (usuario_id) REFERENCES usuarios(id)"
+        },
+        {
+          "tipo": "PRIMARY KEY",
+          "nombre": "suscripciones_caso_pkey",
+          "definicion": "PRIMARY KEY (caso_id, usuario_id)"
+        }
+      ]
+    },
+    {
+      "nombre": "suscripciones_push",
+      "indices": [
+        {
+          "nombre": "idx_suscripciones_push_usuario",
+          "definicion": "CREATE INDEX idx_suscripciones_push_usuario ON public.suscripciones_push USING btree (usuario_id)"
+        },
+        {
+          "nombre": "suscripciones_push_endpoint_key",
+          "definicion": "CREATE UNIQUE INDEX suscripciones_push_endpoint_key ON public.suscripciones_push USING btree (endpoint)"
+        },
+        {
+          "nombre": "suscripciones_push_pkey",
+          "definicion": "CREATE UNIQUE INDEX suscripciones_push_pkey ON public.suscripciones_push USING btree (id)"
+        }
+      ],
+      "columnas": [
+        {
+          "nulo": false,
+          "tipo": "bigint",
+          "nombre": "id",
+          "defecto": "nextval('suscripciones_push_id_seq'::regclass)"
+        },
+        {
+          "nulo": false,
+          "tipo": "integer",
+          "nombre": "usuario_id",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "endpoint",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "p256dh",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "auth",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "creada_en",
+          "defecto": "CURRENT_TIMESTAMP"
+        },
+        {
+          "nulo": true,
+          "tipo": "timestamp with time zone",
+          "nombre": "ultimo_error_en",
+          "defecto": null
+        }
+      ],
+      "disparadores": [],
+      "restricciones": [
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "suscripciones_push_usuario_id_fkey",
+          "definicion": "FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE"
+        },
+        {
+          "tipo": "PRIMARY KEY",
+          "nombre": "suscripciones_push_pkey",
+          "definicion": "PRIMARY KEY (id)"
+        },
+        {
+          "tipo": "UNIQUE",
+          "nombre": "suscripciones_push_endpoint_key",
+          "definicion": "UNIQUE (endpoint)"
+        }
+      ]
+    },
+    {
+      "nombre": "usuarios",
+      "indices": [
+        {
+          "nombre": "usuarios_correo_key",
+          "definicion": "CREATE UNIQUE INDEX usuarios_correo_key ON public.usuarios USING btree (correo)"
+        },
+        {
+          "nombre": "usuarios_pkey",
+          "definicion": "CREATE UNIQUE INDEX usuarios_pkey ON public.usuarios USING btree (id)"
+        }
+      ],
+      "columnas": [
+        {
+          "nulo": false,
+          "tipo": "integer",
+          "nombre": "id",
+          "defecto": "nextval('usuarios_id_seq'::regclass)"
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "nombre_completo",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "correo",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "contrasena_hash",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "rol",
+          "defecto": "'ciudadano'::text"
+        },
+        {
+          "nulo": false,
+          "tipo": "boolean",
+          "nombre": "verificado",
+          "defecto": "false"
+        },
+        {
+          "nulo": false,
+          "tipo": "boolean",
+          "nombre": "acepto_terminos",
+          "defecto": "false"
+        },
+        {
+          "nulo": true,
+          "tipo": "timestamp with time zone",
+          "nombre": "fecha_aceptacion_terminos",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "creado_en",
+          "defecto": "CURRENT_TIMESTAMP"
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "actualizado_en",
+          "defecto": "CURRENT_TIMESTAMP"
+        },
+        {
+          "nulo": false,
+          "tipo": "integer",
+          "nombre": "sesion_version",
+          "defecto": "0"
+        }
+      ],
+      "disparadores": [],
+      "restricciones": [
+        {
+          "tipo": "CHECK",
+          "nombre": "usuarios_rol_check",
+          "definicion": "CHECK ((rol = ANY (ARRAY['ciudadano'::text, 'administrador'::text])))"
+        },
+        {
+          "tipo": "PRIMARY KEY",
+          "nombre": "usuarios_pkey",
+          "definicion": "PRIMARY KEY (id)"
+        },
+        {
+          "tipo": "UNIQUE",
+          "nombre": "usuarios_correo_key",
+          "definicion": "UNIQUE (correo)"
+        }
+      ]
+    }
+  ],
+  "vistas": [],
+  "funciones": [],
+  "tipos_enum": [],
+  "extensiones": []
+}
