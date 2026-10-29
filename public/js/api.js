@@ -24,32 +24,36 @@ async function cargarFotoProtegida(image) {
 }
 
 // Perezosas: cada foto se pide cuando está por verse (300 px antes), no todas al
-// abrir la vista (el historial del panel puede tener muchas). Sin
-// IntersectionObserver (navegadores viejos) se piden todas, como antes.
-let observadorDeFotos = null;
-function observador() {
-  observadorDeFotos ||= new IntersectionObserver(entradas => {
+// abrir la vista (el historial del panel puede tener muchas). Lo usan las fotos
+// protegidas y las del inicio (feed.js). No alcanza con loading="lazy": Chrome
+// empieza a pedir a 1250 px de la pantalla, y a 2500 px con conexión lenta, así
+// que en el inicio se pedían todas justo cuando más importa ahorrar. Sin
+// IntersectionObserver (navegadores viejos) la acción corre en el acto, como antes.
+let observadorDeCercania = null;
+const accionesPendientes = new WeakMap();
+export function cuandoEsteCerca(elemento, accion) {
+  if (typeof globalThis.IntersectionObserver !== 'function') return accion();
+  observadorDeCercania ||= new IntersectionObserver(entradas => {
     for (const entrada of entradas) {
       if (!entrada.isIntersecting) continue;
-      observadorDeFotos.unobserve(entrada.target);
-      cargarFotoProtegida(entrada.target);
+      observadorDeCercania.unobserve(entrada.target);
+      const pendiente = accionesPendientes.get(entrada.target);
+      accionesPendientes.delete(entrada.target);
+      pendiente?.();
     }
   }, { rootMargin: '300px 0px' });
-  return observadorDeFotos;
+  accionesPendientes.set(elemento, accion);
+  observadorDeCercania.observe(elemento);
 }
 
 // Carga las <img src="data:," data-photo-url="/api/..." data-protected-photo> de un
 // contenedor que todavía no se cargaron (cada una se marca para no repetirla).
 export async function loadProtectedPhotos(container) {
   const images = Array.from(container.querySelectorAll('img[data-protected-photo]:not([data-protected-loaded])'));
-  if (typeof globalThis.IntersectionObserver === 'function') {
-    for (const image of images) {
-      image.dataset.protectedLoaded = 'pendiente';
-      observador().observe(image);
-    }
-    return;
-  }
-  await Promise.all(images.map(cargarFotoProtegida));
+  await Promise.all(images.map(image => {
+    image.dataset.protectedLoaded = 'pendiente';
+    return cuandoEsteCerca(image, () => cargarFotoProtegida(image));
+  }));
 }
 
 // Avisa si el servidor respondió. navigator.onLine solo mira la red del equipo:

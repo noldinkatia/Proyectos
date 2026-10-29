@@ -1,4 +1,5 @@
 // Inicio: listado de casos, filtros, paginación y ficha del caso.
+import { cuandoEsteCerca } from './api.js';
 import { escapeHtml } from './config.js';
 import { estado } from './estado.js';
 import { RADIO_ALERTA_KM } from './radio-alerta.js';
@@ -391,16 +392,19 @@ export function renderCasePhotos(cases) {
     const placeholder = document.getElementById(`case-photo-${caseItem.id}`);
     if (!photo || !placeholder) return;
 
-    const image = document.createElement('img');
-    image.alt = `Fotografía de ${caseItem.nombreCompleto}`;
-    image.className = 'case-photo-image';
-    // Perezosa: el navegador la pide recién cuando la tarjeta está por verse.
-    image.loading = 'lazy';
-    image.decoding = 'async';
-    image.addEventListener('error', () => replaceWithMissingPhoto(image, caseItem.nombreCompleto), { once: true });
-    // Foto pública de un caso visible: se pide sin token (consulta sin sesión).
-    image.src = photo;
-    placeholder.replaceWith(image);
+    // Perezosa: la <img> se crea (y la foto se pide) recién cuando la tarjeta está a
+    // 300 px de verse; hasta entonces queda el marcador.
+    cuandoEsteCerca(placeholder, () => {
+      if (!placeholder.isConnected) return;
+      const image = document.createElement('img');
+      image.alt = `Fotografía de ${caseItem.nombreCompleto}`;
+      image.className = 'case-photo-image';
+      image.decoding = 'async';
+      image.addEventListener('error', () => replaceWithMissingPhoto(image, caseItem.nombreCompleto), { once: true });
+      // Foto pública de un caso visible: se pide sin token (consulta sin sesión).
+      image.src = photo;
+      placeholder.replaceWith(image);
+    });
   });
 }
 
