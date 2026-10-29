@@ -22,6 +22,19 @@ for (const [pagina, entradas] of Object.entries(PAGINAS)) {
     // Nada precargado de otro origen.
     assert.ok(precargados.every(m => m.startsWith('/')));
   });
+
+  test(`${pagina}: tema-inicial.js y el CSS van antes que los modulepreload`, async () => {
+    const html = (await readFile(new URL(pagina, publicDir), 'utf8')).replace(/\r\n/g, '\n');
+    const head = html.slice(0, html.indexOf('</head>'));
+    const inicioPrecarga = head.indexOf(INICIO);
+    const tema = head.indexOf('<script src="/js/tema-inicial.js"></script>');
+    assert.ok(tema !== -1 && tema < inicioPrecarga, 'tema-inicial.js antes de los modulepreload');
+    const hojas = [...head.matchAll(/<link rel="stylesheet"[^>]*>/g)];
+    assert.ok(hojas.length >= 2);
+    for (const hoja of hojas) assert.ok(hoja.index < inicioPrecarga, hoja[0]);
+    // Nada que frene el pintado después de la precarga.
+    assert.doesNotMatch(head.slice(inicioPrecarga), /<link rel="stylesheet"|<script(?![^>]*\b(defer|type="module")\b)/);
+  });
 }
 
 test('el grafo incluye los imports de varias líneas y las rutas absolutas de la app', async () => {

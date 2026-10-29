@@ -21,12 +21,18 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="apple-touch-icon" href="/icons/rastreopy-192.png">
 
+  <!-- Primero lo que frena el primer pintado: el tema (antes de dibujar, sin flash)
+       y los estilos. Los modulepreload van después: pedidos antes, comparten la red
+       con el CSS y el primer contenido se pinta más tarde
+       (backend/test/modulepreload.test.js controla el orden). -->
+  <script src="/js/tema-inicial.js"></script>
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/app/app.css">
   <!-- Leaflet 1.9.4 servido por la app (public/vendor/leaflet, licencia BSD-2 en
        LICENSE.txt), con el mismo hash de integridad que tenía desde unpkg. defer: no
        frena el dibujo de la página y corre antes que los módulos (orden del documento). -->
-  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=">
   <script src="/vendor/leaflet/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" defer></script>
-  <link rel="stylesheet" href="/styles.css">
   <!-- modulepreload: generado por backend/ayuda-tests/modulos.js -->
   <link rel="modulepreload" href="/app/app-movil.js">
   <link rel="modulepreload" href="/app/pwa.js">
@@ -59,8 +65,6 @@
   <link rel="modulepreload" href="/js/ui.js">
   <link rel="modulepreload" href="/js/verificacion.js">
   <!-- /modulepreload -->
-  <link rel="stylesheet" href="/app/app.css">
-  <script src="/js/tema-inicial.js"></script>
 </head>
 <body class="app-movil">
 
