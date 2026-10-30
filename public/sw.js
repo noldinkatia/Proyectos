@@ -83,10 +83,29 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
+function esEstaticoInmutable(ruta) {
+  return ruta.startsWith('/fonts/') || ruta.startsWith('/icons/');
+}
+
 self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
+
+  // Fuentes e íconos: caché primero. No cambian entre versiones (si cambian, cambia el
+  // nombre del archivo o CACHE_NAME), así una visita repetida no los vuelve a pedir.
+  // ignoreVary: los precargados se guardaron sin Origin y las fuentes se piden con
+  // Origin (cors responde "Vary: Origin"). JS y CSS siguen yendo primero a la red.
+  if (esEstaticoInmutable(url.pathname)) {
+    event.respondWith((async () => {
+      const guardado = await caches.match(request, { ignoreVary: true });
+      if (guardado) return guardado;
+      const response = await fetch(request);
+      if (response.ok) await caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
+      return response;
+    })());
+    return;
+  }
 
   event.respondWith((async () => {
     try {
