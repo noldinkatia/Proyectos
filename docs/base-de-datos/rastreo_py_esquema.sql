@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict uCjZI7kBv9R4xm5HuVaeT4ORG5HQbJTc3TwVKWHIlQdzzNwzUlLka4HOuE0mSKA
+\restrict WDjatbMVNLB2dtWBKMnJxb7NNoUA9iYBM4CTvdaF9LbF8RHaTxKfQeiniYbY0PH
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -181,6 +181,9 @@ CREATE TABLE public.casos (
     seguimiento_intentos smallint DEFAULT 0 NOT NULL,
     declaracion_aceptada_en timestamp with time zone,
     declaracion_version text,
+    modificado_en timestamp with time zone,
+    ediciones_reportante integer DEFAULT 0 NOT NULL,
+    CONSTRAINT casos_ediciones_reportante_check CHECK ((ediciones_reportante >= 0)),
     CONSTRAINT casos_seguimiento_intentos_check CHECK (((seguimiento_intentos >= 0) AND (seguimiento_intentos <= 2)))
 );
 
@@ -223,6 +226,41 @@ CREATE SEQUENCE public.codigos_verificacion_id_seq
 --
 
 ALTER SEQUENCE public.codigos_verificacion_id_seq OWNED BY public.codigos_verificacion.id;
+
+
+--
+-- Name: ediciones_caso; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ediciones_caso (
+    id bigint NOT NULL,
+    caso_id text NOT NULL,
+    usuario_id integer,
+    editado_en timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    cambios jsonb NOT NULL,
+    declaracion_version text NOT NULL,
+    declaracion_aceptada_en timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT ediciones_caso_cambios_check CHECK (((jsonb_typeof(cambios) = 'array'::text) AND (jsonb_array_length(cambios) > 0)))
+);
+
+
+--
+-- Name: ediciones_caso_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ediciones_caso_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ediciones_caso_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ediciones_caso_id_seq OWNED BY public.ediciones_caso.id;
 
 
 --
@@ -441,6 +479,13 @@ ALTER TABLE ONLY public.codigos_verificacion ALTER COLUMN id SET DEFAULT nextval
 
 
 --
+-- Name: ediciones_caso id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ediciones_caso ALTER COLUMN id SET DEFAULT nextval('public.ediciones_caso_id_seq'::regclass);
+
+
+--
 -- Name: notificaciones id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -522,6 +567,14 @@ ALTER TABLE ONLY public.codigos_verificacion
 
 ALTER TABLE ONLY public.codigos_verificacion
     ADD CONSTRAINT codigos_verificacion_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ediciones_caso ediciones_caso_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ediciones_caso
+    ADD CONSTRAINT ediciones_caso_pkey PRIMARY KEY (id);
 
 
 --
@@ -646,6 +699,13 @@ CREATE INDEX idx_casos_seguimiento_due ON public.casos USING btree (proximo_segu
 
 
 --
+-- Name: idx_ediciones_caso; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ediciones_caso ON public.ediciones_caso USING btree (caso_id, editado_en);
+
+
+--
 -- Name: idx_notificaciones_caso_tipo; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -753,6 +813,22 @@ ALTER TABLE ONLY public.casos
 
 
 --
+-- Name: ediciones_caso ediciones_caso_caso_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ediciones_caso
+    ADD CONSTRAINT ediciones_caso_caso_id_fkey FOREIGN KEY (caso_id) REFERENCES public.casos(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ediciones_caso ediciones_caso_usuario_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ediciones_caso
+    ADD CONSTRAINT ediciones_caso_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES public.usuarios(id) ON DELETE SET NULL;
+
+
+--
 -- Name: notificaciones notificaciones_caso_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -812,4 +888,4 @@ ALTER TABLE ONLY public.suscripciones_push
 -- PostgreSQL database dump complete
 --
 
-\unrestrict uCjZI7kBv9R4xm5HuVaeT4ORG5HQbJTc3TwVKWHIlQdzzNwzUlLka4HOuE0mSKA
+\unrestrict WDjatbMVNLB2dtWBKMnJxb7NNoUA9iYBM4CTvdaF9LbF8RHaTxKfQeiniYbY0PH

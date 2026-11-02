@@ -1,5 +1,5 @@
 {
-  "generado_desde": "backend/migrations/001_esquema_inicial.sql a 008_antecedentes_usuario.sql aplicadas sobre una base vacía",
+  "generado_desde": "backend/migrations/001_esquema_inicial.sql a 009_ediciones_reportante.sql aplicadas sobre una base vacía",
   "motor": "PostgreSQL 16",
   "migraciones": [
     "001_esquema_inicial.sql",
@@ -9,7 +9,8 @@
     "005_indice_localizados.sql",
     "006_seguimiento_intentos.sql",
     "007_declaracion_reporte.sql",
-    "008_antecedentes_usuario.sql"
+    "008_antecedentes_usuario.sql",
+    "009_ediciones_reportante.sql"
   ],
   "tablas": [
     {
@@ -552,10 +553,27 @@
           "tipo": "text",
           "nombre": "declaracion_version",
           "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "timestamp with time zone",
+          "nombre": "modificado_en",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "integer",
+          "nombre": "ediciones_reportante",
+          "defecto": "0"
         }
       ],
       "disparadores": [],
       "restricciones": [
+        {
+          "tipo": "CHECK",
+          "nombre": "casos_ediciones_reportante_check",
+          "definicion": "CHECK ((ediciones_reportante >= 0))"
+        },
         {
           "tipo": "CHECK",
           "nombre": "casos_seguimiento_intentos_check",
@@ -669,6 +687,86 @@
           "tipo": "UNIQUE",
           "nombre": "codigos_verificacion_correo_proposito_key",
           "definicion": "UNIQUE (correo, proposito)"
+        }
+      ]
+    },
+    {
+      "nombre": "ediciones_caso",
+      "indices": [
+        {
+          "nombre": "ediciones_caso_pkey",
+          "definicion": "CREATE UNIQUE INDEX ediciones_caso_pkey ON public.ediciones_caso USING btree (id)"
+        },
+        {
+          "nombre": "idx_ediciones_caso",
+          "definicion": "CREATE INDEX idx_ediciones_caso ON public.ediciones_caso USING btree (caso_id, editado_en)"
+        }
+      ],
+      "columnas": [
+        {
+          "nulo": false,
+          "tipo": "bigint",
+          "nombre": "id",
+          "defecto": "nextval('ediciones_caso_id_seq'::regclass)"
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "caso_id",
+          "defecto": null
+        },
+        {
+          "nulo": true,
+          "tipo": "integer",
+          "nombre": "usuario_id",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "editado_en",
+          "defecto": "CURRENT_TIMESTAMP"
+        },
+        {
+          "nulo": false,
+          "tipo": "jsonb",
+          "nombre": "cambios",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "text",
+          "nombre": "declaracion_version",
+          "defecto": null
+        },
+        {
+          "nulo": false,
+          "tipo": "timestamp with time zone",
+          "nombre": "declaracion_aceptada_en",
+          "defecto": "CURRENT_TIMESTAMP"
+        }
+      ],
+      "disparadores": [],
+      "restricciones": [
+        {
+          "tipo": "CHECK",
+          "nombre": "ediciones_caso_cambios_check",
+          "definicion": "CHECK (((jsonb_typeof(cambios) = 'array'::text) AND (jsonb_array_length(cambios) > 0)))"
+        },
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "ediciones_caso_caso_id_fkey",
+          "definicion": "FOREIGN KEY (caso_id) REFERENCES casos(id) ON DELETE CASCADE"
+        },
+        {
+          "tipo": "FOREIGN KEY",
+          "nombre": "ediciones_caso_usuario_id_fkey",
+          "definicion": "FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL"
+        },
+        {
+          "tipo": "PRIMARY KEY",
+          "nombre": "ediciones_caso_pkey",
+          "definicion": "PRIMARY KEY (id)"
         }
       ]
     },

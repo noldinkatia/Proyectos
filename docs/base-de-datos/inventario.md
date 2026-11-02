@@ -1,12 +1,12 @@
 # Inventario de la base de datos
 
-Esquema que resulta de aplicar las migraciones `001_esquema_inicial.sql` a `008_antecedentes_usuario.sql` (`backend/migrations/`) sobre una base PostgreSQL 16 vacía. Solo estructura: no incluye datos.
+Esquema que resulta de aplicar las migraciones `001_esquema_inicial.sql` a `009_ediciones_reportante.sql` (`backend/migrations/`) sobre una base PostgreSQL 16 vacía. Solo estructura: no incluye datos.
 
 Archivos relacionados:
 
 - `rastreo_py_esquema.sql`: volcado del esquema (`pg_dump --schema-only --no-owner --no-privileges`).
 - `esquema.json`: el mismo esquema en formato legible por programas.
-- `cambios-desde-003.md`: lo que agregan las migraciones 004 a 008 respecto de 001 a 003.
+- `cambios-desde-003.md`: lo que agregan las migraciones 004 a 009 respecto de 001 a 003.
 
 ## Resumen
 
@@ -16,8 +16,9 @@ Archivos relacionados:
 | [`antecedentes_usuario`](#antecedentes_usuario) | 8 | 2 | 3 | `008_antecedentes_usuario.sql` |
 | [`cambios_estado_caso`](#cambios_estado_caso) | 6 | 2 | 2 | `001_esquema_inicial.sql` |
 | [`cambios_estado_pista`](#cambios_estado_pista) | 7 | 1 | 2 | `001_esquema_inicial.sql` |
-| [`casos`](#casos) | 37 | 6 | 1 | `001_esquema_inicial.sql` |
+| [`casos`](#casos) | 39 | 6 | 1 | `001_esquema_inicial.sql` |
 | [`codigos_verificacion`](#codigos_verificacion) | 11 | 2 | 0 | `001_esquema_inicial.sql` |
+| [`ediciones_caso`](#ediciones_caso) | 7 | 2 | 2 | `009_ediciones_reportante.sql` |
 | [`notificaciones`](#notificaciones) | 11 | 3 | 2 | `001_esquema_inicial.sql` |
 | [`pistas`](#pistas) | 11 | 2 | 2 | `001_esquema_inicial.sql` |
 | [`schema_migrations`](#schema_migrations) | 3 | 1 | 0 | `backend/db.js (initializeDatabase)` |
@@ -169,9 +170,12 @@ Creada en `001_esquema_inicial.sql`.
 | `seguimiento_intentos` | smallint | no | `0` |
 | `declaracion_aceptada_en` | timestamp with time zone | sí |  |
 | `declaracion_version` | text | sí |  |
+| `modificado_en` | timestamp with time zone | sí |  |
+| `ediciones_reportante` | integer | no | `0` |
 
 Restricciones:
 
+- `casos_ediciones_reportante_check` (CHECK): `CHECK ((ediciones_reportante >= 0))`
 - `casos_seguimiento_intentos_check` (CHECK): `CHECK (((seguimiento_intentos >= 0) AND (seguimiento_intentos <= 2)))`
 - `casos_reportado_por_usr_id_fkey` (FOREIGN KEY): `FOREIGN KEY (reportado_por_usr_id) REFERENCES usuarios(id)`
 - `casos_pkey` (PRIMARY KEY): `PRIMARY KEY (id)`
@@ -213,6 +217,32 @@ Restricciones:
 
 - `codigos_verificacion_correo_proposito_key`: `UNIQUE btree (correo, proposito)`
 - `codigos_verificacion_pkey`: `UNIQUE btree (id)`
+
+## ediciones_caso
+
+Creada en `009_ediciones_reportante.sql`.
+
+| Columna | Tipo | Nulo | Por defecto |
+|---|---|---|---|
+| `id` | bigint | no | `nextval('ediciones_caso_id_seq'::regclass)` |
+| `caso_id` | text | no |  |
+| `usuario_id` | integer | sí |  |
+| `editado_en` | timestamp with time zone | no | `CURRENT_TIMESTAMP` |
+| `cambios` | jsonb | no |  |
+| `declaracion_version` | text | no |  |
+| `declaracion_aceptada_en` | timestamp with time zone | no | `CURRENT_TIMESTAMP` |
+
+Restricciones:
+
+- `ediciones_caso_cambios_check` (CHECK): `CHECK (((jsonb_typeof(cambios) = 'array'::text) AND (jsonb_array_length(cambios) > 0)))`
+- `ediciones_caso_caso_id_fkey` (FOREIGN KEY): `FOREIGN KEY (caso_id) REFERENCES casos(id) ON DELETE CASCADE`
+- `ediciones_caso_usuario_id_fkey` (FOREIGN KEY): `FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL`
+- `ediciones_caso_pkey` (PRIMARY KEY): `PRIMARY KEY (id)`
+
+Índices:
+
+- `ediciones_caso_pkey`: `UNIQUE btree (id)`
+- `idx_ediciones_caso`: `btree (caso_id, editado_en)`
 
 ## notificaciones
 
