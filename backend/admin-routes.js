@@ -23,6 +23,16 @@ const ANTECEDENTES_ACTIVOS_DEL_REPORTANTE = `(
   WHERE ant.usuario_id = c.reportado_por_usr_id AND ant.retirado_en IS NULL
 )`;
 
+// Ediciones del reportante sobre el caso c, de la más reciente a la más vieja:
+// fecha, campos con su antes y después, y la declaración que volvió a aceptar.
+const EDICIONES_DEL_REPORTANTE = `(
+  SELECT COALESCE(json_agg(json_build_object(
+    'editadoEn', e.editado_en, 'cambios', e.cambios,
+    'declaracionVersion', e.declaracion_version, 'declaracionAceptadaEn', e.declaracion_aceptada_en
+  ) ORDER BY e.editado_en DESC, e.id DESC), '[]'::json)
+  FROM ediciones_caso e WHERE e.caso_id = c.id
+)`;
+
 // Panel de administración: listado y moderación de casos, auditoría, historial
 // de localizados y simulador de seguimiento. Todas las rutas exigen administrador.
 export function createAdminRouter({ db, requireAdmin, push }) {
@@ -33,6 +43,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
     const { rows } = await db.query(`
       SELECT ${caseListColumns('c')}, u.correo AS contacto_reportante,
         ${ANTECEDENTES_ACTIVOS_DEL_REPORTANTE} AS antecedentes_reportante,
+        ${EDICIONES_DEL_REPORTANTE} AS ediciones,
         COUNT(*) OVER() AS total_registros
       FROM casos c LEFT JOIN usuarios u ON u.id = c.reportado_por_usr_id
       ORDER BY c.creado_en DESC

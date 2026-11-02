@@ -33,7 +33,10 @@ export const estado = {
   routeApplyToken: 0,
   pendingDestination: null,
 
-  // Reportar caso (6)
+  // Reportar caso (7)
+  // reportEdicion: al editar un caso propio en revisión, { casoId, teniaFoto,
+  // fotoAccion: 'mantener' | 'reemplazar' | 'quitar' }; null al reportar uno nuevo.
+  reportEdicion: null,
   reportMarker: null,
   reportGeocodeToken: 0,
   selectedReportPhoto: null,

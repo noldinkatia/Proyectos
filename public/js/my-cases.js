@@ -34,7 +34,7 @@ export function renderMyCasesView(cases, notifications) {
                 <span class="status-tag status-${escapeHtml(c.estado)}">${escapeHtml(statusLabel(c.estado))}</span></div>
               <p class="my-case-meta">Reportado ${new Date(c.fechaCreacion).toLocaleString('es-PY')}</p>
               <button type="button" class="btn btn-outline btn-sm my-case-ficha" data-case-id="${escapeHtml(c.id)}" data-on-click="openOwnCaseDetail(this.dataset.caseId)">Ver ficha</button>
-              ${c.estado === 'PENDIENTE' ? '<p class="my-case-notice">Tu reporte está en revisión. Recibirás un aviso cuando se actualice.</p>' : ''}
+              ${c.estado === 'PENDIENTE' ? `<p class="my-case-notice">Tu reporte está en revisión. Recibirás un aviso cuando se actualice.</p>${edicionDelReporte(c)}` : ''}
               ${c.estado === 'LOCALIZADO' ? `<p class="my-case-notice">La persona fue localizada.${fechaCierre(c.cierreAutomaticoEn)}</p>` : ''}
               ${c.estado === 'RECHAZADO' ? `<p class="my-case-notice">${escapeHtml(c.motivoRechazo || 'El reporte no fue aprobado. Contactá a soporte para más información.')}</p>` : ''}
               ${activo ? `<div class="my-case-actions table-actions">
@@ -51,6 +51,20 @@ export function renderMyCasesView(cases, notifications) {
         </aside>
       </div>
     </section>`;
+}
+
+// Mientras está en revisión, quien lo reportó puede corregirlo (hasta el tope que
+// manda el servidor en edicionesDisponibles). El servidor también lo valida.
+function edicionDelReporte(c) {
+  const editado = c.modificadoEn
+    ? `<p class="my-case-meta">Última edición: ${escapeHtml(new Date(c.modificadoEn).toLocaleString('es-PY'))}</p>` : '';
+  if (!c.edicionesDisponibles) {
+    return c.modificadoEn ? `${editado}<p class="my-case-meta">Ya usaste todas las ediciones permitidas.</p>` : editado;
+  }
+  return `${editado}<div class="my-case-actions table-actions">
+    <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="navigateTo('report', {caseId:this.dataset.caseId})">Editar reporte</button>
+  </div>
+  <p class="my-case-meta">Podés editarlo ${c.edicionesDisponibles === 1 ? 'una vez más' : `${Number(c.edicionesDisponibles)} veces más`}.</p>`;
 }
 
 // Fecha del cierre automático de un caso localizado (backend/followups.js).

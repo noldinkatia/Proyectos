@@ -10,7 +10,7 @@ import { clearLeadPhotoSelection, initLeadLeafletMap, renderLeadCaseSelection, r
 import { initMainLeafletMap } from './map.js';
 import { renderMyCasesView } from './my-cases.js';
 import { renderNotifList, updateNotifBadge } from './notifications.js';
-import { initReportLeafletMap, initReportLocationSelects, removeReportPhoto, renderReportView } from './report.js';
+import { initReportLeafletMap, initReportLocationSelects, precargarReporte, removeReportPhoto, renderReportView } from './report.js';
 import { debeAceptarBases } from './sesion.js';
 import { renderStatsView } from './stats.js';
 import { getStore } from './store.js';
@@ -27,7 +27,7 @@ export function consumePendingDestination() {
 
 export function buildRoute(view, params = {}) {
   switch (view) {
-    case 'report': return '#/reportar';
+    case 'report': return params.caseId ? `#/editar-reporte/${encodeURIComponent(params.caseId)}` : '#/reportar';
     case 'lead': return params.caseId ? `#/pista/${encodeURIComponent(params.caseId)}` : '#/pista';
     case 'case': return `#/caso/${encodeURIComponent(params.caseId)}`;
     case 'alert': return `#/alerta/${encodeURIComponent(params.caseId)}`;
@@ -59,6 +59,7 @@ export function parseRoute(hash = location.hash) {
   }
   switch (head) {
     case 'reportar': return { view: 'report', params: {} };
+    case 'editar-reporte': return tail ? { view: 'report', params: { caseId: tail } } : { view: 'my-cases', params: {} };
     case 'pista': return { view: 'lead', params: tail ? { caseId: tail } : {} };
     case 'caso': return tail ? { view: 'feed', params: {}, caseId: tail } : { view: 'feed', params: {} };
     case 'alerta': return tail ? { view: 'alert', params: { caseId: tail } } : { view: 'feed', params: {} };
@@ -262,6 +263,7 @@ export async function navigateTo(view, params = {}, options = {}) {
   let myCases = [];
   let myNotifications = [];
   let alertData = null;
+  let reportEdicion = null;
   if (view === 'feed' || view === 'lead') {
     try {
       const [caseResult, clueResult] = await Promise.all([
@@ -345,6 +347,20 @@ export async function navigateTo(view, params = {}, options = {}) {
       openCaseDetail(params.caseId);
       return;
     }
+  } else if (view === 'report' && params.caseId) {
+    // Editar un reporte propio: solo en revisión y con ediciones disponibles (el
+    // servidor también lo exige).
+    try {
+      reportEdicion = (await apiRequest('/mis-casos')).casos.find(c => c.id === params.caseId) || null;
+    } catch (error) {
+      showToast('No se pudo abrir el reporte', error.message, 'error');
+      return;
+    }
+    if (reportEdicion?.estado !== 'PENDIENTE' || !reportEdicion.edicionesDisponibles) {
+      showToast('No se puede editar', 'Solo podés editar tus reportes mientras están en revisión, hasta 5 veces.', 'error');
+      await navigateTo('my-cases', {}, { replace: true });
+      return;
+    }
   } else if (view === 'my-cases') {
     try {
       const [caseResult, notificationResult] = await Promise.all([
@@ -370,10 +386,17 @@ export async function navigateTo(view, params = {}, options = {}) {
       startLiveSyncPolling('feed');
       break;
     case 'report':
+      estado.reportEdicion = null;
       removeReportPhoto();
-      main.innerHTML = renderReportView();
-      initReportLocationSelects();
-      initReportLeafletMap();
+      estado.reportEnviando = false;
+      main.innerHTML = renderReportView(reportEdicion);
+      if (reportEdicion) {
+        estado.reportEdicion = { casoId: reportEdicion.id, teniaFoto: Boolean(reportEdicion.fotoUrl), fotoAccion: 'mantener' };
+        precargarReporte(reportEdicion);
+      } else {
+        initReportLocationSelects();
+      }
+      initReportLeafletMap(reportEdicion?.ubicacion);
       break;
     case 'lead':
       if (params.caseId) {

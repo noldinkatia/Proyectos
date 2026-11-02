@@ -11,6 +11,7 @@ import {
   enviarFotoGuardada,
   hasPhoto,
   IMAGE_DATA_URL,
+  LIMITE_EDICIONES_REPORTE,
   paginatedBody,
   paginationFromQuery,
   PUBLIC_CASE_FILTER,
@@ -30,6 +31,89 @@ import { DECLARACION_VERSION } from '../public/js/declaracion.js';
 import { avisoLocalizadoAlReportante } from './followups.js';
 
 export { processDueFollowups } from './followups.js';
+
+// Reglas de un reporte, al publicarlo (POST /casos) y al editarlo (PUT
+// /mis-casos/:id). Devuelve el mensaje de error o '' si se puede guardar.
+function errorDelReporte(body) {
+  const requiredText = ['nombreCompleto', 'sexo', 'ciudad', 'departamento', 'descripcionFisica', 'vestimenta', 'fechaHoraDesaparicion'];
+  if (requiredText.some(key => typeof body[key] !== 'string' || !body[key].trim())
+    || !Number.isInteger(body.edad) || body.edad < 0 || body.edad > 120
+    || !validCoordinates(Number(body.ubicacion?.lat), Number(body.ubicacion?.lng))
+    || Number.isNaN(Date.parse(body.fechaHoraDesaparicion))
+    || body.declaraMayorEdad !== true
+    || body.avisoPrivacidadAceptado !== true
+    || (body.edad < 18 && body.autorizacionParental !== true)) {
+    return 'Los datos del caso están incompletos o no son válidos.';
+  }
+  // Declaración de responsabilidad: obligatoria y de la versión vigente, también al
+  // editar. La hora la pone el servidor (CURRENT_TIMESTAMP), no el navegador.
+  if (body.declaracionAceptada !== true) {
+    return 'Para publicar el reporte tenés que aceptar la declaración de responsabilidad.';
+  }
+  if (body.declaracionVersion !== DECLARACION_VERSION) {
+    return 'La declaración de responsabilidad cambió. Recargá la página para leer la versión vigente.';
+  }
+  const barrio = typeof body.barrio === 'string' ? body.barrio.trim() : '';
+  if (!ubicacionValida(body.departamento, body.ciudad, barrio)) {
+    return 'Elegí un departamento, ciudad y barrio de la lista de Paraguay.';
+  }
+  if (body.foto && (typeof body.foto !== 'string'
+    || !IMAGE_DATA_URL.test(body.foto)
+    || Buffer.byteLength(body.foto, 'utf8') > 10 * 1024 * 1024)) {
+    return 'La fotografía debe ser JPEG, PNG o WEBP y no superar 10 MB.';
+  }
+  return '';
+}
+
+// Campos editables de un reporte, normalizados como al publicarlo (POST /casos):
+// lo que manda el navegador y lo guardado en el caso, con los mismos nombres.
+// El antes y el después de cada edición se arma comparando los dos.
+function valoresDelReporte(body) {
+  return {
+    nombreCompleto: body.nombreCompleto.trim(),
+    edad: Number(body.edad),
+    sexo: body.sexo.trim(),
+    departamento: body.departamento.trim(),
+    ciudad: body.ciudad.trim(),
+    barrio: typeof body.barrio === 'string' ? body.barrio.trim() : '',
+    descripcionFisica: body.descripcionFisica.trim(),
+    vestimenta: body.vestimenta.trim(),
+    senasParticulares: typeof body.senasParticulares === 'string' ? body.senasParticulares : '',
+    fechaHoraDesaparicion: new Date(body.fechaHoraDesaparicion).toISOString(),
+    latitud: Number(body.ubicacion.lat),
+    longitud: Number(body.ubicacion.lng),
+    numeroDenuncia: typeof body.numeroDenuncia === 'string' ? body.numeroDenuncia.trim() : '',
+    autorizacionParental: body.autorizacionParental === true
+  };
+}
+
+function valoresDeLaFila(row) {
+  return {
+    nombreCompleto: row.nombre_completo,
+    edad: Number(row.edad),
+    sexo: row.sexo,
+    departamento: row.departamento || '',
+    ciudad: row.ciudad,
+    barrio: row.barrio || '',
+    descripcionFisica: row.descripcion_fisica,
+    vestimenta: row.vestimenta,
+    senasParticulares: row.senas_particulares || '',
+    fechaHoraDesaparicion: new Date(row.fecha_hora_desaparicion).toISOString(),
+    latitud: Number(row.latitud),
+    longitud: Number(row.longitud),
+    numeroDenuncia: row.numero_denuncia || '',
+    autorizacionParental: Boolean(row.autorizacion_parental),
+    alertaCampos: Array.isArray(row.alerta_campos) ? row.alerta_campos : []
+  };
+}
+
+// La fecha se compara al minuto: el formulario (datetime-local) no tiene segundos.
+function mismoValor(campo, anterior, nuevo) {
+  if (campo === 'fechaHoraDesaparicion') {
+    return Math.floor(Date.parse(anterior) / 60_000) === Math.floor(Date.parse(nuevo) / 60_000);
+  }
+  return JSON.stringify(anterior) === JSON.stringify(nuevo);
+}
 
 // Router de /api: define los permisos comunes y las rutas de casos del ciudadano,
 // y monta los routers de pistas, notificaciones, estadísticas y administración.
@@ -125,35 +209,75 @@ export function createCaseRouter({ db, jwtSecret, push }) {
     enviarFotoGuardada(res, rows);
   }));
 
+  // Edición del reporte por quien lo hizo, solo mientras está PENDIENTE (en
+  // cualquier otro caso, 403). El caso sigue PENDIENTE con su fecha de creación y
+  // su seguimiento; no se envía otra alerta temprana ni se toca alerta_temprana_en,
+  // así que tampoco cuenta para el límite de 24 h por reportante. Quien consulte la
+  // alerta ya enviada ve los datos nuevos (/alertas/:casoId lee el caso). Cada
+  // edición queda en ediciones_caso con el antes y el después (migración 009).
+  // fotoAccion: 'mantener' (por defecto), 'reemplazar' (con foto) o 'quitar'.
+  router.put('/mis-casos/:id', ...requireCitizen, asyncRoute(async (req, res) => {
+    const body = req.body || {};
+    const error = errorDelReporte(body);
+    if (error) return res.status(400).json({ error });
+    const fotoAccion = body.fotoAccion ?? 'mantener';
+    if (!['mantener', 'reemplazar', 'quitar'].includes(fotoAccion) || (fotoAccion === 'reemplazar' && !body.foto)) {
+      return res.status(400).json({ error: 'Los datos de la fotografía no son válidos.' });
+    }
+    const nuevo = valoresDelReporte(body);
+    const resultado = await withTransaction(db, async client => {
+      const { rows } = await client.query('SELECT * FROM casos WHERE id = $1 FOR UPDATE', [req.params.id]);
+      const caso = rows[0];
+      if (!caso || caso.reportado_por_usr_id !== req.auth.id || caso.estado !== 'PENDIENTE') {
+        return { status: 403, error: 'Solo podés editar tus reportes mientras están en revisión.' };
+      }
+      if (caso.ediciones_reportante >= LIMITE_EDICIONES_REPORTE) {
+        return { status: 409, error: `Ya editaste este reporte ${LIMITE_EDICIONES_REPORTE} veces, el máximo permitido. Si necesitás corregir algo más, esperá la revisión de la administración.` };
+      }
+      const tieneFoto = fotoAccion === 'reemplazar' || (fotoAccion === 'mantener' && Boolean(caso.foto));
+      nuevo.alertaCampos = normalizarCamposAlerta(body.alertaCampos, { edad: nuevo.edad, tieneFoto });
+      const anterior = valoresDeLaFila(caso);
+      const cambios = Object.keys(nuevo)
+        .filter(campo => !mismoValor(campo, anterior[campo], nuevo[campo]))
+        .map(campo => ({ campo, anterior: anterior[campo], nuevo: nuevo[campo] }));
+      // De la foto solo se registra qué pasó, nunca su contenido.
+      if (fotoAccion === 'reemplazar') {
+        cambios.push({ campo: 'foto', anterior: caso.foto ? 'con foto' : 'sin foto', nuevo: caso.foto ? 'reemplazada' : 'agregada' });
+      } else if (fotoAccion === 'quitar' && caso.foto) {
+        cambios.push({ campo: 'foto', anterior: 'con foto', nuevo: 'quitada' });
+      }
+      if (!cambios.length) return { status: 400, error: 'No hay cambios para guardar.' };
+
+      const { rows: actualizados } = await client.query(`
+        UPDATE casos SET nombre_completo = $2, edad = $3, sexo = $4, departamento = $5, ciudad = $6, barrio = $7,
+          descripcion_fisica = $8, vestimenta = $9, senas_particulares = $10, fecha_hora_desaparicion = $11,
+          latitud = $12, longitud = $13, direccion = $14, numero_denuncia = $15, autorizacion_parental = $16,
+          alerta_campos = $17, foto = CASE $18 WHEN 'reemplazar' THEN $19 WHEN 'quitar' THEN '' ELSE foto END,
+          modificado_en = CURRENT_TIMESTAMP, ediciones_reportante = ediciones_reportante + 1
+        WHERE id = $1 RETURNING *
+      `, [
+        caso.id, nuevo.nombreCompleto, nuevo.edad, nuevo.sexo, nuevo.departamento, nuevo.ciudad, nuevo.barrio,
+        nuevo.descripcionFisica, nuevo.vestimenta, nuevo.senasParticulares, nuevo.fechaHoraDesaparicion,
+        nuevo.latitud, nuevo.longitud, body.ubicacion.direccion || nuevo.ciudad, nuevo.numeroDenuncia,
+        nuevo.autorizacionParental, JSON.stringify(nuevo.alertaCampos), fotoAccion, body.foto || ''
+      ]);
+      // La declaración se volvió a aceptar: versión y hora del servidor en la edición.
+      // casos.declaracion_aceptada_en conserva la aceptación original.
+      await client.query(`
+        INSERT INTO ediciones_caso (caso_id, usuario_id, cambios, declaracion_version)
+        VALUES ($1, $2, $3, $4)
+      `, [caso.id, req.auth.id, JSON.stringify(cambios), DECLARACION_VERSION]);
+      return { caso: actualizados[0] };
+    });
+    if (resultado.error) return res.status(resultado.status).json({ error: resultado.error });
+    res.json({ caso: toOwnerCase(resultado.caso) });
+  }));
+
   router.post('/casos', ...requireCitizen, asyncRoute(async (req, res) => {
     const body = req.body || {};
-    const requiredText = ['nombreCompleto', 'sexo', 'ciudad', 'departamento', 'descripcionFisica', 'vestimenta', 'fechaHoraDesaparicion'];
-    if (requiredText.some(key => typeof body[key] !== 'string' || !body[key].trim())
-      || !Number.isInteger(body.edad) || body.edad < 0 || body.edad > 120
-      || !validCoordinates(Number(body.ubicacion?.lat), Number(body.ubicacion?.lng))
-      || Number.isNaN(Date.parse(body.fechaHoraDesaparicion))
-      || body.declaraMayorEdad !== true
-      || body.avisoPrivacidadAceptado !== true
-      || (body.edad < 18 && body.autorizacionParental !== true)) {
-      return res.status(400).json({ error: 'Los datos del caso están incompletos o no son válidos.' });
-    }
-    // Declaración de responsabilidad: obligatoria y de la versión vigente. La hora
-    // la pone el servidor (CURRENT_TIMESTAMP al insertar), no el navegador.
-    if (body.declaracionAceptada !== true) {
-      return res.status(400).json({ error: 'Para publicar el reporte tenés que aceptar la declaración de responsabilidad.' });
-    }
-    if (body.declaracionVersion !== DECLARACION_VERSION) {
-      return res.status(400).json({ error: 'La declaración de responsabilidad cambió. Recargá la página para leer la versión vigente.' });
-    }
+    const error = errorDelReporte(body);
+    if (error) return res.status(400).json({ error });
     const barrio = typeof body.barrio === 'string' ? body.barrio.trim() : '';
-    if (!ubicacionValida(body.departamento, body.ciudad, barrio)) {
-      return res.status(400).json({ error: 'Elegí un departamento, ciudad y barrio de la lista de Paraguay.' });
-    }
-    if (body.foto && (typeof body.foto !== 'string'
-      || !IMAGE_DATA_URL.test(body.foto)
-      || Buffer.byteLength(body.foto, 'utf8') > 10 * 1024 * 1024)) {
-      return res.status(400).json({ error: 'La fotografía debe ser JPEG, PNG o WEBP y no superar 10 MB.' });
-    }
     const denuncia = typeof body.numeroDenuncia === 'string' ? body.numeroDenuncia.trim() : '';
     const id = `cas_${randomUUID()}`;
     let alertasPush = [];

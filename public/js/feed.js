@@ -330,7 +330,11 @@ export function openCaseDetail(caseId, options = {}) {
 export function openOwnCaseDetail(caseId) {
   const c = (estado.misCasos || []).find(item => item.id === caseId);
   if (!c) return;
-  mostrarFicha(renderCaseDetailHtml(c, { fotoProtegida: true, acciones: false }));
+  // En revisión y con ediciones disponibles, se puede corregir desde la ficha.
+  const editar = c.estado === 'PENDIENTE' && c.edicionesDisponibles
+    ? `<div class="case-detail-actions"><button type="button" class="btn btn-primary btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="closeCaseDetail({silent:true}); navigateTo('report', {caseId:this.dataset.caseId})">Editar reporte</button></div>`
+    : '';
+  mostrarFicha(renderCaseDetailHtml(c, { fotoProtegida: true, acciones: false }) + editar);
 }
 
 function mostrarFicha(html) {

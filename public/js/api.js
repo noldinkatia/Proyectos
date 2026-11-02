@@ -3,12 +3,17 @@ import { API_BASE } from './config.js';
 // Las fotos de casos y pistas exigen sesión, pero un <img src> no manda el token:
 // se piden con fetch y se muestran como blob. Lanza un error si no se pudo.
 export async function showProtectedPhoto(image, url) {
+  const photo = URL.createObjectURL(await pedirFotoProtegida(url));
+  image.src = photo;
+  image.addEventListener('load', () => URL.revokeObjectURL(photo), { once: true });
+}
+
+// La foto como Blob, pedida con la sesión. Lanza un error si no se pudo.
+export async function pedirFotoProtegida(url) {
   const token = sessionStorage.getItem('rastreo_token');
   const response = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
   if (!response.ok) throw new Error(`No se pudo obtener la fotografía (${response.status}).`);
-  const photo = URL.createObjectURL(await response.blob());
-  image.src = photo;
-  image.addEventListener('load', () => URL.revokeObjectURL(photo), { once: true });
+  return response.blob();
 }
 
 async function cargarFotoProtegida(image) {

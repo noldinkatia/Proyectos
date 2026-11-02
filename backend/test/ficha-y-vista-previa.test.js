@@ -6,6 +6,7 @@ import { DECLARACION_VERSION } from '../../public/js/declaracion.js';
 import { createDatabase, initializeDatabase, seedAdministrator } from '../db.js';
 import { createApp } from '../server.js';
 import { borrarUsuariosDePrueba } from '../ayuda-tests/limpieza.js';
+import { instalarDom } from '../ayuda-tests/dom-falso.js';
 
 // Foto en la ficha (feed, Mis casos, panel) y vista previa antes de publicar.
 // La ficha es una sola plantilla (renderCaseDetailHtml, feed.js) para la ficha
@@ -14,46 +15,6 @@ const secret = 'test-secret-with-at-least-thirty-two-characters';
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const conPostgres = { skip: !testDatabaseUrl && 'Defina TEST_DATABASE_URL para ejecutar la prueba de integración con PostgreSQL.' };
 const publicDir = new URL('../../public/', import.meta.url);
-
-// DOM mínimo: cada id es un elemento que se crea al pedirlo.
-function elementoFalso(id) {
-  const clases = new Set();
-  return {
-    id, value: '', checked: false, textContent: '', innerHTML: '', disabled: false, dataset: {},
-    classList: {
-      add: c => clases.add(c),
-      remove: c => clases.delete(c),
-      contains: c => clases.has(c),
-      toggle: (c, forzar = !clases.has(c)) => (forzar ? clases.add(c) : clases.delete(c), forzar)
-    },
-    scrollIntoView() {}, focus() {}, reset() {},
-    querySelector: () => elementoFalso(`${id} hijo`),
-    querySelectorAll: () => []
-  };
-}
-
-function instalarDom(valores = {}, ocultos = []) {
-  const elementos = new Map();
-  const obtener = id => {
-    if (!elementos.has(id)) elementos.set(id, elementoFalso(id));
-    return elementos.get(id);
-  };
-  for (const [id, valor] of Object.entries(valores)) obtener(id).value = valor;
-  for (const id of ocultos) obtener(id).classList.add('hidden');
-  const anteriores = {
-    document: globalThis.document, window: globalThis.window, fetch: globalThis.fetch,
-    localStorage: globalThis.localStorage, sessionStorage: globalThis.sessionStorage
-  };
-  globalThis.document = { getElementById: obtener, querySelectorAll: () => [], createElement: () => elementoFalso('nuevo') };
-  globalThis.window = { backendCaseData: { casos: [], pistas: [] } };
-  const almacen = { getItem: () => null, setItem() {}, removeItem() {} };
-  globalThis.localStorage = almacen;
-  globalThis.sessionStorage = { ...almacen, getItem: () => 'tok' };
-  return {
-    obtener,
-    restaurar: () => Object.assign(globalThis, anteriores)
-  };
-}
 
 const { renderCaseDetailHtml, openCaseDetail, openOwnCaseDetail } = await import(new URL('js/feed.js', publicDir));
 const { estado } = await import(new URL('js/estado.js', publicDir));

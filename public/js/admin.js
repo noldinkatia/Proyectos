@@ -64,7 +64,7 @@ export function renderAdminView(history, clues = [], audit = []) {
         <p class="workflow-guidance"><strong>Flujo seguro:</strong> 1. Validar con la lista de control → 2. Aprobar y publicar. También podés rechazar con motivo; los cambios quedan registrados.</p>
         ${pending.length ? `<div class="table-scroll"><table><thead><tr><th>Caso</th><th>Estado</th><th>Validación</th><th>Reportado</th><th>Acciones</th></tr></thead><tbody>
           ${pending.map(c => `<tr>
-            <td data-label="Caso"><strong>${escapeHtml(c.nombreCompleto)}</strong><br><span class="muted">${escapeHtml(c.ciudad)}, ${Number(c.edad)} años</span>${avisoAntecedente(c)}</td>
+            <td data-label="Caso"><strong>${escapeHtml(c.nombreCompleto)}</strong><br><span class="muted">${escapeHtml(c.ciudad)}, ${Number(c.edad)} años</span>${avisoAntecedente(c)}${avisoModificado(c)}</td>
             <td data-label="Estado"><span class="status-tag status-PENDIENTE">En revisión</span></td>
             <td data-label="Validación"><span class="validation-state">Sin validar</span></td>
             <td data-label="Reportado">${timeSince(c.fechaCreacion)}</td>
@@ -81,7 +81,7 @@ export function renderAdminView(history, clues = [], audit = []) {
         <h2>Gestión de casos</h2>
         ${store.casos.length ? `<div class="table-scroll"><table><thead><tr><th>Persona</th><th>Ciudad</th><th>Denuncia</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>
           ${store.casos.map(c => `<tr id="admin-case-${escapeHtml(c.id)}">
-            <td data-label="Persona">${escapeHtml(c.nombreCompleto)}</td>
+            <td data-label="Persona">${escapeHtml(c.nombreCompleto)}${avisoModificado(c)}</td>
             <td data-label="Ciudad">${escapeHtml(c.ciudad)}</td>
             <td data-label="Denuncia">${escapeHtml(c.numeroDenuncia || 'Sin registrar')}</td>
             <td data-label="Estado"><span class="status-tag status-${escapeHtml(c.estado)}">${escapeHtml(statusLabel(c.estado))}</span></td>
@@ -261,6 +261,40 @@ function alertFieldLabels(fields = []) {
   return labels.length ? labels.join(', ') : 'solo el aviso de caso en revisión';
 }
 
+// Ediciones del reportante mientras el caso estaba en revisión (migración 009). En
+// las filas va una marca corta con la fecha; en la revisión, qué cambió en cada
+// edición (antes y después). Queda como historial aunque se valide o rechace.
+const ETIQUETAS_EDICION = {
+  nombreCompleto: 'Nombre', edad: 'Edad', sexo: 'Sexo', departamento: 'Departamento', ciudad: 'Ciudad',
+  barrio: 'Barrio', descripcionFisica: 'Descripción física', vestimenta: 'Vestimenta',
+  senasParticulares: 'Señas particulares', fechaHoraDesaparicion: 'Fecha y hora de desaparición',
+  latitud: 'Lugar (latitud)', longitud: 'Lugar (longitud)', numeroDenuncia: 'N.º de denuncia',
+  autorizacionParental: 'Autorización parental', alertaCampos: 'Datos de la alerta temprana', foto: 'Fotografía'
+};
+
+function valorEditado(campo, valor) {
+  if (campo === 'alertaCampos') return alertFieldLabels(Array.isArray(valor) ? valor : []);
+  if (campo === 'fechaHoraDesaparicion') return new Date(valor).toLocaleString('es-PY');
+  if (typeof valor === 'boolean') return valor ? 'Sí' : 'No';
+  return valor === '' || valor === null || valor === undefined ? '(vacío)' : String(valor);
+}
+
+export function avisoModificado(c, { detalle = false } = {}) {
+  if (!c?.modificadoEn) return '';
+  const fecha = escapeHtml(new Date(c.modificadoEn).toLocaleString('es-PY'));
+  if (!detalle) return `<br><span class="marca-modificado">✎ Modificado por el reportante el ${fecha}</span>`;
+  const ediciones = (Array.isArray(c.ediciones) ? c.ediciones : []).map(edicion => `
+      <li><strong>${escapeHtml(new Date(edicion.editadoEn).toLocaleString('es-PY'))}</strong>
+        <span class="muted">(volvió a aceptar la declaración, versión ${escapeHtml(edicion.declaracionVersion || '')})</span>
+        <table class="tabla-ediciones"><thead><tr><th>Campo</th><th>Antes</th><th>Después</th></tr></thead><tbody>
+          ${(edicion.cambios || []).map(cambio => `<tr><td>${escapeHtml(ETIQUETAS_EDICION[cambio.campo] || cambio.campo)}</td><td>${escapeHtml(valorEditado(cambio.campo, cambio.anterior))}</td><td>${escapeHtml(valorEditado(cambio.campo, cambio.nuevo))}</td></tr>`).join('')}
+        </tbody></table></li>`).join('');
+  return `<div class="aviso-modificado" role="note">
+      <p><strong>✎ Modificado por el reportante el ${fecha}</strong> (${Number(c.edicionesReportante) || 0} ${Number(c.edicionesReportante) === 1 ? 'edición' : 'ediciones'} mientras estaba en revisión).</p>
+      <ol>${ediciones}</ol>
+    </div>`;
+}
+
 // Antecedentes activos de quien reportó (solo el panel; el ciudadano nunca los ve).
 // No bloquean nada: avisan para revisar el reporte con más cuidado. En la fila de
 // la bandeja va una marca corta; en la revisión, el detalle con los botones.
@@ -327,8 +361,9 @@ export function adminAccept(caseId) {
     <span>Vestimenta: ${escapeHtml(selectedCase.vestimenta || 'Sin especificar')}</span>
     <span>Autorización parental: ${selectedCase.autorizacionParental ? 'Registrada' : 'No registrada / no aplica'}</span>
     ${avisoAntecedente(selectedCase, { detalle: true })}
+    ${avisoModificado(selectedCase, { detalle: true })}
     <span>Declaración de responsabilidad: ${selectedCase.declaracionAceptadaEn ? `aceptada el ${escapeHtml(new Date(selectedCase.declaracionAceptadaEn).toLocaleString('es-PY'))} (versión ${escapeHtml(selectedCase.declaracionVersion || '')})` : 'sin registro (reporte anterior a la declaración)'}</span>
-    <span>Alerta temprana: ${selectedCase.alertaTempranaEn ? `enviada el ${escapeHtml(new Date(selectedCase.alertaTempranaEn).toLocaleString('es-PY'))}` : 'no enviada (posible duplicado o límite por reportante)'}. El reportante eligió mostrar: ${escapeHtml(alertFieldLabels(selectedCase.alertaCampos))}</span>
+    <span>Alerta temprana: ${selectedCase.alertaTempranaEn ? `enviada el ${escapeHtml(new Date(selectedCase.alertaTempranaEn).toLocaleString('es-PY'))}` : 'no enviada (posible duplicado o límite por reportante)'} · El reportante eligió mostrar: ${escapeHtml(alertFieldLabels(selectedCase.alertaCampos))}</span>
   ` : '<span>No se pudo cargar el detalle del caso. Actualizá el panel e intentá otra vez.</span>';
   // La foto se pide con la sesión de administración (/api/admin/casos/:id/foto).
   loadProtectedPhotos(detail);

@@ -19,6 +19,9 @@ export function leerLimiteCierreLocalizado(valor) {
 
 export const LIMITE_CIERRE_LOCALIZADO_DIAS = leerLimiteCierreLocalizado(process.env.LIMITE_CIERRE_LOCALIZADO_DIAS);
 
+// Veces que quien reporta puede editar su reporte mientras está en revisión.
+export const LIMITE_EDICIONES_REPORTE = 5;
+
 // Encontrado = llegó a localizado. localizado_en se conserva al cerrar (a mano o
 // por el cierre automático), así sigue contando; un caso cerrado sin haber sido
 // localizado no cuenta. alias: prefijo de tabla en consultas con JOIN ('c.').
@@ -49,7 +52,8 @@ export function caseListColumns(alias = '') {
     'reportante_mayor_edad', 'autorizacion_parental', 'aviso_privacidad_aceptado',
     'declaracion_aceptada_en', 'declaracion_version',
     'checklist_denuncia', 'checklist_coherencia', 'checklist_duplicados', 'checklist_menores',
-    'motivo_cierre', 'seguimiento_etapa', 'alerta_campos', 'alerta_temprana_en'
+    'motivo_cierre', 'seguimiento_etapa', 'alerta_campos', 'alerta_temprana_en',
+    'modificado_en', 'ediciones_reportante'
   ].map(column => `${prefix}${column}`).join(', ') + `, (${prefix}foto <> '') AS tiene_foto`;
 }
 
@@ -122,6 +126,12 @@ export function toOwnerCase(row) {
     ...toPublicCase(row),
     numeroDenuncia: row.numero_denuncia,
     proximoSeguimiento: row.proximo_seguimiento,
+    // Para editar el reporte (formulario precargado) mientras está en revisión.
+    alertaCampos: Array.isArray(row.alerta_campos) ? row.alerta_campos : [],
+    autorizacionParental: Boolean(row.autorizacion_parental),
+    modificadoEn: row.modificado_en || null,
+    edicionesReportante: Number(row.ediciones_reportante) || 0,
+    edicionesDisponibles: Math.max(0, LIMITE_EDICIONES_REPORTE - (Number(row.ediciones_reportante) || 0)),
     // Cuándo lo cerrará el cierre automático (solo mientras está localizado).
     cierreAutomaticoEn: localizado && !Number.isNaN(localizado.getTime())
       ? new Date(localizado.getTime() + LIMITE_CIERRE_LOCALIZADO_DIAS * 86_400_000).toISOString()
@@ -156,7 +166,10 @@ export function toAdminCase(row) {
     alertaCampos: Array.isArray(row.alerta_campos) ? row.alerta_campos : [],
     alertaTempranaEn: row.alerta_temprana_en || null,
     pistas: row.pistas || [],
-    cambiosEstado: row.cambios_estado || []
+    cambiosEstado: row.cambios_estado || [],
+    // Ediciones del reportante mientras estaba en revisión (migración 009): se
+    // conservan como historial aunque después se valide o rechace.
+    ediciones: Array.isArray(row.ediciones) ? row.ediciones : []
   };
 }
 

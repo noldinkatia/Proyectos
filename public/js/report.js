@@ -1,6 +1,6 @@
 // Reportar una persona desaparecida: formulario, ubicación y foto.
 import { CAMPOS_ALERTA, ETIQUETA_NO_VERIFICADA, avisoPushAlertaTemprana, datosAlerta, fotoPermitida } from './alerta-campos.js';
-import { apiRequest } from './api.js';
+import { apiRequest, pedirFotoProtegida } from './api.js';
 import { escapeHtml } from './config.js';
 import { DECLARACION_CASILLA, DECLARACION_PUNTOS, DECLARACION_TITULO, DECLARACION_VERSION } from './declaracion.js';
 import { confirmar } from './dialogo.js';
@@ -11,13 +11,17 @@ import { RADIO_ALERTA_KM } from './radio-alerta.js';
 import { navigateTo } from './router.js';
 import { showToast } from './ui.js';
 
-export function renderReportView() {
+// edicion: el caso propio en revisión que se edita (Mis casos → "Editar reporte").
+// El formulario es el mismo; precargarReporte lo completa con los datos guardados.
+export function renderReportView(edicion = null) {
   return `
     <div>
       <header class="page-heading">
         <span class="section-kicker">Denuncia ciudadana</span>
-        <h1>Reportar persona desaparecida</h1>
-        <p>Completá los datos de la persona. El reporte pasa por validación antes de publicarse.</p>
+        ${edicion ? `<h1>Editar reporte</h1>
+        <p>El caso sigue en revisión mientras lo corregís. Los cambios no envían una nueva alerta temprana.</p>`
+    : `<h1>Reportar persona desaparecida</h1>
+        <p>Completá los datos de la persona. El reporte pasa por validación antes de publicarse.</p>`}
       </header>
 
       <!-- novalidate: la validación la hace validarFormularioReporte, con un mensaje
@@ -179,25 +183,26 @@ export function renderReportView() {
         <p id="reportPreviewError" class="notice notice-warning hidden" role="alert"></p>
         <div class="report-preview-botones">
           <button type="button" class="btn btn-outline" data-on-click="editarReporte()">Editar</button>
-          <button type="button" id="reportConfirmButton" class="btn btn-red" data-on-click="confirmarYPublicarReporte()">Confirmar y publicar</button>
+          <button type="button" id="reportConfirmButton" class="btn btn-red" data-on-click="confirmarYPublicarReporte()">${edicion ? 'Confirmar cambios' : 'Confirmar y publicar'}</button>
         </div>
       </section>
     </div>
   `;
 }
 
-export function initReportLeafletMap() {
+// posicion: el lugar guardado al editar un reporte (si no, el centro de Asunción).
+export function initReportLeafletMap(posicion = { lat: -25.2867, lng: -57.6333 }) {
   setTimeout(() => {
     if (estado.activeMap) { estado.activeMap.remove(); estado.activeMap = null; }
     const mapEl = document.getElementById('reportMap');
     if (!mapEl) return;
 
     try {
-      const map = L.map('reportMap', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([-25.2867, -57.6333], 12);
+      const map = L.map('reportMap', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([posicion.lat, posicion.lng], 12);
       addTextMapZoomControl(map);
       addBaseTiles(map, mapEl);
 
-      estado.reportMarker = L.marker([-25.2867, -57.6333], { draggable: true, title: 'Lugar de desaparición', icon: L.divIcon({ className: 'location-marker', html: '', iconSize: [14, 14], iconAnchor: [7, 7] }) }).addTo(map);
+      estado.reportMarker = L.marker([posicion.lat, posicion.lng], { draggable: true, title: 'Lugar de desaparición', icon: L.divIcon({ className: 'location-marker', html: '', iconSize: [14, 14], iconAnchor: [7, 7] }) }).addTo(map);
       estado.reportMarker.on('dragend', function (e) {
         setReportCoordinates(e.target.getLatLng());
       });
@@ -285,6 +290,7 @@ export function handleReportPhotoSelection(event) {
   }
 
   estado.selectedReportPhoto = file;
+  if (estado.reportEdicion) estado.reportEdicion.fotoAccion = 'reemplazar';
   setReportPhotoError('');
   if (estado.reportPhotoPreviewUrl) URL.revokeObjectURL(estado.reportPhotoPreviewUrl);
   estado.reportPhotoPreviewUrl = URL.createObjectURL(file);
@@ -300,6 +306,8 @@ export function removeReportPhoto() {
 
 export function clearReportPhotoSelection() {
   estado.selectedReportPhoto = null;
+  // Al editar, sacar la foto que tenía el caso es quitarla (si no tenía, no cambia nada).
+  if (estado.reportEdicion) estado.reportEdicion.fotoAccion = estado.reportEdicion.teniaFoto ? 'quitar' : 'mantener';
   const input = document.getElementById('repFotoFile');
   if (input) input.value = '';
   if (estado.reportPhotoPreviewUrl) URL.revokeObjectURL(estado.reportPhotoPreviewUrl);
@@ -409,12 +417,12 @@ export function actualizarVistaPreviaAlerta() {
   const edadCargada = document.getElementById('repEdad').value !== '';
   const edad = Number(document.getElementById('repEdad').value);
   const foto = document.getElementById('alertaCampoFoto');
-  const fotoHabilitada = fotoPermitida(edad, Boolean(estado.selectedReportPhoto));
+  const fotoHabilitada = fotoPermitida(edad, hayFotoEnElReporte());
   foto.disabled = !fotoHabilitada;
   if (!fotoHabilitada) foto.checked = false;
   document.getElementById('alertaFotoAviso').textContent = edadCargada && edad < 18
     ? 'Es una persona menor de edad: la foto no se mostrará.'
-    : !estado.selectedReportPhoto
+    : !hayFotoEnElReporte()
       ? 'Si se trata de una persona menor de edad, la foto no se mostrará. Para mostrarla, primero cargá una foto más arriba.'
       : 'Si se trata de una persona menor de edad, la foto no se mostrará.';
 
@@ -547,6 +555,77 @@ export function fechaConZona(valor) {
   return Number.isNaN(fecha.getTime()) ? valor : fecha.toISOString();
 }
 
+// Lo inverso, para precargar el formulario: la hora guardada en la zona del navegador.
+export function fechaParaFormulario(iso) {
+  const fecha = new Date(iso);
+  if (Number.isNaN(fecha.getTime())) return '';
+  const dos = n => String(n).padStart(2, '0');
+  return `${fecha.getFullYear()}-${dos(fecha.getMonth() + 1)}-${dos(fecha.getDate())}T${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`;
+}
+
+// Hay foto si se eligió una nueva o, al editar, si el caso tenía y no se quitó.
+function hayFotoEnElReporte() {
+  const edicion = estado.reportEdicion;
+  return Boolean(estado.selectedReportPhoto) || Boolean(edicion?.teniaFoto && edicion.fotoAccion === 'mantener');
+}
+
+// Modo edición: completa el formulario con el caso guardado (de /mis-casos). Los
+// selects se llenan sin geocodificar y el pin queda en las coordenadas guardadas,
+// tal cual: guardar sin tocar nada no mueve el pin ni cuenta como cambio.
+export async function precargarReporte(caso) {
+  const fijar = (id, valor) => { document.getElementById(id).value = valor ?? ''; };
+  fijar('repNombre', caso.nombreCompleto);
+  fijar('repEdad', String(caso.edad));
+  fijar('repSexo', caso.sexo);
+  fijar('repFechaHora', fechaParaFormulario(caso.fechaHoraDesaparicion));
+  fijar('repFisica', caso.descripcionFisica);
+  fijar('repVestimenta', caso.vestimenta);
+  fijar('repSenas', caso.senasParticulares);
+  fijar('repDenuncia', caso.numeroDenuncia);
+  fijar('replat', String(caso.ubicacion.lat));
+  fijar('replng', String(caso.ubicacion.lng));
+  document.getElementById('repCoordsText').innerText = `Coordenadas: ${caso.ubicacion.lat}, ${caso.ubicacion.lng}`;
+  // Las casillas ya se aceptaron al publicar; la declaración se vuelve a pedir al confirmar.
+  document.getElementById('reporterAdult').checked = true;
+  document.getElementById('privacyConsent').checked = true;
+  updateMinorAuthorization();
+  document.getElementById('minorAuthorization').checked = caso.autorizacionParental === true && caso.edad < 18;
+  document.querySelectorAll('input[name="alertaCampo"]').forEach(input => {
+    input.checked = (caso.alertaCampos || []).includes(input.value);
+  });
+  // El paso de la alerta temprana ya se hizo: queda a la vista para revisarlo.
+  document.getElementById('alertPreviewSection').classList.remove('hidden');
+  document.getElementById('reportSubmitButton').textContent = 'Revisar y continuar';
+
+  try {
+    const departamentos = await loadParaguayLocations();
+    const departamento = departamentos.find(item => item.departamento === caso.departamento);
+    const ciudad = departamento?.ciudades.find(item => item.ciudad === caso.ciudad);
+    fillSelect(document.getElementById('repDepartamento'), 'Elegí un departamento', departamentos.map(item => item.departamento));
+    fijar('repDepartamento', caso.departamento);
+    fillSelect(document.getElementById('repCiudad'), 'Elegí una ciudad', departamento ? departamento.ciudades.map(item => item.ciudad) : []);
+    fijar('repCiudad', caso.ciudad);
+    const barrios = ciudad?.barrios || [];
+    fillSelect(document.getElementById('repBarrio'), barrios.length ? 'Sin especificar' : 'Sin barrios cargados', barrios);
+    fijar('repBarrio', caso.barrio);
+  } catch (error) {
+    showToast('Lista de ciudades no disponible', error.message, 'error');
+  }
+
+  if (caso.fotoUrl) {
+    try {
+      // La URL (blob:) se conserva para la vista previa; se libera al salir (removeReportPhoto).
+      estado.reportPhotoPreviewUrl = URL.createObjectURL(await pedirFotoProtegida(caso.fotoUrl));
+      document.getElementById('reportPhotoPreview').src = estado.reportPhotoPreviewUrl;
+      document.getElementById('reportPhotoPreviewWrap').classList.remove('hidden');
+      document.getElementById('selectReportPhotoButton').classList.add('hidden');
+    } catch (error) {
+      setReportPhotoError(`${error.message} Podés elegir otra o dejarla como está.`);
+    }
+  }
+  actualizarVistaPreviaAlerta();
+}
+
 // Los datos del caso tal como están cargados en el formulario (sin la foto).
 function casoDelFormulario() {
   const city = document.getElementById('repCiudad').value.trim();
@@ -582,7 +661,9 @@ export function mostrarVistaPreviaReporte() {
     { fotoUrl: estado.reportPhotoPreviewUrl, acciones: false, etiquetaEstado: 'EN REVISIÓN' }
   );
   const etiquetas = CAMPOS_ALERTA.filter(campo => camposElegidos().includes(campo.clave)).map(campo => campo.etiqueta);
-  document.getElementById('reportPreviewAlerta').textContent = etiquetas.length
+  document.getElementById('reportPreviewAlerta').textContent = estado.reportEdicion
+    ? `Los cambios no envían una nueva alerta temprana. Quien abra la alerta ya enviada verá los datos actualizados${etiquetas.length ? `: ${etiquetas.join(', ')}` : ', sin más datos que el caso en revisión cerca'}.`
+    : etiquetas.length
     ? `Al confirmar avisamos a quienes estén a menos de ${RADIO_ALERTA_KM} km, con estos datos: ${etiquetas.join(', ')}.`
     : `Al confirmar avisamos a quienes estén a menos de ${RADIO_ALERTA_KM} km que hay un caso en revisión cerca, sin más datos.`;
   mostrarErrorVistaPrevia('');
@@ -600,6 +681,8 @@ export function editarReporte() {
   estado.activeMap?.invalidateSize?.();
   document.getElementById('repNombre').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
+
+const textoBotonConfirmar = () => estado.reportEdicion ? 'Confirmar cambios' : 'Confirmar y publicar';
 
 function mostrarErrorVistaPrevia(mensaje) {
   const error = document.getElementById('reportPreviewError');
@@ -621,7 +704,7 @@ export async function confirmarYPublicarReporte({ pedir = pedirDeclaracion } = {
   try {
     // Último paso: la declaración de responsabilidad, con casilla obligatoria.
     if (!await pedir()) return;
-    boton.textContent = 'Publicando…';
+    boton.textContent = estado.reportEdicion ? 'Guardando…' : 'Publicando…';
     const newCase = {
       ...casoDelFormulario(),
       foto: estado.selectedReportPhoto ? await compressReportPhoto(estado.selectedReportPhoto) : '',
@@ -632,7 +715,10 @@ export async function confirmarYPublicarReporte({ pedir = pedirDeclaracion } = {
     };
     newCase.declaracionAceptada = true;
     newCase.declaracionVersion = DECLARACION_VERSION;
-    await apiRequest('/casos', { method: 'POST', body: newCase });
+    const edicion = estado.reportEdicion;
+    // Al editar, la foto solo viaja si se reemplazó; fotoAccion dice qué pasó con ella.
+    if (edicion) await apiRequest(`/mis-casos/${encodeURIComponent(edicion.casoId)}`, { method: 'PUT', body: { ...newCase, fotoAccion: edicion.fotoAccion } });
+    else await apiRequest('/casos', { method: 'POST', body: newCase });
     enviado = true;
   } catch (error) {
     mostrarErrorVistaPrevia(error.message);
@@ -640,11 +726,12 @@ export async function confirmarYPublicarReporte({ pedir = pedirDeclaracion } = {
     estado.reportEnviando = false;
     if (!enviado) {
       boton.disabled = false;
-      boton.textContent = 'Confirmar y publicar';
+      boton.textContent = textoBotonConfirmar();
     }
   }
   if (!enviado) return;
-  showToast('Reporte recibido', 'El caso quedó en revisión y ya aparece en Mis casos.', 'success');
+  if (estado.reportEdicion) showToast('Cambios guardados', 'El caso sigue en revisión con los datos corregidos.', 'success');
+  else showToast('Reporte recibido', 'El caso quedó en revisión y ya aparece en Mis casos.', 'success');
   await navigateTo('my-cases');
 }
 
@@ -655,7 +742,7 @@ export function pedirDeclaracion() {
     titulo: DECLARACION_TITULO,
     contenidoHtml: `<ul>${DECLARACION_PUNTOS.map(punto => `<li>${escapeHtml(punto)}</li>`).join('')}</ul>`,
     casilla: DECLARACION_CASILLA,
-    textoConfirmar: 'Publicar reporte',
+    textoConfirmar: estado.reportEdicion ? 'Guardar cambios' : 'Publicar reporte',
     textoCancelar: 'Volver a revisar'
   });
 }
