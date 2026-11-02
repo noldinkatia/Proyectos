@@ -25,9 +25,11 @@ test('texto de la declaración: lenguaje simple, sin citar leyes ni artículos',
 
 test('el modal se pide antes de enviar y con casilla obligatoria', async () => {
   const fuente = (await readFile(new URL('js/report.js', publicDir), 'utf8')).replace(/\r\n/g, '\n');
-  const inicio = fuente.indexOf('export async function handleReportSubmit(');
+  // Solo "Confirmar y publicar" envía (la vista previa no): la declaración va antes.
+  const inicio = fuente.indexOf('export async function confirmarYPublicarReporte(');
   const cuerpo = fuente.slice(inicio, fuente.indexOf('\n}\n', inicio));
-  const modal = cuerpo.indexOf('if (!await pedirDeclaracion()) return;');
+  const modal = cuerpo.indexOf('if (!await pedir()) return;');
+  assert.ok(cuerpo.includes('{ pedir = pedirDeclaracion } = {}'), 'por defecto, el modal de la declaración');
   assert.ok(modal > 0, 'pide la declaración');
   assert.ok(modal < cuerpo.indexOf("apiRequest('/casos'"), 'antes de enviar');
   assert.match(cuerpo, /newCase\.declaracionAceptada = true;\s*newCase\.declaracionVersion = DECLARACION_VERSION;/);

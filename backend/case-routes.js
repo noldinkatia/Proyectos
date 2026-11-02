@@ -8,6 +8,8 @@ import { asyncRoute, authenticate, isAdministrator, requireAdministrator, respue
 import {
   caseListColumns,
   caseVisibilityParameters,
+  enviarFotoGuardada,
+  hasPhoto,
   IMAGE_DATA_URL,
   paginatedBody,
   paginationFromQuery,
@@ -106,8 +108,21 @@ export function createCaseRouter({ db, jwtSecret, push }) {
     `, [req.auth.id]);
     res.json({ casos: rows.map(row => ({
       ...toOwnerCase(row),
+      // La foto de un caso propio se pide con sesión: la pública (/casos/:id/foto)
+      // da 404 mientras el caso está en revisión.
+      fotoUrl: hasPhoto(row) ? `/api/mis-casos/${encodeURIComponent(row.id)}/foto` : '',
       motivoRechazo: row.motivo_rechazo
     })) });
+  }));
+
+  // Foto de un caso propio en cualquier estado (en revisión, rechazado...). Solo
+  // para quien lo reportó: para otro usuario es un 404, como si no existiera.
+  router.get('/mis-casos/:id/foto', ...requireCitizen, asyncRoute(async (req, res) => {
+    const { rows } = await db.query(
+      'SELECT foto FROM casos WHERE id = $1 AND reportado_por_usr_id = $2',
+      [req.params.id, req.auth.id]
+    );
+    enviarFotoGuardada(res, rows);
   }));
 
   router.post('/casos', ...requireCitizen, asyncRoute(async (req, res) => {

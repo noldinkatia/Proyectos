@@ -38,7 +38,9 @@ const caso = (id, estado) => ({
 function accionesPorCaso(html) {
   return Object.fromEntries([...html.matchAll(/<article class="my-case-card">([\s\S]*?)<\/article>/g)].map(([, tarjeta]) => {
     const id = /<h3>Persona (\w+)<\/h3>/.exec(tarjeta)[1];
-    return [id, botones(tarjeta)];
+    // "Ver ficha" está en todas; acá se miran las acciones de seguimiento.
+    assert.ok(tarjeta.includes('data-on-click="openOwnCaseDetail(this.dataset.caseId)">Ver ficha</button>'), 'falta "Ver ficha"');
+    return [id, botones(tarjeta).filter(([texto]) => texto !== 'Ver ficha')];
   }));
 }
 

@@ -1001,6 +1001,11 @@ form.card { width: 100%; }
 .case-detail-modal > section, .review-checklist { width: min(100%,620px); max-height: min(85vh,720px); overflow: auto; }
 .case-detail-modal > section > button { margin-left: auto; }
 .case-detail-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+/* Foto en la ficha (pública, Mis casos, vista previa) y en la revisión del panel */
+.case-detail-photo { display: block; width: auto; max-width: min(100%, 320px); max-height: 320px; margin: .5rem 0; border-radius: var(--radius); object-fit: contain; background: var(--surface-2); }
+/* Vista previa antes de publicar (js/report.js): la misma ficha, con sus botones */
+.report-preview { display: grid; gap: 1rem; }
+.report-preview-botones { display: flex; flex-wrap: wrap; gap: .5rem; }
 /* Alerta de zona en revisión (js/alerta.js): solo la vista mínima */
 .alerta-zona { display: grid; gap: .6rem; max-width: 640px; margin: 0 auto; }
 .alerta-zona h1 { margin: 0; }

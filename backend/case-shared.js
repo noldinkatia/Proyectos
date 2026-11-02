@@ -176,6 +176,11 @@ export async function sendStoredPhoto(db, req, res, administrator) {
     `SELECT foto FROM casos WHERE id = ${idPlaceholder} ${visibility}`,
     parameters
   );
+  return enviarFotoGuardada(res, rows);
+}
+
+// Responde con la foto de la primera fila ({ foto }) o 404 si no hay caso o foto.
+export function enviarFotoGuardada(res, rows) {
   if (!rows[0]) return res.status(404).json({ error: 'Caso no disponible' });
   if (!rows[0].foto) return res.sendStatus(404);
   const match = rows[0].foto.match(IMAGE_DATA_URL);

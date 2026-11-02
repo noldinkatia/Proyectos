@@ -4,7 +4,7 @@ import { abrirAlerta } from './alerta.js';
 import { adminAccept, adminCloseCase, adminMarcarAntecedente, adminMarkLocated, adminRetirarAntecedente, adminModerateClue, adminOpenCase, adminReject, adminReopenCase, adminReturnToReview, closeReviewChecklist, loadAdminHistory, loadAdminHistoryPhotos, runTimeFastForward, searchAdminHistory, selectAdminTab, submitCaseReview } from './admin.js';
 import { apiRequest, avisarServidor } from './api.js';
 import { abrirBasesModal, acceptTerms, cerrarBasesModal, changeRegistrationEmail, completarRegistroDeNuevo, salirDeVerificacion, handleForgotPassword, handleLogin, handleRecoverRequest, handleRegister, logout, rejectTerms, resendVerificationCode, retryTermsAcceptance, sugerirGmail, togglePass, updatePasswordStrength, verifyEmailCode } from './auth.js';
-import { changeFeedPage, closeCaseDetail, filterFeedCases, openCaseDetail, openCaseDetailWithKeyboard, setFeedView, shareCase, toggleFeedMap } from './feed.js';
+import { changeFeedPage, closeCaseDetail, filterFeedCases, openCaseDetail, openCaseDetailWithKeyboard, openOwnCaseDetail, setFeedView, shareCase, toggleFeedMap } from './feed.js';
 import { iniciarEventos } from './eventos.js';
 import { clearLeadPhotoSelection, filterLeadCaseCards, filterLeadCases, handleLeadPhotoSelection, handleLeadSubmit } from './lead.js';
 import { centerMapOnParaguay, focusCaseOnMap, useMyLocationOnMap, viewCaseOnFeed } from './map.js';
@@ -12,7 +12,7 @@ import { respondToFollowup } from './my-cases.js';
 import { iniciarConexion } from './conexion.js';
 import { restaurarSesion } from './sesion.js';
 import { clearNotifs, enableSystemNotifications, respondToCaseFollowup, toggleNotificationsModal } from './notifications.js';
-import { actualizarVistaPreviaAlerta, centerReportMapOnSelection, desmarcarCampoReporte, handleReportPhotoSelection, handleReportSubmit, onReportCityChange, onReportDepartmentChange, removeReportPhoto, updateMinorAuthorization, useBrowserLocation } from './report.js';
+import { actualizarVistaPreviaAlerta, centerReportMapOnSelection, confirmarYPublicarReporte, desmarcarCampoReporte, editarReporte, handleReportPhotoSelection, handleReportSubmit, onReportCityChange, onReportDepartmentChange, removeReportPhoto, updateMinorAuthorization, useBrowserLocation } from './report.js';
 import { applyCurrentRoute, drawerNavigate, navigateTo } from './router.js';
 import { setStatsView } from './stats.js';
 import { syncOnVisible } from './sync.js';
@@ -52,6 +52,7 @@ export const acciones = {
   runTimeFastForward,
   closeCaseDetail,
   openCaseDetail,
+  openOwnCaseDetail,
   submitCaseReview,
   closeReviewChecklist,
   logout,
@@ -86,6 +87,8 @@ export const acciones = {
   onReportDepartmentChange,
   onReportCityChange,
   handleReportSubmit,
+  editarReporte,
+  confirmarYPublicarReporte,
   actualizarVistaPreviaAlerta,
   desmarcarCampoReporte,
   handleLeadPhotoSelection,

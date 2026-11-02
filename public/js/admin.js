@@ -319,6 +319,7 @@ export function adminAccept(caseId) {
   const detail = document.getElementById('reviewCaseDetails');
   detail.innerHTML = selectedCase ? `
     <strong>${escapeHtml(selectedCase.nombreCompleto)}</strong>
+    ${selectedCase.fotoUrl ? `<img class="case-detail-photo" src="data:," data-photo-url="${escapeHtml(selectedCase.fotoUrl)}" alt="Fotografía de ${escapeHtml(selectedCase.nombreCompleto)}" data-protected-photo>` : '<span>Sin fotografía.</span>'}
     <span>${Number(selectedCase.edad)} años · ${escapeHtml(selectedCase.ciudad)}, ${escapeHtml(selectedCase.departamento || '')}</span>
     <span>Denuncia registrada: ${escapeHtml(selectedCase.numeroDenuncia || 'Sin registrar')}</span>
     <span>Contacto reportante: ${escapeHtml(selectedCase.contactoReportante || 'No disponible')}</span>
@@ -329,6 +330,8 @@ export function adminAccept(caseId) {
     <span>Declaración de responsabilidad: ${selectedCase.declaracionAceptadaEn ? `aceptada el ${escapeHtml(new Date(selectedCase.declaracionAceptadaEn).toLocaleString('es-PY'))} (versión ${escapeHtml(selectedCase.declaracionVersion || '')})` : 'sin registro (reporte anterior a la declaración)'}</span>
     <span>Alerta temprana: ${selectedCase.alertaTempranaEn ? `enviada el ${escapeHtml(new Date(selectedCase.alertaTempranaEn).toLocaleString('es-PY'))}` : 'no enviada (posible duplicado o límite por reportante)'}. El reportante eligió mostrar: ${escapeHtml(alertFieldLabels(selectedCase.alertaCampos))}</span>
   ` : '<span>No se pudo cargar el detalle del caso. Actualizá el panel e intentá otra vez.</span>';
+  // La foto se pide con la sesión de administración (/api/admin/casos/:id/foto).
+  loadProtectedPhotos(detail);
   form.reset();
   form.dataset.caseId = caseId;
   document.getElementById('reviewChecklistModal').classList.remove('hidden');

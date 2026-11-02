@@ -20,8 +20,9 @@ export const estado = {
   feedCurrentPage: 1,
   feedFilteredCases: [],
 
-  // Mis casos (1)
+  // Mis casos (2)
   lastMyCasesSignature: '',
+  misCasos: [],
 
   // Panel de administración y estadísticas (2)
   lastAdminDashboardSignature: '',
@@ -32,11 +33,12 @@ export const estado = {
   routeApplyToken: 0,
   pendingDestination: null,
 
-  // Reportar caso (5)
+  // Reportar caso (6)
   reportMarker: null,
   reportGeocodeToken: 0,
   selectedReportPhoto: null,
   reportPhotoPreviewUrl: '',
+  reportEnviando: false,
   paraguayLocationsPromise: null,
 
   // Aportar pista (3)

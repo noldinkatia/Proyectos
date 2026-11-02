@@ -5,6 +5,7 @@ import { escapeHtml } from './config.js';
 import { DECLARACION_CASILLA, DECLARACION_PUNTOS, DECLARACION_TITULO, DECLARACION_VERSION } from './declaracion.js';
 import { confirmar } from './dialogo.js';
 import { estado } from './estado.js';
+import { renderCaseDetailHtml } from './feed.js';
 import { addBaseTiles, addTextMapZoomControl } from './map.js';
 import { RADIO_ALERTA_KM } from './radio-alerta.js';
 import { navigateTo } from './router.js';
@@ -22,7 +23,7 @@ export function renderReportView() {
       <!-- novalidate: la validación la hace validarFormularioReporte, con un mensaje
            visible y foco en el campo. La del navegador frena el envío sin avisar si
            un campo obligatorio no se puede enfocar. -->
-      <form novalidate data-on-submit="handleReportSubmit(event)" data-on-input="actualizarVistaPreviaAlerta(); desmarcarCampoReporte(event)" data-on-change="actualizarVistaPreviaAlerta(); desmarcarCampoReporte(event)" class="card">
+      <form id="reportForm" novalidate data-on-submit="handleReportSubmit(event)" data-on-input="actualizarVistaPreviaAlerta(); desmarcarCampoReporte(event)" data-on-change="actualizarVistaPreviaAlerta(); desmarcarCampoReporte(event)" class="card">
         <div class="form-group">
           <label for="repNombre">Nombre Completo *</label>
           <input type="text" id="repNombre" required placeholder="Nombre y apellido de la persona" class="form-control">
@@ -161,6 +162,26 @@ export function renderReportView() {
         <p id="reportFormError" class="notice notice-warning hidden" role="alert"></p>
         <button type="submit" id="reportSubmitButton" class="btn btn-red">Revisar alerta y publicar</button>
       </form>
+
+      <!-- Vista previa antes de publicar: la misma ficha que verá el público
+           (renderCaseDetailHtml, feed.js). Solo "Confirmar y publicar" envía. -->
+      <section id="reportPreview" class="report-preview hidden" aria-labelledby="reportPreviewTitle">
+        <header class="page-heading">
+          <h2 id="reportPreviewTitle" tabindex="-1">Revisá el reporte antes de publicarlo</h2>
+          <p>Así se verá la ficha del caso cuando la administración la publique.</p>
+        </header>
+        <p class="notice notice-warning">El reporte quedará en revisión: la administración lo verifica antes de publicarlo.</p>
+        <div id="reportPreviewFicha" class="card"></div>
+        <div class="card">
+          <h3>Alerta temprana a tu zona</h3>
+          <p id="reportPreviewAlerta"></p>
+        </div>
+        <p id="reportPreviewError" class="notice notice-warning hidden" role="alert"></p>
+        <div class="report-preview-botones">
+          <button type="button" class="btn btn-outline" data-on-click="editarReporte()">Editar</button>
+          <button type="button" id="reportConfirmButton" class="btn btn-red" data-on-click="confirmarYPublicarReporte()">Confirmar y publicar</button>
+        </div>
+      </section>
     </div>
   `;
 }
@@ -501,38 +522,36 @@ export function desmarcarCampoReporte(event) {
 export async function handleReportSubmit(e) {
   e.preventDefault();
   if (!validarFormularioReporte(e.currentTarget)) return;
-  // Primer envío: se muestra la vista previa de la alerta temprana para revisarla.
+  // Primer paso: se muestra la vista previa de la alerta temprana para revisarla.
   const previewSection = document.getElementById('alertPreviewSection');
   if (previewSection?.classList.contains('hidden')) {
     previewSection.classList.remove('hidden');
     actualizarVistaPreviaAlerta();
-    document.getElementById('reportSubmitButton').textContent = 'Confirmar y publicar reporte';
+    document.getElementById('reportSubmitButton').textContent = 'Revisar y continuar';
     previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     return;
   }
-  const name = document.getElementById('repNombre').value.trim();
-  const city = document.getElementById('repCiudad').value.trim();
-  let photoData = '';
-
-  if (estado.selectedReportPhoto) {
-    try {
-      photoData = await compressReportPhoto(estado.selectedReportPhoto);
-    } catch (error) {
-      setReportPhotoError(error.message);
-      return;
-    }
-  }
 
   // Validación Ley N.º 6534/2020: Bloqueo de datos financieros o patrimoniales
-  const text = (name + ' ' + document.getElementById('repFisica').value).toLowerCase();
+  const text = (document.getElementById('repNombre').value + ' ' + document.getElementById('repFisica').value).toLowerCase();
   if (text.includes('tarjeta') || text.includes('cuenta') || text.includes('banco') || text.includes('deuda')) {
     showToast('Importante', 'Se prohíbe explícitamente ingresar datos crediticios, bancarios o patrimoniales (Ley N.º 6534/2020).', 'error');
     return;
   }
+  // Segundo paso: la vista previa de la ficha. Todavía no se envía nada.
+  mostrarVistaPreviaReporte();
+}
 
-  const denuncia = document.getElementById('repDenuncia').value.trim();
-  const newCase = {
-    nombreCompleto: name,
+export function fechaConZona(valor) {
+  const fecha = valor ? new Date(valor) : new Date();
+  return Number.isNaN(fecha.getTime()) ? valor : fecha.toISOString();
+}
+
+// Los datos del caso tal como están cargados en el formulario (sin la foto).
+function casoDelFormulario() {
+  const city = document.getElementById('repCiudad').value.trim();
+  return {
+    nombreCompleto: document.getElementById('repNombre').value.trim(),
     edad: parseInt(document.getElementById('repEdad').value),
     sexo: document.getElementById('repSexo').value,
     ciudad: city,
@@ -541,31 +560,90 @@ export async function handleReportSubmit(e) {
     descripcionFisica: document.getElementById('repFisica').value,
     vestimenta: document.getElementById('repVestimenta').value,
     senasParticulares: document.getElementById('repSenas').value,
-    fechaHoraDesaparicion: document.getElementById('repFechaHora').value || new Date().toISOString(),
-    foto: photoData,
+    // datetime-local no lleva zona horaria: se manda con la del navegador (ISO), si
+    // no el servidor la toma como UTC y la ficha muestra 3 horas menos que la vista previa.
+    fechaHoraDesaparicion: fechaConZona(document.getElementById('repFechaHora').value),
     ubicacion: {
       lat: parseFloat(document.getElementById('replat').value),
       lng: parseFloat(document.getElementById('replng').value),
       direccion: city
     },
-    numeroDenuncia: denuncia,
-    declaraMayorEdad: document.getElementById('reporterAdult').checked,
-    autorizacionParental: document.getElementById('minorAuthorization').checked,
-    avisoPrivacidadAceptado: document.getElementById('privacyConsent').checked,
-    alertaCampos: camposElegidos()
+    numeroDenuncia: document.getElementById('repDenuncia').value.trim()
   };
+}
 
-  // Último paso: la declaración de responsabilidad, con casilla obligatoria.
-  if (!await pedirDeclaracion()) return;
-  newCase.declaracionAceptada = true;
-  newCase.declaracionVersion = DECLARACION_VERSION;
+// El formulario se oculta (no se borra): "Editar" vuelve con todos los datos y la foto.
+export function mostrarVistaPreviaReporte() {
+  const caso = casoDelFormulario();
+  // La ficha que verá el público, con la foto elegida (blob: local). El estado dice
+  // "EN REVISIÓN": es lo que pasa al confirmar, antes de que la administración la publique.
+  document.getElementById('reportPreviewFicha').innerHTML = renderCaseDetailHtml(
+    { ...caso, id: 'vista-previa', estado: 'PENDIENTE' },
+    { fotoUrl: estado.reportPhotoPreviewUrl, acciones: false, etiquetaEstado: 'EN REVISIÓN' }
+  );
+  const etiquetas = CAMPOS_ALERTA.filter(campo => camposElegidos().includes(campo.clave)).map(campo => campo.etiqueta);
+  document.getElementById('reportPreviewAlerta').textContent = etiquetas.length
+    ? `Al confirmar avisamos a quienes estén a menos de ${RADIO_ALERTA_KM} km, con estos datos: ${etiquetas.join(', ')}.`
+    : `Al confirmar avisamos a quienes estén a menos de ${RADIO_ALERTA_KM} km que hay un caso en revisión cerca, sin más datos.`;
+  mostrarErrorVistaPrevia('');
+  document.getElementById('reportForm').classList.add('hidden');
+  document.getElementById('reportPreview').classList.remove('hidden');
+  const titulo = document.getElementById('reportPreviewTitle');
+  titulo.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  titulo.focus({ preventScroll: true });
+}
 
+export function editarReporte() {
+  document.getElementById('reportPreview').classList.add('hidden');
+  document.getElementById('reportForm').classList.remove('hidden');
+  // El mapa estuvo oculto: Leaflet recalcula su tamaño al volver a verse.
+  estado.activeMap?.invalidateSize?.();
+  document.getElementById('repNombre').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function mostrarErrorVistaPrevia(mensaje) {
+  const error = document.getElementById('reportPreviewError');
+  if (!error) return;
+  error.textContent = mensaje;
+  error.classList.toggle('hidden', !mensaje);
+}
+
+// Único paso que envía. El botón queda deshabilitado mientras tanto: un segundo
+// toque no manda otro reporte. Vuelve a habilitarse si se cancela o hay un error.
+// pedir: el modal de la declaración (los tests lo reemplazan).
+export async function confirmarYPublicarReporte({ pedir = pedirDeclaracion } = {}) {
+  if (estado.reportEnviando) return;
+  const boton = document.getElementById('reportConfirmButton');
+  estado.reportEnviando = true;
+  boton.disabled = true;
+  mostrarErrorVistaPrevia('');
+  let enviado = false;
   try {
+    // Último paso: la declaración de responsabilidad, con casilla obligatoria.
+    if (!await pedir()) return;
+    boton.textContent = 'Publicando…';
+    const newCase = {
+      ...casoDelFormulario(),
+      foto: estado.selectedReportPhoto ? await compressReportPhoto(estado.selectedReportPhoto) : '',
+      declaraMayorEdad: document.getElementById('reporterAdult').checked,
+      autorizacionParental: document.getElementById('minorAuthorization').checked,
+      avisoPrivacidadAceptado: document.getElementById('privacyConsent').checked,
+      alertaCampos: camposElegidos()
+    };
+    newCase.declaracionAceptada = true;
+    newCase.declaracionVersion = DECLARACION_VERSION;
     await apiRequest('/casos', { method: 'POST', body: newCase });
+    enviado = true;
   } catch (error) {
-    setReportPhotoError(error.message);
-    return;
+    mostrarErrorVistaPrevia(error.message);
+  } finally {
+    estado.reportEnviando = false;
+    if (!enviado) {
+      boton.disabled = false;
+      boton.textContent = 'Confirmar y publicar';
+    }
   }
+  if (!enviado) return;
   showToast('Reporte recibido', 'El caso quedó en revisión y ya aparece en Mis casos.', 'success');
   await navigateTo('my-cases');
 }

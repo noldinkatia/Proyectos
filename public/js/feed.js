@@ -1,5 +1,5 @@
 // Inicio: listado de casos, filtros, paginación y ficha del caso.
-import { cuandoEsteCerca } from './api.js';
+import { cuandoEsteCerca, loadProtectedPhotos } from './api.js';
 import { escapeHtml } from './config.js';
 import { estado } from './estado.js';
 import { RADIO_ALERTA_KM } from './radio-alerta.js';
@@ -320,13 +320,45 @@ export function openCaseDetail(caseId, options = {}) {
     syncUrl('feed', {}, { replace: true });
     return;
   }
-  const content = document.getElementById('caseDetailContent');
   const approvedClues = getStore().pistas.filter(pista => pista.casoId === c.id);
-  const clueGallery = approvedClues.flatMap(pista => (pista.fotosUrl || []).map((url, index) =>
+  mostrarFicha(renderCaseDetailHtml(c, { pistas: approvedClues }));
+  if (!options.fromHistory) syncUrl('feed', {}, { caseId: c.id });
+}
+
+// Ficha de un caso propio desde "Mis casos" (en cualquier estado). La foto se pide
+// con sesión (/api/mis-casos/:id/foto): la pública da 404 mientras está en revisión.
+export function openOwnCaseDetail(caseId) {
+  const c = (estado.misCasos || []).find(item => item.id === caseId);
+  if (!c) return;
+  mostrarFicha(renderCaseDetailHtml(c, { fotoProtegida: true, acciones: false }));
+}
+
+function mostrarFicha(html) {
+  const content = document.getElementById('caseDetailContent');
+  content.innerHTML = html;
+  loadProtectedPhotos(content);
+  document.getElementById('caseDetailModal').classList.remove('hidden');
+  document.getElementById('caseDetailModal').querySelector('button').focus();
+}
+
+// La ficha del caso: una sola plantilla para la ficha pública, la del propio
+// ciudadano (Mis casos) y la vista previa antes de publicar (report.js).
+//   fotoUrl: la del caso (pública), una de sesión o la blob: de la vista previa.
+//   fotoProtegida: la foto exige sesión; se pide con fetch (api.js).
+//   acciones: los botones de 911, compartir y pista (no en Mis casos ni la vista previa).
+//   etiquetaEstado: texto en lugar del estado (la vista previa dice "EN REVISIÓN").
+export function renderCaseDetailHtml(c, { pistas = [], fotoUrl = c.fotoUrl, fotoProtegida = false, acciones = true, etiquetaEstado = '' } = {}) {
+  const alt = `Fotografía de ${escapeHtml(c.nombreCompleto)}`;
+  const foto = !fotoUrl ? ''
+    : fotoProtegida
+      ? `<img class="case-detail-photo" src="data:," data-photo-url="${escapeHtml(fotoUrl)}" alt="${alt}" data-protected-photo>`
+      : `<img class="case-detail-photo" src="${escapeHtml(fotoUrl)}" alt="${alt}" decoding="async">`;
+  const clueGallery = pistas.flatMap(pista => (pista.fotosUrl || []).map((url, index) =>
     `<img src="${escapeHtml(url)}" alt="Fotografía de pista ciudadana ${index + 1}" loading="lazy">`)).join('');
-  content.innerHTML = `
+  return `
     <h2 id="caseDetailTitle">${escapeHtml(c.nombreCompleto)}</h2>
-    <p><span class="status-tag ${c.estado === 'EN_SEGUIMIENTO' && c.seguimientoEtapa >= 2 ? 'status-SIN_ACTUALIZAR' : `status-${escapeHtml(c.estado)}`}">${c.estado === 'EN_SEGUIMIENTO' && c.seguimientoEtapa >= 2 ? 'EN SEGUIMIENTO · SIN ACTUALIZAR' : escapeHtml(c.estado.replaceAll('_', ' '))}</span></p>
+    <p><span class="status-tag ${c.estado === 'EN_SEGUIMIENTO' && c.seguimientoEtapa >= 2 ? 'status-SIN_ACTUALIZAR' : `status-${escapeHtml(c.estado)}`}">${c.estado === 'EN_SEGUIMIENTO' && c.seguimientoEtapa >= 2 ? 'EN SEGUIMIENTO · SIN ACTUALIZAR' : escapeHtml(etiquetaEstado || c.estado.replaceAll('_', ' '))}</span></p>
+    ${foto}
     <p><strong>Edad:</strong> ${Number(c.edad)} años · ${escapeHtml(c.sexo)}</p>
     <p><strong>Ciudad:</strong> ${c.barrio ? `${escapeHtml(c.barrio)}, ` : ''}${escapeHtml(c.ciudad)}${c.departamento ? `, ${escapeHtml(c.departamento)}` : ''}</p>
     <p><strong>Desaparición:</strong> ${new Date(c.fechaHoraDesaparicion).toLocaleString('es-PY')}</p>
@@ -334,17 +366,14 @@ export function openCaseDetail(caseId, options = {}) {
     <p><strong>Vestimenta:</strong> ${escapeHtml(c.vestimenta)}</p>
     <p><strong>Señas particulares:</strong> ${escapeHtml(c.senasParticulares || 'No registradas')}</p>
     <p><strong>Denuncia policial:</strong> verificada por la administración (el número no se publica).</p>
-    ${approvedClues.length ? `<section class="public-clues"><h3>Pistas ciudadanas validadas</h3>${approvedClues.map(pista => `<article><p>${escapeHtml(pista.descripcion)}</p><small>${escapeHtml(new Date(pista.fechaHoraAvistamiento || pista.fechaEnvio).toLocaleString('es-PY'))}</small></article>`).join('')}${clueGallery ? `<div class="public-clue-photos">${clueGallery}</div>` : ''}</section>` : ''}
-    <div class="case-detail-actions">
+    ${pistas.length ? `<section class="public-clues"><h3>Pistas ciudadanas validadas</h3>${pistas.map(pista => `<article><p>${escapeHtml(pista.descripcion)}</p><small>${escapeHtml(new Date(pista.fechaHoraAvistamiento || pista.fechaEnvio).toLocaleString('es-PY'))}</small></article>`).join('')}${clueGallery ? `<div class="public-clue-photos">${clueGallery}</div>` : ''}</section>` : ''}
+    ${acciones ? `<div class="case-detail-actions">
       <a class="btn btn-outline btn-sm" href="tel:911">Llamar al 911</a>
       <button type="button" class="btn btn-outline btn-sm" data-on-click="shareCase('${escapeHtml(c.id)}')">Compartir ficha</button>
       ${c.estado !== 'LOCALIZADO' && c.estado !== 'CERRADO' && c.estado !== 'RECHAZADO' ? `<button type="button" class="btn btn-primary btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="closeCaseDetail({silent:true}); navigateTo('lead', {caseId:this.dataset.caseId}, {replace:true})">Enviar pista</button>` : ''}
-    </div>
+    </div>` : ''}
     <p class="muted">El contacto del reportante se mantiene restringido y no se publica en esta ficha.</p>
   `;
-  document.getElementById('caseDetailModal').classList.remove('hidden');
-  document.getElementById('caseDetailModal').querySelector('button').focus();
-  if (!options.fromHistory) syncUrl('feed', {}, { caseId: c.id });
 }
 
 // silent: cerrar sin tocar el historial, para cuando justo despues se
