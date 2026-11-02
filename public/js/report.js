@@ -130,8 +130,11 @@ export function renderReportView(edicion = null) {
           <label class="check-fila"><input type="checkbox" id="reporterAdult" required data-etiqueta="Declaración de mayoría de edad"><span class="check-fila-texto">Declaro que soy mayor de 18 años y estoy autorizado a realizar este reporte.</span></label>
           <label class="check-fila"><input type="checkbox" id="minorAuthorization" data-etiqueta="Autorización parental o de tutor" data-on-change="updateMinorAuthorization()"><span class="check-fila-texto">Confirmo que cuento con autorización parental o de tutor legal para reportar a la persona menor de edad.</span></label>
         </fieldset>
+        <!-- El id no puede ser "privacyConsent": las listas de avisos de cookies
+             (EasyList Cookie, que Brave usa por defecto) ocultan "###privacyConsent" en
+             cualquier sitio y la casilla desaparecía (backend/test/formulario-reporte.test.js). -->
         <label class="check-fila check-fila-suelta">
-          <input type="checkbox" id="privacyConsent" required data-etiqueta="Aviso de privacidad">
+          <input type="checkbox" id="repAvisoPrivacidad" required data-etiqueta="Aviso de privacidad">
           <span class="check-fila-texto">Acepto el aviso de privacidad y el uso de estos datos únicamente para la búsqueda y gestión de este reporte.</span>
         </label>
 
@@ -587,7 +590,7 @@ export async function precargarReporte(caso) {
   document.getElementById('repCoordsText').innerText = `Coordenadas: ${caso.ubicacion.lat}, ${caso.ubicacion.lng}`;
   // Las casillas ya se aceptaron al publicar; la declaración se vuelve a pedir al confirmar.
   document.getElementById('reporterAdult').checked = true;
-  document.getElementById('privacyConsent').checked = true;
+  document.getElementById('repAvisoPrivacidad').checked = true;
   updateMinorAuthorization();
   document.getElementById('minorAuthorization').checked = caso.autorizacionParental === true && caso.edad < 18;
   document.querySelectorAll('input[name="alertaCampo"]').forEach(input => {
@@ -710,7 +713,7 @@ export async function confirmarYPublicarReporte({ pedir = pedirDeclaracion } = {
       foto: estado.selectedReportPhoto ? await compressReportPhoto(estado.selectedReportPhoto) : '',
       declaraMayorEdad: document.getElementById('reporterAdult').checked,
       autorizacionParental: document.getElementById('minorAuthorization').checked,
-      avisoPrivacidadAceptado: document.getElementById('privacyConsent').checked,
+      avisoPrivacidadAceptado: document.getElementById('repAvisoPrivacidad').checked,
       alertaCampos: camposElegidos()
     };
     newCase.declaracionAceptada = true;

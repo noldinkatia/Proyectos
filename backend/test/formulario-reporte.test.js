@@ -167,7 +167,7 @@ const px = (regla, propiedad) => Number(new RegExp(String.raw`(?:^|[\s;{])${prop
 test('casillas del reporte: dibujo propio con tamaño visible, fila tocable y foco con teclado', async () => {
   const todos = await formularioReporte();
   const casillas = todos.filter(el => el.etiqueta === 'input' && el.atributos.type === 'checkbox');
-  const ids = ['reporterAdult', 'minorAuthorization', 'privacyConsent'];
+  const ids = ['reporterAdult', 'minorAuthorization', 'repAvisoPrivacidad'];
   for (const id of ids) assert.ok(casillas.some(el => el.atributos.id === id), `falta la casilla ${id}`);
   // Toda casilla obligatoria (y las tres de consentimiento) va dentro de una fila .check-fila.
   const sinFila = casillas
@@ -195,11 +195,36 @@ test('casillas del reporte: dibujo propio con tamaño visible, fila tocable y fo
   }
 });
 
+// Selectores que las listas de bloqueo de avisos de cookies (EasyList Cookie y
+// Fanboy, activas por defecto en Brave) ocultan en cualquier sitio con "###id".
+// Con id="privacyConsent" Brave ocultaba la casilla del aviso de privacidad y solo
+// quedaba el texto. Un id con consent, cookie, gdpr o privacy corre el mismo riesgo.
+const OCULTOS_POR_LISTAS_DE_COOKIES = /consent|cookie|gdpr|privacy/i;
+
+test('aviso de privacidad: casilla visible y obligatoria, con un id que los bloqueadores no ocultan', async () => {
+  const todos = await formularioReporte();
+  const privacidad = todos.find(el => el.atributos.id === 'repAvisoPrivacidad');
+  assert.ok(privacidad, 'falta la casilla del aviso de privacidad');
+  assert.equal(privacidad.atributos.type, 'checkbox');
+  assert.ok('required' in privacidad.atributos, 'es obligatoria');
+  assert.equal(privacidad.atributos['data-etiqueta'], 'Aviso de privacidad', 'nombre en el mensaje de error');
+  // Mismo componente que "Confirmo que cuento con autorización parental…": input
+  // dentro de un <label class="check-fila"> (toda la fila se puede tocar).
+  const filaDe = el => el.ancestros.findLast(a => a.etiqueta === 'label');
+  const parental = todos.find(el => el.atributos.id === 'minorAuthorization');
+  assert.match(filaDe(privacidad)?.atributos.class || '', /(^|\s)check-fila(\s|$)/);
+  assert.match(filaDe(parental)?.atributos.class || '', /(^|\s)check-fila(\s|$)/);
+  assert.equal(todos.filter(el => el.atributos.id === 'privacyConsent').length, 0, 'id oculto por EasyList Cookie');
+  const riesgosos = todos.filter(el => ['input', 'label', 'select', 'textarea'].includes(el.etiqueta))
+    .map(el => el.atributos.id).filter(id => id && OCULTOS_POR_LISTAS_DE_COOKIES.test(id));
+  assert.deepEqual(riesgosos, [], 'ids que las listas de cookies podrían ocultar');
+});
+
 test('casillas del reporte: el texto de la fila no se selecciona (un clic con el puntero en movimiento tilda igual)', async () => {
   // Con texto seleccionable, mover el mouse 2 px entre presionar y soltar selecciona
   // texto y el navegador no activa el <label>: la casilla no cambia.
   const todos = await formularioReporte();
-  const privacidad = todos.find(el => el.atributos.id === 'privacyConsent');
+  const privacidad = todos.find(el => el.atributos.id === 'repAvisoPrivacidad');
   const fila = privacidad.ancestros.find(a => a.etiqueta === 'label');
   assert.match(fila?.atributos.class || '', /(^|\s)check-fila(\s|$)/, 'el aviso de privacidad va en una fila .check-fila');
   const css = await readFile(new URL('styles.css', publicDir), 'utf8');
@@ -223,7 +248,7 @@ test('casilla obligatoria sin marcar: fila en rojo, aviso "Marcá esta casilla p
       querySelector: selector => (selector === '.check-fila-texto' ? texto : agregados.find(nodo => !nodo.quitado) || null),
       scrollIntoView: () => { vistaEnFila = true; }
     };
-    const privacidad = campo('privacyConsent', { valido: false, etiqueta: 'Acepto el aviso de privacidad' });
+    const privacidad = campo('repAvisoPrivacidad', { valido: false, etiqueta: 'Acepto el aviso de privacidad' });
     Object.assign(privacidad, { type: 'checkbox', dataset: { etiqueta: 'Aviso de privacidad' }, closest: () => fila });
     assert.equal(validarFormularioReporte(formulario([campo('repNombre'), privacidad])), false);
     assert.ok(clases.has('check-fila-error'));

@@ -88,6 +88,8 @@ test('modo edición: precarga sin geocodificar, el pin queda donde estaba y guar
     assert.equal(cuerpo.fotoAccion, 'mantener');
     assert.equal(cuerpo.foto, '', 'la foto guardada no se vuelve a mandar');
     assert.equal(cuerpo.declaracionAceptada, true, 'la declaración se volvió a pedir');
+    assert.equal(dom.obtener('repAvisoPrivacidad').checked, true, 'la casilla de privacidad vuelve marcada al editar');
+    assert.equal(cuerpo.avisoPrivacidadAceptado, true);
     assert.equal(dom.obtener('reportPreviewError').textContent, 'No hay cambios para guardar.');
     assert.equal(dom.obtener('reportConfirmButton').textContent, 'Confirmar cambios');
   } finally {
