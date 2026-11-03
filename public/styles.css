@@ -675,7 +675,7 @@ button { touch-action: manipulation; }
 .lead-upload-zone > span { color: var(--link); font-size: 1.4rem; }
 .lead-upload-zone strong { font-size: .78rem; }
 .lead-upload-zone small { color: var(--muted); font-size: .66rem; font-weight: 500; }
-.lead-location-group > .form-group > label, .lead-location-heading label { margin: 0; }
+.lead-location-group > .form-group > label, .lead-location-heading .campo-titulo { margin: 0; }
 .lead-location-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .3rem .8rem; margin-bottom: .5rem; }
 .lead-location-heading > span { color: var(--muted); font-size: .69rem; }
 .lead-location-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .55rem; }
@@ -806,7 +806,9 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
    8. Formularios, avisos, acceso y legales
    ========================================================================== */
 .form-group { min-width: 0; margin-bottom: 1rem; }
-.form-group label, label { display: block; margin-bottom: .38rem; color: var(--text); font-size: .82rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.form-group label, label, .campo-titulo { display: block; margin-bottom: .38rem; color: var(--text); font-size: .82rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
+/* Título de un grupo que no es un campo (el mapa del reporte): se ve como una etiqueta. */
+.campo-titulo { margin-top: 0; }
 .form-control {
   width: 100%;
   min-height: 44px;
@@ -1040,6 +1042,10 @@ form.card { width: 100%; }
 .check-fila-suelta { margin: 1rem 0; }
 .check-fila.check-fila-error, .check-fila.check-fila-error:has(input:focus-visible) { border: 2px solid var(--red); background: var(--red-soft); }
 .check-fila-aviso { color: var(--red); font-size: .85rem; font-weight: 700; }
+.check-fila-ayuda { color: var(--muted); font-size: .8rem; font-weight: 400; }
+/* Borrador recuperado (report.js): el aviso y "Empezar de nuevo" en la misma franja. */
+.report-borrador { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem .75rem; margin-bottom: 1rem; }
+.report-borrador p { margin: 0; }
 .check-fila-aviso::before { content: "⚠ "; }
 .consent-group .check-fila { gap: .75rem; margin: .5rem 0; font-size: .9rem; }
 /* Campos que faltan en el formulario de reporte (validarFormularioReporte) */

@@ -96,8 +96,9 @@ export function renderLeadView(preCaseId) {
         <label class="privacy-consent lead-public-consent"><input type="checkbox" id="leadPublicConsent" required>
           Entiendo que la pista, su ubicación y las fotografías que envíe podrán ser publicadas si el equipo las valida.
         </label>
-        <div class="form-group lead-location-group">
-          <div class="lead-location-heading"><label>Ubicación del avistamiento *</label><span>Tocá el mapa para marcar el lugar</span></div>
+        <!-- El mapa no es un campo: el título nombra al grupo (como en el reporte). -->
+        <div class="form-group lead-location-group" role="group" aria-labelledby="leadLugarTitulo">
+          <div class="lead-location-heading"><p id="leadLugarTitulo" class="campo-titulo">Ubicación del avistamiento *</p><span>Tocá el mapa para marcar el lugar</span></div>
           <div id="leadMap" class="map-container"></div>
           <input type="hidden" id="leadlat" value="-25.2867">
           <input type="hidden" id="leadlng" value="-57.6333">

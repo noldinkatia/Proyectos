@@ -5,6 +5,8 @@
 // mostrando la cuenta, y se vuelve a comprobar cuando el servidor responda.
 const CLAVE_TOKEN = 'rastreo_token';
 const CLAVE_USUARIO = 'rastreo_usuario';
+// Borrador del reporte nuevo (report.js): es de la cuenta, se va con la sesión.
+export const CLAVE_BORRADOR_REPORTE = 'rastreo_borrador_reporte';
 
 // Las bases y condiciones se exigen solo a ciudadanos que todavía no las aceptaron
 // (el backend rechaza la aceptación de un administrador).
@@ -29,6 +31,7 @@ export function recordarUsuario(usuario, almacen = sessionStorage) {
 export function olvidarSesion(almacen = sessionStorage) {
   almacen.removeItem(CLAVE_TOKEN);
   almacen.removeItem(CLAVE_USUARIO);
+  almacen.removeItem(CLAVE_BORRADOR_REPORTE);
 }
 
 function usuarioRecordado(almacen) {

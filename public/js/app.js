@@ -12,7 +12,7 @@ import { respondToFollowup } from './my-cases.js';
 import { iniciarConexion } from './conexion.js';
 import { restaurarSesion } from './sesion.js';
 import { clearNotifs, enableSystemNotifications, respondToCaseFollowup, toggleNotificationsModal } from './notifications.js';
-import { actualizarVistaPreviaAlerta, centerReportMapOnSelection, confirmarYPublicarReporte, desmarcarCampoReporte, editarReporte, handleReportPhotoSelection, handleReportSubmit, onReportCityChange, onReportDepartmentChange, removeReportPhoto, updateMinorAuthorization, useBrowserLocation } from './report.js';
+import { actualizarVistaPreviaAlerta, avisarAntesDeCerrar, centerReportMapOnSelection, confirmarYPublicarReporte, desmarcarCampoReporte, descartarBorradorReporte, editarReporte, handleReportPhotoSelection, handleReportSubmit, onReportCityChange, onReportDepartmentChange, registrarCambioReporte, removeReportPhoto, updateMinorAuthorization, useBrowserLocation } from './report.js';
 import { applyCurrentRoute, drawerNavigate, navigateTo } from './router.js';
 import { setStatsView } from './stats.js';
 import { syncOnVisible } from './sync.js';
@@ -26,6 +26,9 @@ window.backendCurrentUser = null;
 window.addEventListener('popstate', () => { applyCurrentRoute(); });
 
 window.addEventListener('hashchange', () => { applyCurrentRoute(); });
+
+// Recargar o cerrar la pestaña con el reporte a medio enviar: aviso del navegador.
+window.addEventListener('beforeunload', avisarAntesDeCerrar);
 
 // Las actualizaciones periódicas se pausan con la pestaña oculta (sync.js); al
 // volver se pide una enseguida.
@@ -91,6 +94,8 @@ export const acciones = {
   confirmarYPublicarReporte,
   actualizarVistaPreviaAlerta,
   desmarcarCampoReporte,
+  registrarCambioReporte,
+  descartarBorradorReporte,
   handleLeadPhotoSelection,
   clearLeadPhotoSelection,
   filterLeadCases,

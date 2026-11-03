@@ -9,7 +9,25 @@ import { renderCaseDetailHtml } from './feed.js';
 import { addBaseTiles, addTextMapZoomControl } from './map.js';
 import { RADIO_ALERTA_KM } from './radio-alerta.js';
 import { navigateTo } from './router.js';
+import { CLAVE_BORRADOR_REPORTE } from './sesion.js';
 import { showToast } from './ui.js';
+
+// Los tres pasos del reporte, con el mismo formato que la pista ("Paso 1 de 2 · …").
+const PASOS_REPORTE = ['Datos de la persona', 'Qué verán en tu zona', 'Revisión final'];
+
+export function textoPasoReporte(paso) {
+  return `Paso ${paso} de ${PASOS_REPORTE.length} · ${PASOS_REPORTE[paso - 1]}`;
+}
+
+export function actualizarPasoReporte(paso) {
+  const indicador = document.getElementById('reportPaso');
+  if (indicador) indicador.textContent = textoPasoReporte(paso);
+}
+
+const AYUDA_AUTORIZACION = {
+  inactiva: 'Se activa si la persona tiene menos de 18 años.',
+  activa: 'Obligatoria: la persona tiene menos de 18 años.'
+};
 
 // edicion: el caso propio en revisión que se edita (Mis casos → "Editar reporte").
 // El formulario es el mismo; precargarReporte lo completa con los datos guardados.
@@ -17,7 +35,8 @@ export function renderReportView(edicion = null) {
   return `
     <div>
       <header class="page-heading">
-        <span class="section-kicker">Denuncia ciudadana</span>
+        <!-- Paso actual (actualizarPasoReporte): 1 datos, 2 alerta, 3 vista previa. -->
+        <span id="reportPaso" class="section-kicker" aria-live="polite">${textoPasoReporte(edicion ? 2 : 1)}</span>
         ${edicion ? `<h1>Editar reporte</h1>
         <p>El caso sigue en revisión mientras lo corregís. Los cambios no envían una nueva alerta temprana.</p>`
     : `<h1>Reportar persona desaparecida</h1>
@@ -27,7 +46,11 @@ export function renderReportView(edicion = null) {
       <!-- novalidate: la validación la hace validarFormularioReporte, con un mensaje
            visible y foco en el campo. La del navegador frena el envío sin avisar si
            un campo obligatorio no se puede enfocar. -->
-      <form id="reportForm" novalidate data-on-submit="handleReportSubmit(event)" data-on-input="actualizarVistaPreviaAlerta(); desmarcarCampoReporte(event)" data-on-change="actualizarVistaPreviaAlerta(); desmarcarCampoReporte(event)" class="card">
+      <form id="reportForm" novalidate data-on-submit="handleReportSubmit(event)" data-on-input="actualizarVistaPreviaAlerta(); desmarcarCampoReporte(event); registrarCambioReporte()" data-on-change="actualizarVistaPreviaAlerta(); desmarcarCampoReporte(event); registrarCambioReporte()" class="card">
+        ${edicion ? '' : `<div id="reportDraftNotice" class="notice notice-info report-borrador hidden" role="status">
+          <p>Recuperamos lo que habías escrito en esta pestaña. Volvé a cargar la foto y a marcar las casillas de aceptación.</p>
+          <button type="button" class="btn btn-outline btn-sm" data-on-click="descartarBorradorReporte()">Empezar de nuevo</button>
+        </div>`}
         <div class="form-group">
           <label for="repNombre">Nombre Completo *</label>
           <input type="text" id="repNombre" required placeholder="Nombre y apellido de la persona" class="form-control">
@@ -90,9 +113,10 @@ export function renderReportView(edicion = null) {
         </div>
 
         <!-- GEOLOCALIZADOR CON MAPA REAL Y PIN ARRASTRABLE -->
-        <div class="form-group">
+        <!-- El mapa no es un campo: el título nombra al grupo (pin, botón y coordenadas). -->
+        <div class="form-group" role="group" aria-labelledby="repLugarTitulo">
           <div>
-            <label>Lugar exacto de desaparición *</label>
+            <p id="repLugarTitulo" class="campo-titulo">Lugar exacto de desaparición *</p>
             <p class="muted">El pin se ubica solo según el departamento, ciudad y barrio elegidos. Tocá el mapa o arrastrá el pin para marcar el punto exacto.</p>
             <button type="button" data-on-click="useBrowserLocation('replat', 'replng', estado.reportMarker, 'repCoordsText')" class="btn btn-outline btn-sm">Usar mi ubicación actual</button>
           </div>
@@ -103,7 +127,7 @@ export function renderReportView(edicion = null) {
         </div>
 
         <div class="form-group">
-          <label>Fotografía de referencia</label>
+          <label for="repFotoFile">Fotografía de referencia</label>
           <input type="file" id="repFotoFile" accept="image/jpeg,image/png,image/webp" hidden data-on-change="handleReportPhotoSelection(event)">
           <button type="button" id="selectReportPhotoButton" class="btn btn-outline" data-on-click="openFilePicker('repFotoFile')">Seleccionar fotografía</button>
           <div id="reportPhotoPreviewWrap" class="hidden">
@@ -117,7 +141,7 @@ export function renderReportView(edicion = null) {
         </div>
 
         <div class="form-group">
-          <label>N.º de denuncia (si ya la hiciste)</label>
+          <label for="repDenuncia">N.º de denuncia (si ya la hiciste)</label>
           <input type="text" id="repDenuncia" placeholder="Ej: DEN-2026-XXXX" class="form-control">
           <p class="notice notice-warning">
             No es obligatorio: sin número el caso queda como Pendiente / En revisión y la administración lo verificará con la Policía. La alerta temprana a tu zona se envía igual.
@@ -128,7 +152,8 @@ export function renderReportView(edicion = null) {
           <legend>Verificación de edad y autorización *</legend>
           <!-- .check-fila: casilla dibujada por styles.css (no la del navegador) y toda la fila se puede tocar -->
           <label class="check-fila"><input type="checkbox" id="reporterAdult" required data-etiqueta="Declaración de mayoría de edad"><span class="check-fila-texto">Declaro que soy mayor de 18 años y estoy autorizado a realizar este reporte.</span></label>
-          <label class="check-fila"><input type="checkbox" id="minorAuthorization" data-etiqueta="Autorización parental o de tutor" data-on-change="updateMinorAuthorization()"><span class="check-fila-texto">Confirmo que cuento con autorización parental o de tutor legal para reportar a la persona menor de edad.</span></label>
+          <!-- Deshabilitada hasta que la edad sea menor de 18 (updateMinorAuthorization). -->
+          <label class="check-fila"><input type="checkbox" id="minorAuthorization" disabled data-etiqueta="Autorización parental o de tutor" data-on-change="updateMinorAuthorization()"><span class="check-fila-texto">Confirmo que cuento con autorización parental o de tutor legal para reportar a la persona menor de edad.<small id="minorAuthorizationAyuda" class="check-fila-ayuda">${AYUDA_AUTORIZACION.inactiva}</small></span></label>
         </fieldset>
         <!-- El id no puede ser "privacyConsent": las listas de avisos de cookies
              (EasyList Cookie, que Brave usa por defecto) ocultan "###privacyConsent" en
@@ -141,6 +166,7 @@ export function renderReportView(edicion = null) {
         <!-- Paso previo al envío: quien reporta elige qué ven las personas cercanas en
              la alerta temprana. Textos simples, pensados para cualquier persona. -->
         <section id="alertPreviewSection" class="alert-preview hidden" aria-labelledby="alertPreviewTitle">
+          <span class="section-kicker">${textoPasoReporte(2)}</span>
           <h2 id="alertPreviewTitle">¿Qué datos verán las personas cercanas?</h2>
           <div class="alert-preview-intro">
             <p>Cuando publiques el reporte, avisamos a quienes estén a menos de ${RADIO_ALERTA_KM} km para que estén atentos.</p>
@@ -174,6 +200,7 @@ export function renderReportView(edicion = null) {
            (renderCaseDetailHtml, feed.js). Solo "Confirmar y publicar" envía. -->
       <section id="reportPreview" class="report-preview hidden" aria-labelledby="reportPreviewTitle">
         <header class="page-heading">
+          <span class="section-kicker">${textoPasoReporte(3)}</span>
           <h2 id="reportPreviewTitle" tabindex="-1">Revisá el reporte antes de publicarlo</h2>
           <p>Así se verá la ficha del caso cuando la administración la publique.</p>
         </header>
@@ -225,6 +252,7 @@ export function setReportCoordinates({ lat, lng }) {
   document.getElementById('replat').value = Number(lat).toFixed(5);
   document.getElementById('replng').value = Number(lng).toFixed(5);
   document.getElementById('repCoordsText').innerText = `Coordenadas: ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`;
+  registrarCambioReporte();
 }
 
 // Al elegir departamento, ciudad o barrio, el pin se mueve solo a esa zona
@@ -262,6 +290,7 @@ export function useBrowserLocation(latId, lngId, markerObj, coordsTextId) {
         markerObj.setLatLng([lat, lng]);
         estado.activeMap.setView([lat, lng], 14);
       }
+      if (latId === 'replat') registrarCambioReporte();
     }, () => showToast('Ubicación no disponible', 'No se pudo obtener la localización del navegador.', 'error'));
   }
 }
@@ -539,6 +568,7 @@ export async function handleReportSubmit(e) {
     previewSection.classList.remove('hidden');
     actualizarVistaPreviaAlerta();
     document.getElementById('reportSubmitButton').textContent = 'Revisar y continuar';
+    actualizarPasoReporte(2);
     previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     return;
   }
@@ -600,20 +630,7 @@ export async function precargarReporte(caso) {
   document.getElementById('alertPreviewSection').classList.remove('hidden');
   document.getElementById('reportSubmitButton').textContent = 'Revisar y continuar';
 
-  try {
-    const departamentos = await loadParaguayLocations();
-    const departamento = departamentos.find(item => item.departamento === caso.departamento);
-    const ciudad = departamento?.ciudades.find(item => item.ciudad === caso.ciudad);
-    fillSelect(document.getElementById('repDepartamento'), 'Elegí un departamento', departamentos.map(item => item.departamento));
-    fijar('repDepartamento', caso.departamento);
-    fillSelect(document.getElementById('repCiudad'), 'Elegí una ciudad', departamento ? departamento.ciudades.map(item => item.ciudad) : []);
-    fijar('repCiudad', caso.ciudad);
-    const barrios = ciudad?.barrios || [];
-    fillSelect(document.getElementById('repBarrio'), barrios.length ? 'Sin especificar' : 'Sin barrios cargados', barrios);
-    fijar('repBarrio', caso.barrio);
-  } catch (error) {
-    showToast('Lista de ciudades no disponible', error.message, 'error');
-  }
+  await fijarUbicacionReporte(caso);
 
   if (caso.fotoUrl) {
     try {
@@ -627,6 +644,158 @@ export async function precargarReporte(caso) {
     }
   }
   actualizarVistaPreviaAlerta();
+}
+
+// Departamento, ciudad y barrio guardados, sin geocodificar (el pin no se mueve).
+async function fijarUbicacionReporte({ departamento: nombreDepartamento, ciudad: nombreCiudad, barrio }) {
+  const fijar = (id, valor) => { document.getElementById(id).value = valor ?? ''; };
+  try {
+    const departamentos = await loadParaguayLocations();
+    const departamento = departamentos.find(item => item.departamento === nombreDepartamento);
+    const ciudad = departamento?.ciudades.find(item => item.ciudad === nombreCiudad);
+    fillSelect(document.getElementById('repDepartamento'), 'Elegí un departamento', departamentos.map(item => item.departamento));
+    fijar('repDepartamento', nombreDepartamento);
+    fillSelect(document.getElementById('repCiudad'), departamento ? 'Elegí una ciudad' : 'Elegí un departamento', departamento ? departamento.ciudades.map(item => item.ciudad) : []);
+    fijar('repCiudad', nombreCiudad);
+    const barrios = ciudad?.barrios || [];
+    fillSelect(document.getElementById('repBarrio'), !ciudad ? 'Elegí una ciudad' : barrios.length ? 'Sin especificar' : 'Sin barrios cargados', barrios);
+    fijar('repBarrio', barrio);
+  } catch (error) {
+    showToast('Lista de ciudades no disponible', error.message, 'error');
+  }
+}
+
+// Borrador del reporte nuevo: se guarda en sessionStorage (solo esta pestaña) con
+// cada cambio, vuelve al entrar otra vez a Reportar y se borra al publicar, al
+// tocar "Empezar de nuevo" o al cerrar sesión (sesion.js). No guarda la foto ni las
+// casillas de aceptación: se vuelven a marcar. Al editar un caso no hay borrador.
+const CAMPOS_BORRADOR = ['repNombre', 'repEdad', 'repSexo', 'repDepartamento', 'repCiudad', 'repBarrio',
+  'repFechaHora', 'repFisica', 'repVestimenta', 'repSenas', 'repDenuncia'];
+// Lo que ya viene cargado al abrir el formulario no cuenta como escrito.
+const VALORES_INICIALES = { repSexo: 'Femenino' };
+
+const usuarioActual = () => globalThis.window?.backendCurrentUser?.id ?? null;
+
+export function datosBorradorReporte() {
+  const campos = Object.fromEntries(CAMPOS_BORRADOR.map(id => [id, document.getElementById(id)?.value ?? '']));
+  return {
+    campos,
+    ubicacion: { lat: Number(document.getElementById('replat')?.value), lng: Number(document.getElementById('replng')?.value) },
+    alertaCampos: camposElegidos()
+  };
+}
+
+export function borradorVacio(borrador) {
+  return !borrador || Object.entries(borrador.campos || {})
+    .every(([id, valor]) => !String(valor ?? '').trim() || valor === VALORES_INICIALES[id]);
+}
+
+export function guardarBorradorReporte(almacen = globalThis.sessionStorage) {
+  if (estado.reportEdicion || !document.getElementById('reportForm')) return;
+  const borrador = datosBorradorReporte();
+  try {
+    if (borradorVacio(borrador)) almacen.removeItem(CLAVE_BORRADOR_REPORTE);
+    else almacen.setItem(CLAVE_BORRADOR_REPORTE, JSON.stringify({ ...borrador, usuarioId: usuarioActual() }));
+  } catch {
+    /* Almacenamiento lleno o bloqueado: el formulario sigue, sin borrador. */
+  }
+}
+
+// El borrador guardado por esta misma cuenta, o null.
+export function leerBorradorReporte(almacen = globalThis.sessionStorage) {
+  try {
+    const borrador = JSON.parse(almacen.getItem(CLAVE_BORRADOR_REPORTE));
+    if (!borrador || typeof borrador.campos !== 'object' || borrador.usuarioId !== usuarioActual()) return null;
+    return borradorVacio(borrador) ? null : borrador;
+  } catch {
+    return null;
+  }
+}
+
+export function borrarBorradorReporte(almacen = globalThis.sessionStorage) {
+  try {
+    almacen.removeItem(CLAVE_BORRADOR_REPORTE);
+  } catch {
+    /* Almacenamiento bloqueado: no había borrador que borrar. */
+  }
+}
+
+// Al entrar a Reportar (sin editar un caso): selects, borrador si lo hay y mapa.
+export async function iniciarReporteNuevo() {
+  const borrador = leerBorradorReporte();
+  const { lat, lng } = borrador?.ubicacion || {};
+  const posicion = Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined;
+  initReportLeafletMap(posicion);
+  if (!borrador) {
+    await initReportLocationSelects();
+    return;
+  }
+  const { campos } = borrador;
+  for (const id of CAMPOS_BORRADOR.filter(id => !['repDepartamento', 'repCiudad', 'repBarrio'].includes(id))) {
+    const campo = document.getElementById(id);
+    if (campo && typeof campos[id] === 'string') campo.value = campos[id];
+  }
+  // Sin setReportCoordinates: guardaría el borrador antes de llenar los selects.
+  if (posicion) {
+    document.getElementById('replat').value = String(lat);
+    document.getElementById('replng').value = String(lng);
+    document.getElementById('repCoordsText').innerText = `Coordenadas: ${lat}, ${lng}`;
+  }
+  estado.reportCambios = true;
+  if (Array.isArray(borrador.alertaCampos)) {
+    document.querySelectorAll('input[name="alertaCampo"]').forEach(input => {
+      input.checked = borrador.alertaCampos.includes(input.value);
+    });
+  }
+  updateMinorAuthorization();
+  document.getElementById('reportDraftNotice')?.classList.remove('hidden');
+  await fijarUbicacionReporte({ departamento: campos.repDepartamento, ciudad: campos.repCiudad, barrio: campos.repBarrio });
+  actualizarVistaPreviaAlerta();
+}
+
+// "Empezar de nuevo": sin borrador y con el formulario vacío.
+export async function descartarBorradorReporte() {
+  borrarBorradorReporte();
+  estado.reportCambios = false;
+  await navigateTo('report', {}, { replace: true, sinAvisoDeSalida: true });
+}
+
+// Cada cambio del formulario (o del pin): guarda el borrador y marca que hay algo
+// sin enviar, para avisar antes de salir.
+export function registrarCambioReporte() {
+  estado.reportCambios = true;
+  guardarBorradorReporte();
+}
+
+// true si salir del formulario perdería algo: al editar, cualquier cambio; en un
+// reporte nuevo, lo escrito (aunque el borrador quede, la foto no se guarda).
+export function reporteConCambiosSinEnviar() {
+  if (!estado.reportCambios || !document.getElementById('reportForm')) return false;
+  return Boolean(estado.reportEdicion) || !borradorVacio(datosBorradorReporte());
+}
+
+export function confirmarSalidaDelReporte({ pedir = confirmar } = {}) {
+  return pedir(estado.reportEdicion
+    ? {
+      titulo: '¿Salir sin guardar los cambios?',
+      mensaje: 'Los cambios que hiciste en el reporte se pierden. El caso queda como estaba.',
+      textoConfirmar: 'Salir sin guardar',
+      textoCancelar: 'Seguir editando',
+      peligro: true
+    }
+    : {
+      titulo: '¿Salir del reporte?',
+      mensaje: 'Lo que escribiste queda guardado en esta pestaña hasta que lo publiques. La foto no se guarda: vas a tener que cargarla de nuevo.',
+      textoConfirmar: 'Salir',
+      textoCancelar: 'Seguir con el reporte'
+    });
+}
+
+// Recargar o cerrar la pestaña con cambios: el aviso del navegador.
+export function avisarAntesDeCerrar(event) {
+  if (globalThis.window?.rastreoCurrentView !== 'report' || !reporteConCambiosSinEnviar()) return;
+  event.preventDefault();
+  event.returnValue = '';
 }
 
 // Los datos del caso tal como están cargados en el formulario (sin la foto).
@@ -672,6 +841,7 @@ export function mostrarVistaPreviaReporte() {
   mostrarErrorVistaPrevia('');
   document.getElementById('reportForm').classList.add('hidden');
   document.getElementById('reportPreview').classList.remove('hidden');
+  actualizarPasoReporte(3);
   const titulo = document.getElementById('reportPreviewTitle');
   titulo.scrollIntoView({ behavior: 'smooth', block: 'start' });
   titulo.focus({ preventScroll: true });
@@ -680,6 +850,7 @@ export function mostrarVistaPreviaReporte() {
 export function editarReporte() {
   document.getElementById('reportPreview').classList.add('hidden');
   document.getElementById('reportForm').classList.remove('hidden');
+  actualizarPasoReporte(2);
   // El mapa estuvo oculto: Leaflet recalcula su tamaño al volver a verse.
   estado.activeMap?.invalidateSize?.();
   document.getElementById('repNombre').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -733,6 +904,10 @@ export async function confirmarYPublicarReporte({ pedir = pedirDeclaracion } = {
     }
   }
   if (!enviado) return;
+  // Publicado: el borrador ya no hace falta y salir no tiene que avisar. Al editar
+  // un caso no se toca (puede haber un reporte nuevo a medio escribir).
+  if (!estado.reportEdicion) borrarBorradorReporte();
+  estado.reportCambios = false;
   if (estado.reportEdicion) showToast('Cambios guardados', 'El caso sigue en revisión con los datos corregidos.', 'success');
   else showToast('Reporte recibido', 'El caso quedó en revisión y ya aparece en Mis casos.', 'success');
   await navigateTo('my-cases');
@@ -751,11 +926,15 @@ export function pedirDeclaracion() {
 }
 
 export function updateMinorAuthorization() {
-  const age = Number(document.getElementById('repEdad')?.value);
+  const texto = String(document.getElementById('repEdad')?.value ?? '').trim();
   const authorization = document.getElementById('minorAuthorization');
   if (!authorization) return;
-  const isMinor = Number.isFinite(age) && age < 18;
+  // Sin edad cargada no es menor: Number('') da 0 y la casilla quedaba obligatoria.
+  const age = Number(texto);
+  const isMinor = texto !== '' && Number.isFinite(age) && age < 18;
   authorization.required = isMinor;
   authorization.disabled = !isMinor;
+  const ayuda = document.getElementById('minorAuthorizationAyuda');
+  if (ayuda) ayuda.textContent = isMinor ? AYUDA_AUTORIZACION.activa : AYUDA_AUTORIZACION.inactiva;
   if (!isMinor) authorization.checked = false;
 }

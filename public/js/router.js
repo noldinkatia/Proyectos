@@ -10,7 +10,7 @@ import { clearLeadPhotoSelection, initLeadLeafletMap, renderLeadCaseSelection, r
 import { initMainLeafletMap } from './map.js';
 import { renderMyCasesView } from './my-cases.js';
 import { renderNotifList, updateNotifBadge } from './notifications.js';
-import { initReportLeafletMap, initReportLocationSelects, precargarReporte, removeReportPhoto, renderReportView } from './report.js';
+import { confirmarSalidaDelReporte, iniciarReporteNuevo, initReportLeafletMap, precargarReporte, removeReportPhoto, renderReportView, reporteConCambiosSinEnviar } from './report.js';
 import { debeAceptarBases } from './sesion.js';
 import { renderStatsView } from './stats.js';
 import { getStore } from './store.js';
@@ -136,7 +136,8 @@ export async function applyCurrentRoute() {
       === routeRenderKey(window.rastreoCurrentView, window.rastreoCurrentParams || {});
 
   if (!alreadyRendered) {
-    await navigateTo(route.view, route.params, { fromHistory: true });
+    // false: se quedó en el reporte (no quiso salir); no se abre ninguna ficha.
+    if (await navigateTo(route.view, route.params, { fromHistory: true }) === false) return;
     if (token !== estado.routeApplyToken) return;
   } else if (route.view === 'admin') {
     // La pestaña no forma parte de routeRenderKey: se cambia sin recargar el panel.
@@ -152,7 +153,22 @@ export async function applyCurrentRoute() {
 // pantalla pedida.
 export const PUBLIC_VIEWS = ['feed', 'stats', 'legal'];
 
+function saleDelReporte(view, params) {
+  if (window.rastreoCurrentView !== 'report') return false;
+  return view !== 'report' || (params.caseId || '') !== (window.rastreoCurrentParams?.caseId || '');
+}
+
 export async function navigateTo(view, params = {}, options = {}) {
+  // Salir del formulario de reporte con cambios sin enviar: se pregunta antes. Volver
+  // a dibujar el mismo reporte (reintento de sesión, "Empezar de nuevo") no pregunta.
+  if (!options.sinAvisoDeSalida && window.backendCurrentUser && saleDelReporte(view, params) && reporteConCambiosSinEnviar()) {
+    if (!await confirmarSalidaDelReporte()) {
+      // Con atrás/adelante la dirección ya cambió: vuelve a la del reporte.
+      if (options.fromHistory) syncUrl('report', window.rastreoCurrentParams || {});
+      return false;
+    }
+    estado.reportCambios = false;
+  }
   // La app (/app/) no tiene panel de administración: se abre el de la web.
   if (view === 'admin' && document.documentElement.dataset.frontend === 'app') {
     location.assign(`/${buildRoute('admin', params)}`);
@@ -390,13 +406,15 @@ export async function navigateTo(view, params = {}, options = {}) {
       removeReportPhoto();
       estado.reportEnviando = false;
       main.innerHTML = renderReportView(reportEdicion);
+      estado.reportCambios = false;
       if (reportEdicion) {
         estado.reportEdicion = { casoId: reportEdicion.id, teniaFoto: Boolean(reportEdicion.fotoUrl), fotoAccion: 'mantener' };
         precargarReporte(reportEdicion);
+        initReportLeafletMap(reportEdicion.ubicacion);
       } else {
-        initReportLocationSelects();
+        // Con el borrador de esta pestaña, si lo hay (report.js).
+        iniciarReporteNuevo();
       }
-      initReportLeafletMap(reportEdicion?.ubicacion);
       break;
     case 'lead':
       if (params.caseId) {
