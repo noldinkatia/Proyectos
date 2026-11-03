@@ -78,9 +78,9 @@ export function renderLegalTerms() {
       </div>
 
       <div>
-        <label>
+        <label class="check-fila">
           <input type="checkbox" id="checkTerms">
-          <span>He leído y acepto expresamente las bases y condiciones.</span>
+          <span class="check-fila-texto">He leído y acepto expresamente las bases y condiciones.</span>
         </label>
         <div id="termsSaveError" class="hidden" role="alert">
           <span id="termsSaveErrorText"></span>
@@ -282,9 +282,9 @@ ${campoCorreo({ id: 'regEmail', valor: estado.pendingRegistration?.correo || '' 
         despues: '\n        <div id="passwordStrength" aria-live="polite">Fortaleza de la contraseña: sin evaluar</div>'
       })}${campoContrasena({ id: 'regPassConfirm', etiqueta: 'Confirmar contraseña', autocomplete: 'new-password', placeholder: 'Repita la contraseña', atributos: 'required minlength="8"' })}
       <!-- El enlace es un botón dentro de la etiqueta: tocarlo abre el modal y no tilda la casilla -->
-      <label>
+      <label class="check-fila">
         <input type="checkbox" id="regTerms" required>
-        <span>He leído y acepto las <button type="button" id="regTermsLink" class="link-inline" aria-haspopup="dialog" data-on-click="abrirBasesModal()">bases y condiciones</button></span>
+        <span class="check-fila-texto">He leído y acepto las <button type="button" id="regTermsLink" class="link-inline" aria-haspopup="dialog" data-on-click="abrirBasesModal()">bases y condiciones</button></span>
       </label>
       <button type="submit" class="btn btn-red">Enviar código al Gmail</button>
     </form>
@@ -309,9 +309,22 @@ export function showAuthFeedback(message) {
   feedback.classList.remove('hidden');
 }
 
+// Qué pasó y qué hacer. El servidor explica los errores de datos (contraseña,
+// código, cuenta); cuando no hay explicación útil (sin respuesta, proxy caído o
+// error interno) se dice qué hacer en lugar de "no se pudo completar".
+export function mensajeErrorAuth(error) {
+  if ([502, 503, 504].includes(error?.status)) {
+    return 'El servidor no está disponible en este momento. Esperá un minuto y volvé a intentar.';
+  }
+  if (error?.status >= 500) {
+    return 'Hubo un problema en el servidor y la solicitud no se completó. Volvé a intentar en unos minutos.';
+  }
+  return error?.message || 'No pudimos completar la solicitud. Revisá tu conexión a internet y volvé a intentar.';
+}
+
 export function handleAuthError(error) {
   console.error('Error de autenticación:', error?.status, error?.message);
-  showAuthFeedback(error.message || 'No se pudo completar la solicitud.');
+  showAuthFeedback(mensajeErrorAuth(error));
 }
 
 export function updatePasswordStrength() {
@@ -421,7 +434,7 @@ export async function handleRecoverRequest(e) {
     const espera = Number(error.reintentarEn);
     showAuthFeedback(error.status === 429 && espera > 0
       ? `${error.message} Podés pedir otro código en ${textoEspera(espera)}.`
-      : error.message || 'No se pudo completar la solicitud.');
+      : mensajeErrorAuth(error));
   }
 }
 

@@ -44,7 +44,8 @@ test('registro: la casilla de las bases lleva un enlace que abre el modal sin ti
   } finally {
     globalThis.window = anterior;
   }
-  const etiqueta = html.match(/<label>\s*<input type="checkbox" id="regTerms" required>[\s\S]*?<\/label>/)?.[0];
+  // Fila .check-fila (44 px, toda la fila se toca), como las casillas del reporte.
+  const etiqueta = html.match(/<label class="check-fila">\s*<input type="checkbox" id="regTerms" required>[\s\S]*?<\/label>/)?.[0];
   assert.ok(etiqueta, 'la casilla sigue siendo obligatoria');
   // Un botón dentro de la etiqueta: el navegador no activa la casilla al tocarlo.
   assert.match(etiqueta, /<button type="button" id="regTermsLink" class="link-inline" aria-haspopup="dialog" data-on-click="abrirBasesModal\(\)">bases y condiciones<\/button>/);

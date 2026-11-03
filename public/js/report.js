@@ -278,21 +278,26 @@ export async function centerReportMapOnSelection() {
   }
 }
 
+export const AVISO_UBICACION_NO_DISPONIBLE = 'No pudimos obtener tu ubicación. Permití el acceso a la ubicación en el navegador o marcá el punto en el mapa.';
+
 export function useBrowserLocation(latId, lngId, markerObj, coordsTextId) {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(pos => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      document.getElementById(latId).value = lat.toFixed(5);
-      document.getElementById(lngId).value = lng.toFixed(5);
-      if (coordsTextId) document.getElementById(coordsTextId).innerText = `Coordenadas aproximadas: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-      if (markerObj && estado.activeMap) {
-        markerObj.setLatLng([lat, lng]);
-        estado.activeMap.setView([lat, lng], 14);
-      }
-      if (latId === 'replat') registrarCambioReporte();
-    }, () => showToast('Ubicación no disponible', 'No se pudo obtener la localización del navegador.', 'error'));
+  const sinUbicacion = () => showToast('Ubicación no disponible', AVISO_UBICACION_NO_DISPONIBLE, 'error');
+  if (!navigator.geolocation) {
+    sinUbicacion();
+    return;
   }
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    document.getElementById(latId).value = lat.toFixed(5);
+    document.getElementById(lngId).value = lng.toFixed(5);
+    if (coordsTextId) document.getElementById(coordsTextId).innerText = `Coordenadas aproximadas: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    if (markerObj && estado.activeMap) {
+      markerObj.setLatLng([lat, lng]);
+      estado.activeMap.setView([lat, lng], 14);
+    }
+    if (latId === 'replat') registrarCambioReporte();
+  }, sinUbicacion);
 }
 
 // Las fotos se reducen a 800 px antes de enviarse, así que se acepta el tamaño de una foto de celular.
@@ -559,9 +564,62 @@ export function desmarcarCampoReporte(event) {
   }
 }
 
+// Ley N.º 6534/2020: el reporte no puede llevar datos crediticios, bancarios ni
+// patrimoniales. Se buscan expresiones que solo se usan para esos datos y números
+// de tarjeta (13 a 19 dígitos que pasan el control de Luhn), no palabras sueltas:
+// "cuenta con un tatuaje" o "cerca del Banco Nacional" son descripciones válidas.
+const CAMPOS_TEXTO_LIBRE = ['repNombre', 'repFisica', 'repVestimenta', 'repSenas'];
+const DATOS_FINANCIEROS = [
+  [/\btarjetas?\s+(de\s+)?(cr[eé]dito|d[eé]bito)\b/i, 'datos de una tarjeta'],
+  [/\b(n[uú]mero|nro\.?|n\.?\s*[°º])\s+de\s+(la\s+)?(cuenta|tarjeta)\b/i, 'un número de cuenta o de tarjeta'],
+  [/\bcuentas?\s+(bancarias?|corrientes?|de\s+ahorros?)\b/i, 'datos de una cuenta bancaria'],
+  [/\bcajas?\s+de\s+ahorros?\b/i, 'datos de una cuenta bancaria'],
+  [/\b(cbu|iban|swift|cvv|cvc)\b/i, 'datos bancarios'],
+  [/\b(pin|clave|contraseña)\s+(del?\s+)?(banco|cajero|tarjeta|homebanking)\b/i, 'una clave bancaria'],
+  [/\b(deudas?|pr[eé]stamos?|cr[eé]ditos?)\s+(bancari[oa]s?|con\s+(el|la)\s+(banco|financiera|cooperativa))\b/i, 'datos de deudas o préstamos'],
+  [/\b(saldo|sueldo|salario|ingresos?)\s+(de|en)\s+\d/i, 'datos de dinero o patrimonio']
+];
+
+function pasaLuhn(digitos) {
+  let suma = 0;
+  for (let i = 0; i < digitos.length; i += 1) {
+    let d = Number(digitos[digitos.length - 1 - i]);
+    if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
+    suma += d;
+  }
+  return suma % 10 === 0;
+}
+
+// Devuelve el motivo si el texto parece tener datos financieros, o null.
+export function motivoDatoFinanciero(texto) {
+  const valor = String(texto ?? '');
+  for (const [patron, motivo] of DATOS_FINANCIEROS) if (patron.test(valor)) return motivo;
+  for (const [numero] of valor.matchAll(/\d(?:[ -]?\d){12,18}/g)) {
+    if (pasaLuhn(numero.replace(/\D/g, ''))) return 'un número de tarjeta';
+  }
+  return null;
+}
+
+// Primer campo de texto libre con datos financieros: lo marca, lo enfoca y explica
+// qué corregir. true si se puede seguir.
+export function revisarDatosFinancieros() {
+  for (const id of CAMPOS_TEXTO_LIBRE) {
+    const campo = document.getElementById(id);
+    const motivo = motivoDatoFinanciero(campo?.value);
+    if (!motivo) continue;
+    campo.setAttribute?.('aria-invalid', 'true');
+    mostrarErrorReporte(`Revisá «${etiquetaCampo(campo)}»: parece incluir ${motivo}. Por ley (N.º 6534/2020) el reporte no puede llevar datos bancarios, de tarjetas ni de deudas. Borralo para continuar.`);
+    campo.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    campo.focus?.({ preventScroll: true });
+    return false;
+  }
+  return true;
+}
+
 export async function handleReportSubmit(e) {
   e.preventDefault();
   if (!validarFormularioReporte(e.currentTarget)) return;
+  if (!revisarDatosFinancieros()) return;
   // Primer paso: se muestra la vista previa de la alerta temprana para revisarla.
   const previewSection = document.getElementById('alertPreviewSection');
   if (previewSection?.classList.contains('hidden')) {
@@ -570,13 +628,6 @@ export async function handleReportSubmit(e) {
     document.getElementById('reportSubmitButton').textContent = 'Revisar y continuar';
     actualizarPasoReporte(2);
     previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    return;
-  }
-
-  // Validación Ley N.º 6534/2020: Bloqueo de datos financieros o patrimoniales
-  const text = (document.getElementById('repNombre').value + ' ' + document.getElementById('repFisica').value).toLowerCase();
-  if (text.includes('tarjeta') || text.includes('cuenta') || text.includes('banco') || text.includes('deuda')) {
-    showToast('Importante', 'Se prohíbe explícitamente ingresar datos crediticios, bancarios o patrimoniales (Ley N.º 6534/2020).', 'error');
     return;
   }
   // Segundo paso: la vista previa de la ficha. Todavía no se envía nada.

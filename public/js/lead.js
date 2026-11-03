@@ -93,8 +93,8 @@ export function renderLeadView(preCaseId) {
           <label for="leadFecha">Fecha y hora del avistamiento *</label>
           <input type="datetime-local" id="leadFecha" required class="form-control">
         </div>
-        <label class="privacy-consent lead-public-consent"><input type="checkbox" id="leadPublicConsent" required>
-          Entiendo que la pista, su ubicación y las fotografías que envíe podrán ser publicadas si el equipo las valida.
+        <label class="check-fila lead-public-consent"><input type="checkbox" id="leadPublicConsent" required>
+          <span class="check-fila-texto">Entiendo que la pista, su ubicación y las fotografías que envíe podrán ser publicadas si el equipo las valida.</span>
         </label>
         <!-- El mapa no es un campo: el título nombra al grupo (como en el reporte). -->
         <div class="form-group lead-location-group" role="group" aria-labelledby="leadLugarTitulo">

@@ -114,7 +114,7 @@ export function renderStatsView(stats) {
     <div class="monthly-chart-bars">
       <span class="monthly-chart-bar monthly-reports" style="--bar-height:${month.reports / referenceMax * 100}%"></span>
       <span class="monthly-chart-bar monthly-located" style="--bar-height:${month.located / referenceMax * 100}%"></span>
-    </div><span class="monthly-chart-month">${month.month}</span>
+    </div><span class="monthly-chart-month"><span class="mes-largo">${month.month}</span><span class="mes-corto" aria-hidden="true">${month.month.charAt(0)}</span></span>
   </div>`).join('');
   const departments = stats.casosPorDepartamento || [];
   const maxDepartmentCount = Math.max(...departments.map(row => Number(row.total)), 1);

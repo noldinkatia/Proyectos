@@ -23,6 +23,11 @@ export function renderFeedView(statistics = window.currentStatistics) {
     ?? casos.filter(c => c.estado === 'VALIDADO' || c.estado === 'EN_SEGUIMIENTO').length);
   const sinActualizar = casos.filter(c => c.estado === 'EN_SEGUIMIENTO' && Number(c.seguimientoEtapa) >= 2).length;
   const efectividad = total ? Math.round(encontrados / total * 100) : 0;
+  // Atajo a "Mis casos" en la portada web (la app ya lo tiene en la barra de abajo).
+  // Sin sesión lleva al ingreso y vuelve; la administración no tiene casos propios.
+  const esAdministrador = ['administrador', 'ADMINISTRADOR'].includes(store.currentUser?.rol);
+  const atajoMisCasos = !esAdministrador && globalThis.document?.documentElement?.dataset.frontend !== 'app'
+    ? `<button type="button" data-on-click="navigateTo('my-cases')" class="btn btn-outline">▤ Mis casos</button>` : '';
   const groupCases = (select, label) => {
     const groups = new Map();
     casos.forEach(item => {
@@ -51,6 +56,7 @@ export function renderFeedView(statistics = window.currentStatistics) {
           <p class="hero-description">Un canal de difusión y ayuda colaborativa para encontrar personas desaparecidas en Paraguay. <strong>No reemplaza la denuncia policial</strong>: la complementa con alertas por zona, pistas ciudadanas con foto y ubicación, y un seguimiento automático de cada caso.</p>
           <div class="hero-actions">
             <button type="button" data-on-click="navigateTo('report')" class="btn btn-primary">＋ Reportar persona desaparecida</button>
+            ${atajoMisCasos}
             <button type="button" data-on-click="navigateTo('lead')" class="btn btn-outline">⌖ Generar pista</button>
             <a href="tel:911" class="btn btn-emergency">☎ 911</a>
           </div>
