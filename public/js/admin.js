@@ -3,6 +3,7 @@ import { CAMPOS_ALERTA } from './alerta-campos.js';
 import { apiRequest, loadProtectedPhotos } from './api.js';
 import { escapeHtml } from './config.js';
 import { confirmar, pedirMotivo } from './dialogo.js';
+import { estado } from './estado.js';
 import { statusLabel, timeSince } from './my-cases.js';
 import { navigateTo, syncUrl } from './router.js';
 import { getStore } from './store.js';
@@ -419,10 +420,18 @@ export async function adminReject(caseId) {
   }
 }
 
+// Cuánto sigue pública la ficha al marcar localizado (VENTANA_LOCALIZADOS_HORAS).
+// Una persona menor de edad se retira enseguida (case-shared.js).
+export function avisoVentanaLocalizado(horas) {
+  const menores = ' Si es una persona menor de edad, se retira enseguida.';
+  if (!(horas > 0)) return 'La ficha se retirará enseguida del acceso público.';
+  return `La ficha de una persona adulta permanecerá visible hasta ${horas === 1 ? '1 hora' : `${horas} horas`} y luego se retirará del acceso público.${menores}`;
+}
+
 export async function adminMarkLocated(caseId) {
   if (!await confirmar({
     titulo: 'Marcar como localizada',
-    mensaje: 'La ficha permanecerá visible hasta 24 horas y luego se retirará del acceso público.',
+    mensaje: avisoVentanaLocalizado(estado.ventanaLocalizadosHoras),
     textoConfirmar: 'Marcar como localizada'
   })) return;
   try {

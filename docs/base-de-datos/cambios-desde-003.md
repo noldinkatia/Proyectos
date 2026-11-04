@@ -1,6 +1,6 @@
 # Cambios respecto de las migraciones 001 a 003
 
-Comparación entre el esquema que dejan `001` a `003` y el que dejan `001` a `009`, ambos aplicados sobre bases vacías. Se compararon tablas, columnas (tipo, nulo, valor por defecto), restricciones e índices.
+Comparación entre el esquema que dejan `001` a `003` y el que dejan `001` a `010`, ambos aplicados sobre bases vacías. Se compararon tablas, columnas (tipo, nulo, valor por defecto), restricciones e índices.
 
 | Cambio | Objeto | Detalle | Migración |
 |---|---|---|---|
@@ -13,6 +13,7 @@ Comparación entre el esquema que dejan `001` a `003` y el que dejan `001` a `00
 | Columna nueva | `casos.modificado_en` | timestamp with time zone, admite nulo | `009_ediciones_reportante.sql` |
 | Columna nueva | `casos.ediciones_reportante` | integer, NOT NULL, por defecto `0` | `009_ediciones_reportante.sql` |
 | Restricción nueva | `casos.casos_ediciones_reportante_check` | `CHECK ((ediciones_reportante >= 0))` | `009_ediciones_reportante.sql` |
+| Restricción nueva | `casos.casos_estado_valido` | `CHECK ((estado = ANY (ARRAY['PENDIENTE'::text, 'VALIDADO'::text, 'EN_SEGUIMIENTO'::text, 'LOCALIZADO'::text, 'CERRADO'::text, 'RECHAZADO'::text])))` | `010_estado_caso_valido.sql` |
 | Restricción nueva | `casos.casos_seguimiento_intentos_check` | `CHECK (((seguimiento_intentos >= 0) AND (seguimiento_intentos <= 2)))` | `006_seguimiento_intentos.sql` |
 | Índice nuevo | `casos.idx_casos_localizados` | `CREATE INDEX idx_casos_localizados ON public.casos USING btree (estado, localizado_en) WHERE (localizado_en IS NOT NULL)` | `005_indice_localizados.sql` |
 

@@ -51,6 +51,11 @@ export const estado = {
   selectedLeadPhotos: [],
   leadPhotoPreviewUrls: [],
 
+  // Panel de administración (1)
+  // Horas que la ficha de un adulto localizado sigue pública (VENTANA_LOCALIZADOS_HORAS
+  // del servidor, llega con /admin/casos).
+  ventanaLocalizadosHoras: 24,
+
   // Interfaz de usuario (2)
   toastTimeout: null,
   notificationRefreshTimer: null

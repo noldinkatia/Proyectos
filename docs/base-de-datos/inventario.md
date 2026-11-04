@@ -1,12 +1,12 @@
 # Inventario de la base de datos
 
-Esquema que resulta de aplicar las migraciones `001_esquema_inicial.sql` a `009_ediciones_reportante.sql` (`backend/migrations/`) sobre una base PostgreSQL 16 vacía. Solo estructura: no incluye datos.
+Esquema que resulta de aplicar las migraciones `001_esquema_inicial.sql` a `010_estado_caso_valido.sql` (`backend/migrations/`) sobre una base PostgreSQL 16 vacía. Solo estructura: no incluye datos.
 
 Archivos relacionados:
 
 - `rastreo_py_esquema.sql`: volcado del esquema (`pg_dump --schema-only --no-owner --no-privileges`).
 - `esquema.json`: el mismo esquema en formato legible por programas.
-- `cambios-desde-003.md`: lo que agregan las migraciones 004 a 009 respecto de 001 a 003.
+- `cambios-desde-003.md`: lo que agregan las migraciones 004 a 010 respecto de 001 a 003.
 
 ## Resumen
 
@@ -176,6 +176,7 @@ Creada en `001_esquema_inicial.sql`.
 Restricciones:
 
 - `casos_ediciones_reportante_check` (CHECK): `CHECK ((ediciones_reportante >= 0))`
+- `casos_estado_valido` (CHECK): `CHECK ((estado = ANY (ARRAY['PENDIENTE'::text, 'VALIDADO'::text, 'EN_SEGUIMIENTO'::text, 'LOCALIZADO'::text, 'CERRADO'::text, 'RECHAZADO'::text])))` (`010_estado_caso_valido.sql`; los saltos permitidos entre estados están en `backend/estados-caso.js`)
 - `casos_seguimiento_intentos_check` (CHECK): `CHECK (((seguimiento_intentos >= 0) AND (seguimiento_intentos <= 2)))`
 - `casos_reportado_por_usr_id_fkey` (FOREIGN KEY): `FOREIGN KEY (reportado_por_usr_id) REFERENCES usuarios(id)`
 - `casos_pkey` (PRIMARY KEY): `PRIMARY KEY (id)`

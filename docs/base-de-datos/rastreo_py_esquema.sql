@@ -184,6 +184,7 @@ CREATE TABLE public.casos (
     modificado_en timestamp with time zone,
     ediciones_reportante integer DEFAULT 0 NOT NULL,
     CONSTRAINT casos_ediciones_reportante_check CHECK ((ediciones_reportante >= 0)),
+    CONSTRAINT casos_estado_valido CHECK ((estado = ANY (ARRAY['PENDIENTE'::text, 'VALIDADO'::text, 'EN_SEGUIMIENTO'::text, 'LOCALIZADO'::text, 'CERRADO'::text, 'RECHAZADO'::text]))),
     CONSTRAINT casos_seguimiento_intentos_check CHECK (((seguimiento_intentos >= 0) AND (seguimiento_intentos <= 2)))
 );
 

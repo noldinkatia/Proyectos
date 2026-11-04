@@ -133,6 +133,7 @@ export async function refreshMyCases() {
 
 export async function loadAdminDashboardData() {
   const caseResult = await apiRequest('/admin/casos');
+  if (Number.isFinite(caseResult.ventanaLocalizadosHoras)) estado.ventanaLocalizadosHoras = caseResult.ventanaLocalizadosHoras;
   const [historyResult, clueResult, auditResult] = await Promise.allSettled([
     apiRequest('/admin/historial-localizados'),
     apiRequest('/admin/pistas'),

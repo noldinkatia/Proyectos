@@ -524,11 +524,13 @@ test('el proceso de seguimiento envía la consulta tras 48 h, la repite a las 24
     { id: 'retry', nombre_completo: 'Caso tres', reportado_por_usr_id: 12, estado: 'VALIDADO', seguimiento_etapa: 1, seguimiento_intentos: 2 }
   ];
   const statements = [];
+  const parametros = [];
   const db = {
     async connect() {
       return {
-        async query(sql) {
+        async query(sql, valores = []) {
           statements.push(sql);
+          parametros.push(valores);
           if (sql.includes('SELECT id, nombre_completo')) return { rows };
           return { rows: [], rowCount: 1 };
         },
@@ -538,7 +540,10 @@ test('el proceso de seguimiento envía la consulta tras 48 h, la repite a las 24
   };
   const result = await processDueFollowups(db);
   assert.deepEqual(result, { consultasEnviadas: 1, segundasConsultas: 1, casosEnSeguimiento: 1 });
-  assert.ok(statements.some(sql => sql.includes("INTERVAL '24 hours'")));
+  // La consulta siguiente se programa a HORAS_ENTRE_CONSULTAS (24 h, case-shared.js).
+  const reprogramada = statements.findIndex(sql => sql.includes("($3 * INTERVAL '1 hour')"));
+  assert.ok(reprogramada >= 0);
+  assert.equal(parametros[reprogramada][2], 24);
   assert.ok(statements.some(sql => sql.includes("SET estado = 'EN_SEGUIMIENTO'")));
   assert.ok(statements.some(sql => sql.includes("'SEGUIMIENTO')")));
   assert.ok(statements.some(sql => sql.includes("'CASO_SIN_ACTUALIZAR'")));

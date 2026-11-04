@@ -1,5 +1,5 @@
 {
-  "generado_desde": "backend/migrations/001_esquema_inicial.sql a 009_ediciones_reportante.sql aplicadas sobre una base vacía",
+  "generado_desde": "backend/migrations/001_esquema_inicial.sql a 010_estado_caso_valido.sql aplicadas sobre una base vacía",
   "motor": "PostgreSQL 16",
   "migraciones": [
     "001_esquema_inicial.sql",
@@ -10,7 +10,8 @@
     "006_seguimiento_intentos.sql",
     "007_declaracion_reporte.sql",
     "008_antecedentes_usuario.sql",
-    "009_ediciones_reportante.sql"
+    "009_ediciones_reportante.sql",
+    "010_estado_caso_valido.sql"
   ],
   "tablas": [
     {
@@ -573,6 +574,11 @@
           "tipo": "CHECK",
           "nombre": "casos_ediciones_reportante_check",
           "definicion": "CHECK ((ediciones_reportante >= 0))"
+        },
+        {
+          "tipo": "CHECK",
+          "nombre": "casos_estado_valido",
+          "definicion": "CHECK ((estado = ANY (ARRAY['PENDIENTE'::text, 'VALIDADO'::text, 'EN_SEGUIMIENTO'::text, 'LOCALIZADO'::text, 'CERRADO'::text, 'RECHAZADO'::text])))"
         },
         {
           "tipo": "CHECK",

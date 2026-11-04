@@ -1,10 +1,12 @@
-import { LIMITE_CIERRE_LOCALIZADO_DIAS } from './case-shared.js';
+import { HORAS_ENTRE_CONSULTAS, LIMITE_CIERRE_LOCALIZADO_DIAS } from './case-shared.js';
 import { withTransaction } from './db.js';
 
-// Seguimiento automático en dos intentos (seguimiento_intentos, migración 006):
-//   48 h después de publicado (o de la última respuesta) → primera pregunta.
-//   24 h sin respuesta → segunda pregunta, con las mismas opciones.
-//   24 h más sin respuesta → EN_SEGUIMIENTO "Sin actualizar" y aviso a la
+// Seguimiento automático en dos intentos (seguimiento_intentos, migración 006).
+// Las horas son las de case-shared.js:
+//   HORAS_PRIMER_SEGUIMIENTO (48 h) después de publicado o de la última respuesta
+//   (lo programan admin-routes.js y case-routes.js) → primera pregunta.
+//   HORAS_ENTRE_CONSULTAS (24 h) sin respuesta → segunda pregunta, con las mismas opciones.
+//   HORAS_ENTRE_CONSULTAS más sin respuesta → EN_SEGUIMIENTO "Sin actualizar" y aviso a la
 //   administración.
 // Lo ejecuta server.js cada minuto y el simulador del admin (un paso por vez).
 export async function processDueFollowups(db) {
@@ -27,9 +29,9 @@ export async function processDueFollowups(db) {
         const segunda = caso.seguimiento_etapa === 1;
         await client.query(`
           UPDATE casos SET seguimiento_etapa = 1, seguimiento_intentos = $2,
-            proximo_seguimiento = CURRENT_TIMESTAMP + INTERVAL '24 hours'
+            proximo_seguimiento = CURRENT_TIMESTAMP + ($3 * INTERVAL '1 hour')
           WHERE id = $1
-        `, [caso.id, segunda ? 2 : 1]);
+        `, [caso.id, segunda ? 2 : 1, HORAS_ENTRE_CONSULTAS]);
         if (caso.reportado_por_usr_id) {
           await client.query(`
             INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo)
@@ -39,8 +41,8 @@ export async function processDueFollowups(db) {
             caso.id,
             segunda ? 'Segunda consulta de seguimiento' : 'Consulta de seguimiento',
             segunda
-              ? `Todavía no recibimos tu respuesta: ¿la búsqueda de ${caso.nombre_completo} continúa activa? Si no respondés en 24 horas, el caso quedará como sin actualizar.`
-              : `¿La búsqueda de ${caso.nombre_completo} continúa activa? Responda dentro de las próximas 24 horas.`
+              ? `Todavía no recibimos tu respuesta: ¿la búsqueda de ${caso.nombre_completo} continúa activa? Si no respondés en ${HORAS_ENTRE_CONSULTAS} horas, el caso quedará como sin actualizar.`
+              : `¿La búsqueda de ${caso.nombre_completo} continúa activa? Responda dentro de las próximas ${HORAS_ENTRE_CONSULTAS} horas.`
           ]);
         }
         if (segunda) result.segundasConsultas += 1;

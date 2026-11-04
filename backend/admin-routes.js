@@ -4,6 +4,8 @@ import { asyncRoute } from './auth-routes.js';
 import {
   caseListColumns,
   casoEncontrado,
+  HORAS_PRIMER_SEGUIMIENTO,
+  LOCATED_WINDOW_HOURS,
   paginatedBody,
   paginationFromQuery,
   sendStoredPhoto,
@@ -11,6 +13,7 @@ import {
   validDateFilter
 } from './case-shared.js';
 import { withTransaction } from './db.js';
+import { ESTADOS_CASO, mensajeTransicionNoPermitida, transicionPermitida } from './estados-caso.js';
 import { avisoLocalizadoAlReportante, processDueFollowups } from './followups.js';
 
 // Antecedentes activos de quien reportó el caso c (solo para el panel).
@@ -49,7 +52,8 @@ export function createAdminRouter({ db, requireAdmin, push }) {
       ORDER BY c.creado_en DESC
       LIMIT $1::integer OFFSET $2::integer
     `, [pagination.limit, pagination.offset]);
-    res.json(paginatedBody('casos', rows.map(toAdminCase), rows, pagination));
+    // ventanaLocalizadosHoras: el panel avisa cuánto queda visible la ficha al marcar localizado.
+    res.json({ ...paginatedBody('casos', rows.map(toAdminCase), rows, pagination), ventanaLocalizadosHoras: LOCATED_WINDOW_HOURS });
   }));
 
   router.get('/admin/auditoria', ...requireAdmin, asyncRoute(async (_req, res) => {
@@ -168,7 +172,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
 
   router.post('/admin/casos/:id/estado', ...requireAdmin, asyncRoute(async (req, res) => {
     const state = req.body?.estado;
-    if (!['PENDIENTE', 'VALIDADO', 'EN_SEGUIMIENTO', 'LOCALIZADO', 'CERRADO', 'RECHAZADO'].includes(state)) {
+    if (!ESTADOS_CASO.includes(state)) {
       return res.status(400).json({ error: 'El estado solicitado no es válido.' });
     }
     // Un motivo de solo espacios no cuenta. Se guarda sin los espacios de más.
@@ -200,6 +204,10 @@ export function createAdminRouter({ db, requireAdmin, push }) {
       if (!rows[0]) return null;
       const current = rows[0];
       if (current.estado === state) return current;
+      // Salto que no está en la tabla (estados-caso.js): no se toca nada.
+      if (!transicionPermitida(current.estado, state)) {
+        return { conflicto: mensajeTransicionNoPermitida(current.estado, state) };
+      }
       const { rows: updatedRows } = await client.query(`
         UPDATE casos SET estado = $2,
           -- Al cerrar se conserva la fecha de localizado: sigue contando como encontrado.
@@ -215,7 +223,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
           proximo_seguimiento = CASE
             WHEN $2 IN ('VALIDADO', 'EN_SEGUIMIENTO')
               AND $9 NOT IN ('VALIDADO', 'EN_SEGUIMIENTO')
-              THEN CURRENT_TIMESTAMP + INTERVAL '48 hours'
+              THEN CURRENT_TIMESTAMP + ($10 * INTERVAL '1 hour')
             WHEN $2 IN ('LOCALIZADO', 'CERRADO', 'RECHAZADO', 'PENDIENTE') THEN NULL
             ELSE proximo_seguimiento
           END,
@@ -237,7 +245,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
         req.params.id, state, motivo || null, req.body?.numeroDenuncia || '',
         req.body?.verificoDenuncia === true, req.body?.datosCoherentes === true,
         req.body?.duplicadosVerificados === true, req.body?.menorValidado === true,
-        current.estado
+        current.estado, HORAS_PRIMER_SEGUIMIENTO
       ]);
       await client.query(`
         INSERT INTO cambios_estado_caso (caso_id, estado_anterior, estado_nuevo, cambiado_por)
@@ -276,6 +284,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
       return updatedRows[0];
     });
     if (!updated) return res.status(404).json({ error: 'Caso no disponible' });
+    if (updated.conflicto) return res.status(409).json({ error: updated.conflicto });
     push.programar(db, alertasPush);
     res.json({ caso: toAdminCase(updated) });
   }));

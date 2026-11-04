@@ -10,6 +10,7 @@ import {
   caseVisibilityParameters,
   enviarFotoGuardada,
   hasPhoto,
+  HORAS_PRIMER_SEGUIMIENTO,
   IMAGE_DATA_URL,
   LIMITE_EDICIONES_REPORTE,
   paginatedBody,
@@ -366,10 +367,10 @@ export function createCaseRouter({ db, jwtSecret, push }) {
           seguimiento_intentos = 0,
           proximo_seguimiento = CASE
             WHEN $2 IN ('LOCALIZADO', 'CERRADO') THEN NULL
-            ELSE CURRENT_TIMESTAMP + INTERVAL '48 hours'
+            ELSE CURRENT_TIMESTAMP + ($4 * INTERVAL '1 hour')
           END
         WHERE id = $1 RETURNING *
-      `, [req.params.id, state, reason || null]);
+      `, [req.params.id, state, reason || null, HORAS_PRIMER_SEGUIMIENTO]);
 
       if (current.estado !== state) {
         await client.query(`

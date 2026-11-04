@@ -19,6 +19,14 @@ export function leerLimiteCierreLocalizado(valor) {
 
 export const LIMITE_CIERRE_LOCALIZADO_DIAS = leerLimiteCierreLocalizado(process.env.LIMITE_CIERRE_LOCALIZADO_DIAS);
 
+// Seguimiento automático (followups.js): la primera consulta llega 48 h después de
+// publicado el caso o de la última respuesta del reportante; la segunda consulta y
+// el paso a "sin actualizar" llegan cada 24 h sin respuesta. Únicos valores: los
+// usan admin-routes.js (validar o reabrir), case-routes.js (respuesta "sigue
+// activa") y followups.js, también en los textos de las consultas.
+export const HORAS_PRIMER_SEGUIMIENTO = 48;
+export const HORAS_ENTRE_CONSULTAS = 24;
+
 // Veces que quien reporta puede editar su reporte mientras está en revisión.
 export const LIMITE_EDICIONES_REPORTE = 5;
 
