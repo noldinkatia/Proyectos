@@ -168,6 +168,11 @@
   /* Banner de la ficha de caso */
   --case-banner-bg: #dbe5f0;
 
+  /* Hero de la portada: degradado institucional suave */
+  --hero-fondo-1: #e9f0f8;
+  --hero-fondo-2: #f6f8fb;
+  --hero-fondo-3: #e8f2ef;
+
   /* Geometría */
   --radius: var(--radio);
   --radius-sm: 10px;
@@ -293,6 +298,10 @@
 
   --case-banner-bg: #141c30;
 
+  --hero-fondo-1: #11223b;
+  --hero-fondo-2: #0f1524;
+  --hero-fondo-3: #0f2225;
+
   --shadow-xs: 0 1px 2px rgba(0,0,0,.3);
   --shadow-sm: var(--sombra);
   --shadow-md: 0 7px 22px rgba(0,0,0,.38);
@@ -363,20 +372,25 @@ button { touch-action: manipulation; }
   flex-direction: column;
   background: transparent;
 }
+/* Barra superior: tarjeta flotante y redondeada, alineada con la columna de
+   contenido (--gutter). La app (/app/) la vuelve a pegar arriba (app/app.css). */
 #topHeader {
   position: sticky;
   z-index: 1000;
-  top: 0;
+  top: .6rem;
   display: flex;
   min-height: var(--header-h);
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: .4rem 1rem;
-  padding: .55rem var(--gutter);
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg) 84%, transparent);
+  margin: .6rem var(--gutter) 0;
+  padding: .5rem .75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
   color: var(--text);
+  box-shadow: var(--sombra);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -386,10 +400,18 @@ button { touch-action: manipulation; }
   top: 0;
   right: 0;
   left: 0;
-  height: 4px;
+  height: 3px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   background: linear-gradient(90deg, #c8281d 0 33.333%, #fff 33.333% 66.666%, #0b2545 66.666% 100%);
   content: "";
 }
+/* Accesos directos al centro (solo en pantallas anchas). */
+.header-links { display: none; flex: 1 1 auto; justify-content: center; gap: .15rem; }
+@media (min-width: 1100px) { .header-links { display: flex; } }
+#topHeader .header-links button { min-height: 2.5rem; padding: .45rem .75rem; border-radius: var(--radius-sm); color: var(--text-2); font-size: .84rem; font-weight: 600; }
+#topHeader .header-links button:hover { background: var(--surface-2); color: var(--text-strong); }
+#topHeader .header-links button[aria-current="page"] { background: var(--info-soft); color: var(--color-primario-oscuro); box-shadow: inset 0 -2px 0 var(--color-primario); }
+[data-theme="dark"] #topHeader .header-links button[aria-current="page"] { color: var(--text-strong); }
 #topHeader > div { display: flex; min-width: 0; align-items: center; gap: .3rem; }
 /* :not(.drawer-item) es necesario: sin eso esta regla gana por especificidad
    sobre .drawer-item y le borra tanto el color apagado como el resaltado de
@@ -500,7 +522,7 @@ button { touch-action: manipulation; }
 .role-badge { display: inline-flex; align-items: center; padding: .16rem .45rem; border-radius: var(--radius-pill); font-size: .64rem; font-weight: 700; line-height: 1.2; }
 .role-badge-citizen { background: var(--badge-citizen-bg); color: var(--badge-citizen-fg); }
 .role-badge-admin { background: var(--badge-admin-bg); color: var(--badge-admin-fg); }
-#topHeader .header-auth-action { padding: .55rem .8rem; border-radius: var(--radius-sm); background: var(--navy-primary); color: var(--on-dark); font-size: .76rem; white-space: nowrap; }
+#topHeader .header-auth-action { min-height: 2.5rem; padding: .55rem .95rem; border-radius: var(--radius-sm); background: var(--navy-primary); color: var(--on-dark); font-size: .8rem; white-space: nowrap; }
 #topHeader .header-auth-action:hover { background: var(--navy-hover); }
 /* "Descargar app" de la web en computadoras (public/js/web.js): enlace con forma de botón */
 #topHeader .header-app-link { display: inline-flex; align-items: center; min-height: 2.35rem; padding: .45rem .8rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-strong); cursor: pointer; font-size: .76rem; font-weight: 700; text-decoration: none; white-space: nowrap; }
@@ -587,25 +609,32 @@ button { touch-action: manipulation; }
 
 .home-hero {
   display: flex;
-  min-height: 270px;
+  min-height: 0;
   align-items: center;
   justify-content: space-between;
   gap: 2rem;
-  padding: clamp(1.5rem, 4vw, 3.25rem);
-  border-color: var(--border-strong);
-  background: linear-gradient(115deg, var(--surface) 0%, var(--surface) 69%, var(--surface-2) 100%);
-  box-shadow: var(--shadow-xl);
+  padding: clamp(1.5rem, 4vw, 2.75rem) clamp(1.25rem, 4.5vw, 3.25rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(125deg, var(--hero-fondo-1) 0%, var(--hero-fondo-2) 55%, var(--hero-fondo-3) 100%);
+  box-shadow: var(--sombra);
 }
-.hero-copy { max-width: 760px; }
-.hero-eyebrow { display: inline-flex; margin: 0 0 1rem; padding: .36rem .7rem; border: 1px solid var(--border); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text-2); font-size: .72rem; font-weight: 600; letter-spacing: .015em; }
-.hero-copy h1 { margin: 0 0 .7rem; color: var(--text-strong); font-size: clamp(2.35rem, 5vw, 3.5rem); letter-spacing: -.03em; line-height: 1.12; }
+.hero-copy { max-width: 780px; }
+.hero-eyebrow { display: inline-flex; margin: 0 0 1rem; color: var(--color-primario); font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+[data-theme="dark"] .hero-eyebrow { color: var(--info); }
+.hero-copy h1 { max-width: 22ch; margin: 0 0 .9rem; color: var(--text-strong); font-size: clamp(1.75rem, 3.6vw, 2.6rem); font-weight: 700; letter-spacing: -.025em; line-height: 1.15; }
 .hero-description { max-width: 720px; margin: 0; color: var(--text-2); font-size: .96rem; line-height: 1.75; }
 .hero-description strong { color: var(--text); }
-.hero-actions { display: flex; flex-wrap: wrap; gap: .65rem; margin-top: 1.5rem; }
-.hero-actions .btn { min-height: 44px; }
-.hero-mark { display: grid; flex: 0 0 132px; justify-items: center; gap: .65rem; color: var(--muted); }
-.hero-mark > span { display: grid; width: 108px; height: 108px; place-items: center; border: 1px solid var(--border-strong); border-radius: var(--radius-xl); background: var(--navy-primary); color: var(--on-dark); box-shadow: var(--shadow-lg); font: 800 4rem/1 Sora, Inter, sans-serif; }
-.hero-mark small { text-align: center; font-size: .62rem; font-weight: 700; letter-spacing: .14em; line-height: 1.5; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: .65rem; margin-top: 1.6rem; }
+.hero-actions .btn { min-height: 46px; padding-inline: 1.2rem; font-size: .9rem; }
+.hero-actions .btn-outline { background: var(--surface); }
+/* Accesos secundarios: enlaces discretos debajo de las dos acciones. */
+.hero-atajos { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem 1.1rem; margin: 1rem 0 0; }
+.hero-atajo { display: inline-flex; min-height: 44px; align-items: center; padding: 0; border: 0; background: none; color: var(--link); cursor: pointer; font: inherit; font-size: .86rem; font-weight: 600; text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 4px; }
+.hero-atajo:hover { color: var(--text-strong); text-decoration-color: currentColor; }
+.hero-emergencia { color: var(--red); }
+/* Ver casos activos: el título no queda bajo la barra superior fija. */
+#caseExplorerHeading { scroll-margin-top: calc(var(--header-h) + 1.75rem); }
 
 .home-stats { margin-top: 2rem; }
 .home-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin: 0 0 .9rem; }
@@ -1286,9 +1315,6 @@ table tr:hover td { background: var(--surface-2); }
   #topHeader { gap: .25rem .6rem; }
   #topHeader > .header-brand { flex: 1 1 auto; }
   #topHeader > .header-actions { flex: 0 0 auto; margin-left: auto; }
-  .home-hero { min-height: 0; }
-  .hero-mark { flex-basis: 105px; }
-  .hero-mark > span { width: 88px; height: 88px; font-size: 3.2rem; }
   .home-stats-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .analytics-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .analytics-card:last-child { grid-column: 1 / -1; }
@@ -1332,8 +1358,7 @@ table tr:hover td { background: var(--surface-2); }
   .menu-btn { gap: .38rem; font-size: .78rem; }
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .home-hero { padding: 1.2rem; }
-  .hero-mark { display: none; }
-  .hero-copy h1 { font-size: 2.3rem; }
+  .hero-copy h1 { font-size: 1.6rem; }
   .hero-description { font-size: .86rem; }
   .hero-actions { align-items: stretch; }
   .hero-actions .btn { flex: 1 1 auto; }

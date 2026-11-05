@@ -171,9 +171,10 @@ test('legibilidad y objetivos táctiles: .btn-sm de 44 px en celular, letra mín
   }
 });
 
-test('portada web: atajo a "Mis casos" junto a Reportar (no para la administración ni en la app)', () => {
+test('portada web: atajo a "Mis casos" en el hero, junto a Reportar (no para la administración ni en la app)', () => {
   const dom = instalarDom();
-  const atajo = /data-on-click="navigateTo\('report'\)"[^>]*>＋ Reportar persona desaparecida<\/button>\s*<button type="button" data-on-click="navigateTo\('my-cases'\)" class="btn btn-outline">▤ Mis casos<\/button>/;
+  // En el hero: "Reportar" como acción principal y "Mis casos" en los accesos de abajo.
+  const atajo = /data-on-click="navigateTo\('report'\)"[^>]*>Reportar una persona desaparecida<\/button>[\s\S]*?<p class="hero-atajos">\s*<button type="button" data-on-click="navigateTo\('my-cases'\)" class="hero-atajo">Mis casos<\/button>/;
   try {
     globalThis.document.documentElement = { dataset: {} };
     for (const [usuario, ve] of [[null, true], [{ id: 1, rol: 'ciudadano' }, true], [{ id: 2, rol: 'administrador' }, false]]) {

@@ -27,7 +27,7 @@ export function renderFeedView(statistics = window.currentStatistics) {
   // Sin sesión lleva al ingreso y vuelve; la administración no tiene casos propios.
   const esAdministrador = ['administrador', 'ADMINISTRADOR'].includes(store.currentUser?.rol);
   const atajoMisCasos = !esAdministrador && globalThis.document?.documentElement?.dataset.frontend !== 'app'
-    ? `<button type="button" data-on-click="navigateTo('my-cases')" class="btn btn-outline">▤ Mis casos</button>` : '';
+    ? `<button type="button" data-on-click="navigateTo('my-cases')" class="hero-atajo">Mis casos</button>` : '';
   const groupCases = (select, label) => {
     const groups = new Map();
     casos.forEach(item => {
@@ -49,19 +49,24 @@ export function renderFeedView(statistics = window.currentStatistics) {
     .map(department => `<option value="${escapeHtml(department)}">${escapeHtml(department)}</option>`).join('');
   return `
     <div class="home-page">
-      <section class="home-hero card" aria-labelledby="homeHeading">
+      <!-- Hero: qué es la página y las dos acciones principales. "Ver casos activos" es
+           un enlace a la sección de casos: el navegador desplaza y el router deja la
+           dirección en #/ sin volver a dibujar la vista. -->
+      <section class="home-hero" aria-labelledby="homeHeading">
         <div class="hero-copy">
-          <p class="hero-eyebrow">Canal colaborativo · complementa la denuncia policial</p>
-          <h1 id="homeHeading">Rastreo PY</h1>
-          <p class="hero-description">Un canal de difusión y ayuda colaborativa para encontrar personas desaparecidas en Paraguay. <strong>No reemplaza la denuncia policial</strong>: la complementa con alertas por zona, pistas ciudadanas con foto y ubicación, y un seguimiento automático de cada caso.</p>
+          <p class="hero-eyebrow">Rastreo PY · Canal colaborativo que complementa la denuncia policial</p>
+          <h1 id="homeHeading">Búsqueda colaborativa de personas desaparecidas en Paraguay</h1>
+          <p class="hero-description">Reportá un caso, avisamos a quienes están cerca y cualquiera puede aportar una pista con foto y ubicación. <strong>No reemplaza la denuncia policial</strong>: la complementa con alertas por zona y un seguimiento de cada caso.</p>
           <div class="hero-actions">
-            <button type="button" data-on-click="navigateTo('report')" class="btn btn-primary">＋ Reportar persona desaparecida</button>
-            ${atajoMisCasos}
-            <button type="button" data-on-click="navigateTo('lead')" class="btn btn-outline">⌖ Generar pista</button>
-            <a href="tel:911" class="btn btn-emergency">☎ 911</a>
+            <button type="button" data-on-click="navigateTo('report')" class="btn btn-primary">Reportar una persona desaparecida</button>
+            <a href="#caseExplorerHeading" class="btn btn-outline">Ver casos activos</a>
           </div>
+          <p class="hero-atajos">
+            ${atajoMisCasos}
+            <button type="button" data-on-click="navigateTo('lead')" class="hero-atajo">Generar pista</button>
+            <a href="tel:911" class="hero-atajo hero-emergencia">Emergencias: llamá al 911</a>
+          </p>
         </div>
-        <div class="hero-mark" aria-hidden="true"><span>R</span><small>UNIDA<br>PARAGUAY</small></div>
       </section>
 
       <section class="home-stats" aria-labelledby="homeStatsHeading">
