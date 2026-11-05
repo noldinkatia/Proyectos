@@ -7,7 +7,19 @@
 :root { --tabbar-h: 62px; }
 
 body.app-movil { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+/* La app no usa la barra flotante de la web: va pegada arriba, de borde a borde,
+   como el encabezado de una app. */
+body.app-movil #topHeader { top: 0; margin: 0; padding-inline: max(.75rem, var(--gutter)); border-width: 0 0 1px; border-radius: 0; box-shadow: none; }
+body.app-movil #topHeader::before { border-radius: 0; }
 body.app-movil #topHeader { padding-top: calc(.55rem + env(safe-area-inset-top)); }
+/* Inicio de la app: sin hero grande. Queda el título y las acciones, compactos
+   (Reportar y Mis casos también están en la barra de abajo). */
+body.app-movil .home-hero { padding: 1.1rem 1.15rem; }
+body.app-movil .hero-eyebrow, body.app-movil .hero-description { display: none; }
+body.app-movil .hero-copy h1 { max-width: none; margin-bottom: 0; font-size: 1.3rem; }
+body.app-movil .hero-actions { margin-top: .9rem; gap: .5rem; }
+body.app-movil .hero-actions .btn { min-height: 44px; font-size: .86rem; }
+body.app-movil .hero-atajos { margin-top: .35rem; }
 /* Encabezado: la app no tiene el subtítulo de la web. Con la grilla de dos filas de
    .brand-title el nombre quedaba arriba y no centrado con la "R". */
 body.app-movil .brand-title { grid-template-rows: auto; }
@@ -39,7 +51,7 @@ body.app-movil #toastNotification { bottom: calc(var(--tabbar-h) + .75rem + env(
   padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   border-top: 1px solid var(--border);
   background: var(--surface);
-  box-shadow: 0 -6px 18px rgba(11,37,69,.08);
+  box-shadow: 0 -1px 2px rgba(11,37,69,.04), 0 -4px 14px rgba(11,37,69,.05);
 }
 .app-tabbar button {
   position: relative;
@@ -55,11 +67,14 @@ body.app-movil #toastNotification { bottom: calc(var(--tabbar-h) + .75rem + env(
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: .68rem;
+  font-size: .72rem;
   font-weight: 600;
 }
+.app-tabbar button:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: var(--radius-sm); }
 .app-tabbar button > span[aria-hidden] { font-size: 1.15rem; line-height: 1; }
-.app-tabbar button[aria-current="page"] { color: var(--info); }
+/* Pestaña actual: color de marca y una línea arriba (no solo el color). */
+.app-tabbar button[aria-current="page"] { color: var(--color-primario); box-shadow: inset 0 2px 0 var(--color-primario); }
+[data-theme="dark"] .app-tabbar button[aria-current="page"] { color: var(--info); box-shadow: inset 0 2px 0 var(--info); }
 .app-tabbar #notifBadge { position: absolute; top: .3rem; left: calc(50% + .35rem); }
 
 /* Bienvenida del QR (app abierta en el navegador, sin instalar) */
