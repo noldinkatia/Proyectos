@@ -47,13 +47,36 @@
    2. Tokens de diseño
    Pesos disponibles: 400/500/600/700/800 (fuentes estáticas). No usar valores
    intermedios como 650 u 850: el navegador los redondea sin control.
+
+   Rediseño visual (noviembre 2026). Inventario antes del cambio:
+     color   fondo #f4f5f7 con dos brillos (azul y rojo); superficies #fff,
+             #f8f9fb, #e6e9ef; marca #35587f / #2b4a6d; acento terracota
+             #c25b52; series #6f8fb5, #6fb594, #e39b93, #efb8a6.
+     radios  6, 8, 10, 14 y 22 px, y píldora.
+     sombras cinco niveles teñidos de azul (3 a 14 px de desplazamiento).
+   Variables nuevas del sistema (los componentes siguen usando los tokens de
+   siempre, que ahora salen de estas):
+     --color-primario         azul institucional de botones y marca
+     --color-primario-oscuro  el mismo, más oscuro (hover, texto sobre claro)
+     --color-superficie       tarjetas y paneles
+     --color-fondo            fondo de la página, más uniforme
+     --radio                  esquina moderada de tarjetas y botones (12 px)
+     --sombra                 sombra sutil de una tarjeta en reposo
    ========================================================================== */
 :root,
 [data-theme="light"] {
   color-scheme: light;
 
+  /* Sistema visual */
+  --color-primario: #2c4f75;
+  --color-primario-oscuro: #22405f;
+  --color-superficie: var(--surface);
+  --color-fondo: var(--bg);
+  --radio: 12px;
+  --sombra: 0 1px 2px rgba(11,37,69,.05), 0 4px 14px rgba(11,37,69,.05);
+
   /* Fondos y superficies */
-  --bg: #f4f5f7;
+  --bg: #f3f5f8;
   --bg-2: #e6e9ef;
   --surface: #ffffff;
   --surface-2: #f8f9fb;
@@ -83,10 +106,10 @@
 
   /* Marca */
   --accent: #1f3b5c;
-  --accent-2: #c25b52;
+  --accent-2: #a5645c;
   /* Paleta pastel: botones principales en azul suave y no en azul marino casi negro. */
-  --navy-primary: #35587f;
-  --navy-hover: #2b4a6d;
+  --navy-primary: var(--color-primario);
+  --navy-hover: var(--color-primario-oscuro);
   --navy-deep: #234568;
 
   /* Informativo / interactivo: el rol "cyan" del sistema. Separado de
@@ -138,19 +161,19 @@
   --series-1: #6f8fb5;
   --series-2: #6fb594;
   --series-neutral: #8994a2;
-  --series-accent: #e39b93;
-  --series-accent-2: #efb8a6;
+  --series-accent: #c9958d;
+  --series-accent-2: #dcb9ab;
   --series-amber: #b67512;
 
   /* Banner de la ficha de caso */
   --case-banner-bg: #dbe5f0;
 
   /* Geometría */
-  --radius: 10px;
-  --radius-sm: 8px;
+  --radius: var(--radio);
+  --radius-sm: 10px;
   --radius-xs: 6px;
   --radius-lg: 14px;
-  --radius-xl: 22px;
+  --radius-xl: 16px;
   --radius-pill: 99px;
   /* Ancho de la columna de contenido. Las barras ocupan todo el ancho de
      la pantalla, pero alinean su contenido con esta misma medida. */
@@ -160,10 +183,10 @@
   --header-h: 66px;
 
   /* Elevación: sombras amplias teñidas con el azul de marca (design_system 4) */
-  --shadow-xs: 0 3px 12px rgba(11,37,69,.035);
-  --shadow-sm: 0 5px 18px rgba(11,37,69,.045);
-  --shadow-md: 0 7px 22px rgba(11,37,69,.06);
-  --shadow-lg: 0 12px 34px rgba(11,37,69,.08);
+  --shadow-xs: 0 1px 2px rgba(11,37,69,.04);
+  --shadow-sm: var(--sombra);
+  --shadow-md: 0 2px 4px rgba(11,37,69,.05), 0 8px 20px rgba(11,37,69,.06);
+  --shadow-lg: 0 4px 8px rgba(11,37,69,.05), 0 14px 30px rgba(11,37,69,.08);
   --shadow-xl: 0 14px 42px rgba(11,37,69,.12);
   --shadow-primary: 0 6px 18px -12px rgba(11,37,69,.8);
   --shadow-hover: 0 12px 28px -15px rgba(11,37,69,.32);
@@ -176,12 +199,16 @@
   --overlay: rgba(11,37,69,.58);
 
   /* Degradados de profundidad del fondo */
-  --page-glow-1: rgba(11,37,69,.07);
-  --page-glow-2: rgba(200,40,29,.045);
+  --page-glow-1: rgba(11,37,69,.045);
+  --page-glow-2: rgba(8,103,122,.025);
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
+
+  --color-primario: #21466f;
+  --color-primario-oscuro: #2a5285;
+  --sombra: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.28);
 
   --bg: #070b16;
   --bg-2: #0b1120;
@@ -212,8 +239,8 @@
   --accent-2: #6366f1;
   /* navy-primary es un relleno, nunca un color de texto: en oscuro se aclara
      para que --on-dark conserve contraste encima. */
-  --navy-primary: #1d3f6b;
-  --navy-hover: #2a5285;
+  --navy-primary: var(--color-primario);
+  --navy-hover: var(--color-primario-oscuro);
   --navy-deep: #27486f;
 
   --info: #22d3ee;
@@ -260,14 +287,14 @@
   --series-1: #22d3ee;
   --series-2: #34d399;
   --series-neutral: #64748b;
-  --series-accent: #f87171;
-  --series-accent-2: #fb923c;
+  --series-accent: #d9938b;
+  --series-accent-2: #d8a585;
   --series-amber: #f59e0b;
 
   --case-banner-bg: #141c30;
 
-  --shadow-xs: 0 3px 12px rgba(0,0,0,.3);
-  --shadow-sm: 0 5px 18px rgba(0,0,0,.34);
+  --shadow-xs: 0 1px 2px rgba(0,0,0,.3);
+  --shadow-sm: var(--sombra);
   --shadow-md: 0 7px 22px rgba(0,0,0,.38);
   --shadow-lg: 0 12px 34px rgba(0,0,0,.42);
   --shadow-xl: 0 14px 42px rgba(0,0,0,.46);
@@ -280,8 +307,8 @@
   --selection: rgba(34,211,238,.32);
   --overlay: rgba(1,5,15,.68);
 
-  --page-glow-1: rgba(34,211,238,.06);
-  --page-glow-2: rgba(99,102,241,.06);
+  --page-glow-1: rgba(34,211,238,.035);
+  --page-glow-2: rgba(99,102,241,.03);
 }
 
 /* ==========================================================================
@@ -571,7 +598,7 @@ button { touch-action: manipulation; }
 }
 .hero-copy { max-width: 760px; }
 .hero-eyebrow { display: inline-flex; margin: 0 0 1rem; padding: .36rem .7rem; border: 1px solid var(--border); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text-2); font-size: .72rem; font-weight: 600; letter-spacing: .015em; }
-.hero-copy h1 { margin: 0 0 .7rem; color: var(--text-strong); font-size: clamp(2.35rem, 5vw, 3.5rem); letter-spacing: -.055em; line-height: 1.08; }
+.hero-copy h1 { margin: 0 0 .7rem; color: var(--text-strong); font-size: clamp(2.35rem, 5vw, 3.5rem); letter-spacing: -.03em; line-height: 1.12; }
 .hero-description { max-width: 720px; margin: 0; color: var(--text-2); font-size: .96rem; line-height: 1.75; }
 .hero-description strong { color: var(--text); }
 .hero-actions { display: flex; flex-wrap: wrap; gap: .65rem; margin-top: 1.5rem; }
@@ -740,6 +767,7 @@ button { touch-action: manipulation; }
    7. Títulos, tarjetas y botones
    ========================================================================== */
 h1, h2, h3, .status-tag, table th { font-family: Sora, Inter, sans-serif; }
+h1, h2, h3 { letter-spacing: -.015em; text-wrap: balance; }
 h1, h2, h3, p { overflow-wrap: anywhere; }
 .card {
   margin: 0 0 .9rem;
