@@ -171,20 +171,30 @@ test('legibilidad y objetivos táctiles: .btn-sm de 44 px en celular, letra mín
   }
 });
 
-test('portada web: atajo a "Mis casos" en el hero, junto a Reportar (no para la administración ni en la app)', () => {
+test('portada web: hero con dos acciones, casos y después las estadísticas una sola vez; "Mis casos" en la barra superior', async () => {
   const dom = instalarDom();
-  // En el hero: "Reportar" como acción principal y "Mis casos" en los accesos de abajo.
-  const atajo = /data-on-click="navigateTo\('report'\)"[^>]*>Reportar una persona desaparecida<\/button>[\s\S]*?<p class="hero-atajos">\s*<button type="button" data-on-click="navigateTo\('my-cases'\)" class="hero-atajo">Mis casos<\/button>/;
+  let html;
   try {
-    globalThis.document.documentElement = { dataset: {} };
-    for (const [usuario, ve] of [[null, true], [{ id: 1, rol: 'ciudadano' }, true], [{ id: 2, rol: 'administrador' }, false]]) {
-      globalThis.window.backendCurrentUser = usuario;
-      assert.equal(atajo.test(renderFeedView({})), ve, `usuario ${usuario?.rol || 'sin sesión'}`);
-    }
     globalThis.window.backendCurrentUser = { id: 1, rol: 'ciudadano' };
-    globalThis.document.documentElement = { dataset: { frontend: 'app' } };
-    assert.doesNotMatch(renderFeedView({}), /navigateTo\('my-cases'\)/, 'la app ya lo tiene en la barra de abajo');
+    html = renderFeedView({});
   } finally {
     dom.restaurar();
   }
+  const hero = html.slice(html.indexOf('<section class="home-hero"'), html.indexOf('</section>', html.indexOf('<section class="home-hero"')));
+  const acciones = [...hero.matchAll(/<(button|a)\b[^>]*>([^<]*)<\/\1>/g)].map(m => m[2]);
+  assert.deepEqual(acciones, ['Reportar una persona desaparecida', 'Ver casos activos']);
+  assert.match(hero, /<a href="#caseExplorerHeading" class="btn btn-outline">Ver casos activos<\/a>/);
+  assert.doesNotMatch(hero, /metric|analytics|Estadísticas/, 'sin estadísticas en el hero');
+  // Orden: hero, casos, indicadores y distribución (una sola vez cada uno).
+  const posiciones = ['class="home-hero"', 'class="case-explorer"', 'class="home-stats"', 'class="analytics-grid"'].map(clase => {
+    assert.equal(html.split(clase).length, 2, `${clase} una sola vez`);
+    return html.indexOf(clase);
+  });
+  assert.deepEqual([...posiciones].sort((a, b) => a - b), posiciones);
+  // "Mis casos" sigue a un toque: barra superior de la web (oculto para la administración) y barra de la app.
+  const web = await readFile(new URL('Rastreopy.html', publicDir), 'utf8');
+  const barra = web.slice(web.indexOf('<nav class="header-links"'), web.indexOf('</nav>', web.indexOf('<nav class="header-links"')));
+  assert.match(barra, /<button type="button" data-hide-admin-nav data-nav-view="my-cases" data-on-click="navigateTo\('my-cases'\)">Mis casos<\/button>/);
+  const app = await readFile(new URL('app/index.html', publicDir), 'utf8');
+  assert.match(app, /data-hide-admin-nav data-nav-view="my-cases" data-on-click="navigateTo\('my-cases'\)"/);
 });

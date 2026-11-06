@@ -628,15 +628,10 @@ button { touch-action: manipulation; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: .65rem; margin-top: 1.6rem; }
 .hero-actions .btn { min-height: 46px; padding-inline: 1.2rem; font-size: .9rem; }
 .hero-actions .btn-outline { background: var(--surface); }
-/* Accesos secundarios: enlaces discretos debajo de las dos acciones. */
-.hero-atajos { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem 1.1rem; margin: 1rem 0 0; }
-.hero-atajo { display: inline-flex; min-height: 44px; align-items: center; padding: 0; border: 0; background: none; color: var(--link); cursor: pointer; font: inherit; font-size: .86rem; font-weight: 600; text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 4px; }
-.hero-atajo:hover { color: var(--text-strong); text-decoration-color: currentColor; }
-.hero-emergencia { color: var(--red); }
 /* Ver casos activos: el título no queda bajo la barra superior fija. */
 #caseExplorerHeading { scroll-margin-top: calc(var(--header-h) + 1.75rem); }
 
-.home-stats { margin-top: 2rem; }
+.home-stats { margin-top: 2.75rem; }
 .home-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin: 0 0 .9rem; }
 .section-kicker { display: block; margin-bottom: .18rem; color: var(--muted); font-size: .65rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .home-section-heading h2 { margin: 0; color: var(--text-strong); font-size: 1.22rem; letter-spacing: -.015em; }
@@ -669,7 +664,7 @@ button { touch-action: manipulation; }
 .analytics-row:nth-child(even) .analytics-bar-status { background: var(--series-neutral); }
 .analytics-empty { margin: 0; color: var(--muted); font-size: .76rem; }
 
-.case-explorer { padding-top: .25rem; }
+.case-explorer { margin-top: 2.25rem; padding-top: .25rem; }
 .explorer-heading { margin-bottom: 1rem; }
 .explorer-description { margin: .35rem 0 0; color: var(--muted); font-size: .78rem; }
 .results-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: .85rem 0 .7rem; }

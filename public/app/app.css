@@ -19,7 +19,6 @@ body.app-movil .hero-eyebrow, body.app-movil .hero-description { display: none; 
 body.app-movil .hero-copy h1 { max-width: none; margin-bottom: 0; font-size: 1.3rem; }
 body.app-movil .hero-actions { margin-top: .9rem; gap: .5rem; }
 body.app-movil .hero-actions .btn { min-height: 44px; font-size: .86rem; }
-body.app-movil .hero-atajos { margin-top: .35rem; }
 /* Encabezado: la app no tiene el subtítulo de la web. Con la grilla de dos filas de
    .brand-title el nombre quedaba arriba y no centrado con la "R". */
 body.app-movil .brand-title { grid-template-rows: auto; }

@@ -23,11 +23,6 @@ export function renderFeedView(statistics = window.currentStatistics) {
     ?? casos.filter(c => c.estado === 'VALIDADO' || c.estado === 'EN_SEGUIMIENTO').length);
   const sinActualizar = casos.filter(c => c.estado === 'EN_SEGUIMIENTO' && Number(c.seguimientoEtapa) >= 2).length;
   const efectividad = total ? Math.round(encontrados / total * 100) : 0;
-  // Atajo a "Mis casos" en la portada web (la app ya lo tiene en la barra de abajo).
-  // Sin sesión lleva al ingreso y vuelve; la administración no tiene casos propios.
-  const esAdministrador = ['administrador', 'ADMINISTRADOR'].includes(store.currentUser?.rol);
-  const atajoMisCasos = !esAdministrador && globalThis.document?.documentElement?.dataset.frontend !== 'app'
-    ? `<button type="button" data-on-click="navigateTo('my-cases')" class="hero-atajo">Mis casos</button>` : '';
   const groupCases = (select, label) => {
     const groups = new Map();
     casos.forEach(item => {
@@ -49,9 +44,11 @@ export function renderFeedView(statistics = window.currentStatistics) {
     .map(department => `<option value="${escapeHtml(department)}">${escapeHtml(department)}</option>`).join('');
   return `
     <div class="home-page">
-      <!-- Hero: qué es la página y las dos acciones principales. "Ver casos activos" es
-           un enlace a la sección de casos: el navegador desplaza y el router deja la
-           dirección en #/ sin volver a dibujar la vista. -->
+      <!-- Hero: qué es la página y las dos acciones principales, sin estadísticas (van
+           una sola vez, al final). "Ver casos activos" es un enlace a la sección de
+           casos: el navegador desplaza y el router deja la dirección en #/ sin volver a
+           dibujar la vista. Mis casos y Generar pista están en la barra superior y en el
+           menú; el 911, en el pie de página y en cada ficha. -->
       <section class="home-hero" aria-labelledby="homeHeading">
         <div class="hero-copy">
           <p class="hero-eyebrow">Rastreo PY · Canal colaborativo que complementa la denuncia policial</p>
@@ -61,31 +58,7 @@ export function renderFeedView(statistics = window.currentStatistics) {
             <button type="button" data-on-click="navigateTo('report')" class="btn btn-primary">Reportar una persona desaparecida</button>
             <a href="#caseExplorerHeading" class="btn btn-outline">Ver casos activos</a>
           </div>
-          <p class="hero-atajos">
-            ${atajoMisCasos}
-            <button type="button" data-on-click="navigateTo('lead')" class="hero-atajo">Generar pista</button>
-            <a href="tel:911" class="hero-atajo hero-emergencia">Emergencias: llamá al 911</a>
-          </p>
         </div>
-      </section>
-
-      <section class="home-stats" aria-labelledby="homeStatsHeading">
-        <div class="home-section-heading">
-          <div><span class="section-kicker">Datos públicos</span><h2 id="homeStatsHeading">Estadísticas en tiempo real</h2></div>
-          <button type="button" class="section-link" data-on-click="navigateTo('stats')">Ver detalle <span aria-hidden="true">›</span></button>
-        </div>
-        <div class="home-stats-grid">
-          <article class="metric-card"><span class="metric-icon">▤</span><strong id="metricTotal">${total}</strong><span>Casos registrados (validados)</span></article>
-          <article class="metric-card metric-found"><span class="metric-icon">✓</span><strong id="metricFound">${encontrados}</strong><span>Personas localizadas</span></article>
-          <article class="metric-card metric-followup"><span class="metric-icon">◷</span><strong id="metricActive">${activos}</strong><span id="metricOutdated">En seguimiento activo · ${sinActualizar} sin actualizar</span></article>
-          <article class="metric-card metric-effectiveness"><span class="metric-icon">↗</span><strong id="metricEffectiveness">${efectividad}%</strong><span>Efectividad (localizadas / registradas)</span></article>
-        </div>
-      </section>
-
-      <section class="analytics-grid" aria-label="Distribución analítica de los reportes">
-        <article class="analytics-card card"><h2>Por ciudad</h2><div id="analyticsByCity" class="analytics-list">${renderAnalyticsBars(cityRows)}</div></article>
-        <article class="analytics-card card"><h2>Por rango de edad</h2><div id="analyticsByAge" class="analytics-list">${renderAnalyticsBars(ageRows)}</div></article>
-        <article class="analytics-card card"><h2>Por estado</h2><div id="analyticsByState" class="analytics-list">${renderAnalyticsBars(stateRows, 'status')}</div></article>
       </section>
 
       <section class="case-explorer" aria-labelledby="caseExplorerHeading">
@@ -140,6 +113,25 @@ export function renderFeedView(statistics = window.currentStatistics) {
       <div id="feedCaseList" class="case-grid"></div>
       <div id="feedPagination"></div>
       <p id="feedEmptyState" class="feed-empty-state hidden">No hay reportes que coincidan con los filtros seleccionados.</p>
+      </section>
+
+      <section class="home-stats" aria-labelledby="homeStatsHeading">
+        <div class="home-section-heading">
+          <div><span class="section-kicker">Datos públicos</span><h2 id="homeStatsHeading">Estadísticas en tiempo real</h2></div>
+          <button type="button" class="section-link" data-on-click="navigateTo('stats')">Ver detalle <span aria-hidden="true">›</span></button>
+        </div>
+        <div class="home-stats-grid">
+          <article class="metric-card"><span class="metric-icon">▤</span><strong id="metricTotal">${total}</strong><span>Casos registrados (validados)</span></article>
+          <article class="metric-card metric-found"><span class="metric-icon">✓</span><strong id="metricFound">${encontrados}</strong><span>Personas localizadas</span></article>
+          <article class="metric-card metric-followup"><span class="metric-icon">◷</span><strong id="metricActive">${activos}</strong><span id="metricOutdated">En seguimiento activo · ${sinActualizar} sin actualizar</span></article>
+          <article class="metric-card metric-effectiveness"><span class="metric-icon">↗</span><strong id="metricEffectiveness">${efectividad}%</strong><span>Efectividad (localizadas / registradas)</span></article>
+        </div>
+      </section>
+
+      <section class="analytics-grid" aria-label="Distribución analítica de los reportes">
+        <article class="analytics-card card"><h2>Por ciudad</h2><div id="analyticsByCity" class="analytics-list">${renderAnalyticsBars(cityRows)}</div></article>
+        <article class="analytics-card card"><h2>Por rango de edad</h2><div id="analyticsByAge" class="analytics-list">${renderAnalyticsBars(ageRows)}</div></article>
+        <article class="analytics-card card"><h2>Por estado</h2><div id="analyticsByState" class="analytics-list">${renderAnalyticsBars(stateRows, 'status')}</div></article>
       </section>
     </div>
   `;
