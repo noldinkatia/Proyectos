@@ -722,7 +722,8 @@ button { touch-action: manipulation; }
 .lead-form { padding: clamp(1rem,3vw,1.5rem); }
 .lead-form > h2 { margin: 0 0 .65rem; color: var(--text-strong); font-size: 1rem; }
 .lead-description-input { min-height: 130px; resize: vertical; }
-.lead-upload-zone { display: flex; min-height: 124px; flex-direction: column; align-items: center; justify-content: center; gap: .3rem; padding: 1rem; border: 1.5px dashed var(--border-dashed); border-radius: var(--radius); background: var(--surface-2); color: var(--text); cursor: pointer; text-align: center; }
+/* .form-group .lead-upload-zone: si no, ".form-group label" (display: block) le gana y el ícono y los dos textos quedan en una sola línea pegados. */
+.form-group .lead-upload-zone, .lead-upload-zone { display: flex; min-height: 124px; flex-direction: column; align-items: center; justify-content: center; gap: .3rem; padding: 1rem; border: 1.5px dashed var(--border-dashed); border-radius: var(--radius); background: var(--surface-2); color: var(--text); cursor: pointer; text-align: center; }
 .lead-upload-zone > span { color: var(--link); font-size: 1.4rem; }
 .lead-upload-zone strong { font-size: .78rem; }
 .lead-upload-zone small { color: var(--muted); font-size: .66rem; font-weight: 500; }
@@ -896,7 +897,8 @@ form.card { width: 100%; }
 #passwordStrength { margin-top: .35rem; color: var(--muted); font-size: .78rem; }
 
 .feed-filters { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,180px),1fr)); gap: .65rem; margin-top: 1rem; }
-.feed-filters.advanced-feed-filters { grid-template-columns: minmax(210px,1.6fr) repeat(4,minmax(135px,1fr)); gap: .7rem; margin: 0; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
+/* El estado tiene la opción más larga ("Localizados (últimas 24 h)"): columna un poco más ancha para que no se corte. */
+.feed-filters.advanced-feed-filters { grid-template-columns: minmax(200px,1.4fr) minmax(205px,1.3fr) repeat(3,minmax(135px,1fr)); gap: .7rem; margin: 0; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
 .filter-field { display: grid; min-width: 0; gap: .35rem; margin: 0; color: var(--text-2); font-size: .68rem; font-weight: 700; }
 .filter-field .form-control { min-height: 42px; margin: 0; border-color: var(--border); background-color: var(--surface); color: var(--text); font-size: .76rem; }
 .filter-field select { cursor: pointer; }
@@ -1114,6 +1116,9 @@ form.card { width: 100%; }
 .consent-group .check-fila { gap: .75rem; margin: .5rem 0; font-size: .9rem; }
 /* Campos que faltan en el formulario de reporte (validarFormularioReporte) */
 #reportFormError { margin: 1rem 0 .75rem; }
+/* Vista previa del reporte: el paso ya figura en su propio encabezado (no se repite arriba) y el título recibe el foco sin recuadro (es un título, no un control). */
+.page-heading:has(~ #reportPreview:not(.hidden)) > #reportPaso { display: none; }
+#reportPreviewTitle:focus { outline: none; }
 .form-control[aria-invalid="true"] { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
 input[type="checkbox"][aria-invalid="true"] { outline: 2px solid var(--red); outline-offset: 2px; }
 .check-fila input[type="checkbox"][aria-invalid="true"] { border-color: var(--red) !important; outline: none; }
