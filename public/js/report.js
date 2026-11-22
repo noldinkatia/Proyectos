@@ -889,7 +889,7 @@ export function mostrarVistaPreviaReporte() {
   // "EN REVISIÓN": es lo que pasa al confirmar, antes de que la administración la publique.
   document.getElementById('reportPreviewFicha').innerHTML = renderCaseDetailHtml(
     { ...caso, id: 'vista-previa', estado: 'PENDIENTE' },
-    { fotoUrl: estado.reportPhotoPreviewUrl, acciones: false, etiquetaEstado: 'EN REVISIÓN' }
+    { fotoUrl: estado.reportPhotoPreviewUrl, acciones: false, etiquetaEstado: 'EN REVISIÓN', verDenuncia: true }
   );
   const etiquetas = CAMPOS_ALERTA.filter(campo => camposElegidos().includes(campo.clave)).map(campo => campo.etiqueta);
   document.getElementById('reportPreviewAlerta').textContent = estado.reportEdicion

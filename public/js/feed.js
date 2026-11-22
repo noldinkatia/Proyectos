@@ -337,7 +337,7 @@ export function openOwnCaseDetail(caseId) {
   const editar = c.estado === 'PENDIENTE' && c.edicionesDisponibles
     ? `<div class="case-detail-actions"><button type="button" class="btn btn-primary btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="closeCaseDetail({silent:true}); navigateTo('report', {caseId:this.dataset.caseId})">Editar reporte</button></div>`
     : '';
-  mostrarFicha(renderCaseDetailHtml(c, { fotoProtegida: true, acciones: false }) + editar);
+  mostrarFicha(renderCaseDetailHtml(c, { fotoProtegida: true, acciones: false, verDenuncia: true }) + editar);
 }
 
 function mostrarFicha(html) {
@@ -354,7 +354,10 @@ function mostrarFicha(html) {
 //   fotoProtegida: la foto exige sesión; se pide con fetch (api.js).
 //   acciones: los botones de 911, compartir y pista (no en Mis casos ni la vista previa).
 //   etiquetaEstado: texto en lugar del estado (la vista previa dice "EN REVISIÓN").
-export function renderCaseDetailHtml(c, { pistas = [], fotoUrl = c.fotoUrl, fotoProtegida = false, acciones = true, etiquetaEstado = '' } = {}) {
+//   verDenuncia: el número de denuncia, solo para quien reportó (Mis casos y la
+//     vista previa). La ficha pública nunca lo muestra, aunque viniera en c: la
+//     API pública no lo envía (toPublicCase) y la administración lo ve en el panel.
+export function renderCaseDetailHtml(c, { pistas = [], fotoUrl = c.fotoUrl, fotoProtegida = false, acciones = true, etiquetaEstado = '', verDenuncia = false } = {}) {
   const alt = `Fotografía de ${escapeHtml(c.nombreCompleto)}`;
   const foto = !fotoUrl ? ''
     : fotoProtegida
@@ -372,7 +375,9 @@ export function renderCaseDetailHtml(c, { pistas = [], fotoUrl = c.fotoUrl, foto
     <p><strong>Descripción física:</strong> ${escapeHtml(c.descripcionFisica)}</p>
     <p><strong>Vestimenta:</strong> ${escapeHtml(c.vestimenta)}</p>
     <p><strong>Señas particulares:</strong> ${escapeHtml(c.senasParticulares || 'No registradas')}</p>
-    <p><strong>Denuncia policial:</strong> verificada por la administración (el número no se publica).</p>
+    ${verDenuncia
+    ? `<p><strong>N.º de denuncia:</strong> ${escapeHtml(c.numeroDenuncia || 'Sin registrar')} <span class="muted">(no se publica: solo lo ven vos y la administración)</span></p>`
+    : '<p><strong>Denuncia policial:</strong> verificada por la administración (el número no se publica).</p>'}
     ${pistas.length ? `<section class="public-clues"><h3>Pistas ciudadanas validadas</h3>${pistas.map(pista => `<article><p>${escapeHtml(pista.descripcion)}</p><small>${escapeHtml(new Date(pista.fechaHoraAvistamiento || pista.fechaEnvio).toLocaleString('es-PY'))}</small></article>`).join('')}${clueGallery ? `<div class="public-clue-photos">${clueGallery}</div>` : ''}</section>` : ''}
     ${acciones ? `<div class="case-detail-actions">
       <a class="btn btn-outline btn-sm" href="tel:911">Llamar al 911</a>
