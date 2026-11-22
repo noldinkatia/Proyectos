@@ -100,6 +100,26 @@ export function validCoordinates(lat, lng) {
     && Number.isFinite(lng) && lng >= -180 && lng <= 180;
 }
 
+// Lo que la ficha pública dice de la denuncia, sin el número (ese solo lo ven
+// quien reportó y la administración). La validación exige número y verificación
+// (admin-routes.js), pero un caso también se hace público sin pasar por ella: de
+// En revisión a Localizado, o reabierto después de cerrarse.
+//   VERIFICADA: hay número y la administración lo verificó.
+//   SIN_VERIFICAR: quien reportó cargó un número, todavía sin verificar.
+//   NO_REGISTRADA: no hay número.
+export function estadoDenunciaPublica(row) {
+  if (!String(row.numero_denuncia || '').trim()) return 'NO_REGISTRADA';
+  return row.checklist_denuncia ? 'VERIFICADA' : 'SIN_VERIFICAR';
+}
+
+// Al editar el reporte (PUT /mis-casos/:id): un número distinto del guardado,
+// sin contar los espacios, ya no es el que verificó la administración, y la marca
+// checklist_denuncia se borra. Si el número no cambia, la marca se conserva.
+export function cambioNumeroDenuncia(anterior, nuevo) {
+  const normalizar = valor => String(valor ?? '').replace(/\s+/g, '');
+  return normalizar(anterior) !== normalizar(nuevo);
+}
+
 export function toPublicCase(row) {
   return {
     id: row.id,
@@ -117,6 +137,7 @@ export function toPublicCase(row) {
     ubicacion: { lat: row.latitud, lng: row.longitud, direccion: row.direccion },
     estado: row.estado,
     seguimientoEtapa: Number(row.seguimiento_etapa) || 0,
+    denunciaPolicial: estadoDenunciaPublica(row),
     fechaCreacion: row.creado_en,
     localizadoEn: row.localizado_en,
     visibleHasta: row.localizado_en

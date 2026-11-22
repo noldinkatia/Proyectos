@@ -9,6 +9,7 @@ import {
   caseListColumns,
   caseVisibilityParameters,
   enviarFotoGuardada,
+  cambioNumeroDenuncia,
   hasPhoto,
   HORAS_PRIMER_SEGUIMIENTO,
   IMAGE_DATA_URL,
@@ -254,13 +255,17 @@ export function createCaseRouter({ db, jwtSecret, push }) {
           descripcion_fisica = $8, vestimenta = $9, senas_particulares = $10, fecha_hora_desaparicion = $11,
           latitud = $12, longitud = $13, direccion = $14, numero_denuncia = $15, autorizacion_parental = $16,
           alerta_campos = $17, foto = CASE $18 WHEN 'reemplazar' THEN $19 WHEN 'quitar' THEN '' ELSE foto END,
+          -- Número de denuncia distinto: la verificación anterior ya no vale (las
+          -- demás casillas del checklist no se tocan).
+          checklist_denuncia = CASE WHEN $20::boolean THEN FALSE ELSE checklist_denuncia END,
           modificado_en = CURRENT_TIMESTAMP, ediciones_reportante = ediciones_reportante + 1
         WHERE id = $1 RETURNING *
       `, [
         caso.id, nuevo.nombreCompleto, nuevo.edad, nuevo.sexo, nuevo.departamento, nuevo.ciudad, nuevo.barrio,
         nuevo.descripcionFisica, nuevo.vestimenta, nuevo.senasParticulares, nuevo.fechaHoraDesaparicion,
         nuevo.latitud, nuevo.longitud, body.ubicacion.direccion || nuevo.ciudad, nuevo.numeroDenuncia,
-        nuevo.autorizacionParental, JSON.stringify(nuevo.alertaCampos), fotoAccion, body.foto || ''
+        nuevo.autorizacionParental, JSON.stringify(nuevo.alertaCampos), fotoAccion, body.foto || '',
+        cambioNumeroDenuncia(caso.numero_denuncia, nuevo.numeroDenuncia)
       ]);
       // La declaración se volvió a aceptar: versión y hora del servidor en la edición.
       // casos.declaracion_aceptada_en conserva la aceptación original.

@@ -1015,7 +1015,7 @@ test('fotos de pistas por URL con PostgreSQL', {
 // Opción A (ROLES_Y_PERMISOS.txt): la consulta no exige sesión, así que lo que
 // devuelven /casos, /casos/:id y /pistas sin token lo puede ver cualquiera.
 const PUBLIC_CASE_KEYS = [
-  'barrio', 'ciudad', 'departamento', 'descripcionFisica', 'edad', 'estado', 'fechaCreacion',
+  'barrio', 'ciudad', 'denunciaPolicial', 'departamento', 'descripcionFisica', 'edad', 'estado', 'fechaCreacion',
   'fechaHoraDesaparicion', 'fotoUrl', 'id', 'localizadoEn', 'nombreCompleto', 'seguimientoEtapa',
   'senasParticulares', 'sexo', 'ubicacion', 'vestimenta', 'visibleHasta'
 ];

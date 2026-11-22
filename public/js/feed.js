@@ -348,6 +348,14 @@ function mostrarFicha(html) {
   document.getElementById('caseDetailModal').querySelector('button').focus();
 }
 
+// Denuncia en la ficha pública (denunciaPolicial, backend/case-shared.js): nunca
+// el número. Sin el dato no se muestra la línea, para no afirmar nada de más.
+const DENUNCIA_PUBLICA = {
+  VERIFICADA: 'Verificada',
+  SIN_VERIFICAR: 'Registrada, sin verificar',
+  NO_REGISTRADA: 'No registrada'
+};
+
 // La ficha del caso: una sola plantilla para la ficha pública, la del propio
 // ciudadano (Mis casos) y la vista previa antes de publicar (report.js).
 //   fotoUrl: la del caso (pública), una de sesión o la blob: de la vista previa.
@@ -377,7 +385,7 @@ export function renderCaseDetailHtml(c, { pistas = [], fotoUrl = c.fotoUrl, foto
     <p><strong>Señas particulares:</strong> ${escapeHtml(c.senasParticulares || 'No registradas')}</p>
     ${verDenuncia
     ? `<p><strong>N.º de denuncia:</strong> ${escapeHtml(c.numeroDenuncia || 'Sin registrar')} <span class="muted">(no se publica: solo lo ven vos y la administración)</span></p>`
-    : '<p><strong>Denuncia policial:</strong> verificada por la administración (el número no se publica).</p>'}
+    : DENUNCIA_PUBLICA[c.denunciaPolicial] ? `<p><strong>Denuncia policial:</strong> ${DENUNCIA_PUBLICA[c.denunciaPolicial]}</p>` : ''}
     ${pistas.length ? `<section class="public-clues"><h3>Pistas ciudadanas validadas</h3>${pistas.map(pista => `<article><p>${escapeHtml(pista.descripcion)}</p><small>${escapeHtml(new Date(pista.fechaHoraAvistamiento || pista.fechaEnvio).toLocaleString('es-PY'))}</small></article>`).join('')}${clueGallery ? `<div class="public-clue-photos">${clueGallery}</div>` : ''}</section>` : ''}
     ${acciones ? `<div class="case-detail-actions">
       <a class="btn btn-outline btn-sm" href="tel:911">Llamar al 911</a>

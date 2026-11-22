@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import jwt from 'jsonwebtoken';
-import { toAdminCase, toOwnerCase, toPublicCase } from '../case-shared.js';
+import { estadoDenunciaPublica, toAdminCase, toOwnerCase, toPublicCase } from '../case-shared.js';
 import { createApp } from '../server.js';
 
 // El número de denuncia (casos.numero_denuncia) solo lo ven quien reportó el caso
@@ -29,6 +29,23 @@ test('serialización: la pública no lleva el número; la del dueño y la del ad
   assert.ok(!JSON.stringify(publica).includes(NUMERO), 'ni el valor en ningún otro campo');
   assert.equal(toOwnerCase(fila()).numeroDenuncia, NUMERO);
   assert.equal(toAdminCase(fila()).numeroDenuncia, NUMERO);
+});
+
+test('indicador público de la denuncia: verificada, sin verificar o no registrada, nunca el número', () => {
+  assert.equal(estadoDenunciaPublica(fila()), 'VERIFICADA');
+  // Público sin validar (de En revisión a Localizado, o reabierto): número sin verificar.
+  assert.equal(estadoDenunciaPublica(fila({ checklist_denuncia: false })), 'SIN_VERIFICAR');
+  assert.equal(estadoDenunciaPublica(fila({ checklist_denuncia: null })), 'SIN_VERIFICAR');
+  for (const vacio of ['', '   ', null, undefined]) {
+    assert.equal(estadoDenunciaPublica(fila({ numero_denuncia: vacio })), 'NO_REGISTRADA', JSON.stringify(vacio));
+    assert.equal(estadoDenunciaPublica(fila({ numero_denuncia: vacio, checklist_denuncia: true })), 'NO_REGISTRADA');
+  }
+  for (const extra of [{}, { checklist_denuncia: false }, { numero_denuncia: '' }]) {
+    const publica = toPublicCase(fila(extra));
+    assert.ok(['VERIFICADA', 'SIN_VERIFICAR', 'NO_REGISTRADA'].includes(publica.denunciaPolicial));
+    assert.ok(!('numeroDenuncia' in publica));
+    assert.ok(!JSON.stringify(publica).includes(NUMERO));
+  }
 });
 
 // authenticate revalida cada token contra la BD: id 11 es administrador, el resto ciudadano.
@@ -67,6 +84,7 @@ test('API: sin sesión y con la sesión de otro ciudadano, el listado y el detal
         assert.equal(status, 200, `${ruta} (${usuario ?? 'sin sesión'})`);
         assert.ok(!texto.includes(NUMERO), `${ruta} (${usuario ?? 'sin sesión'}) no debe incluir el número`);
         assert.ok(!texto.includes('numeroDenuncia'), `${ruta} (${usuario ?? 'sin sesión'}) no debe tener la clave`);
+        assert.match(texto, /"denunciaPolicial":"VERIFICADA"/, `${ruta}: solo el indicador`);
       }
     }
     // Otro ciudadano: "Mis casos" solo trae lo suyo, y el panel le está prohibido.
@@ -110,11 +128,18 @@ test('ficha: la pública nunca muestra el número; la del dueño y la vista prev
     const publica = renderCaseDetailHtml(caso);
     assert.ok(!publica.includes(NUMERO));
     assert.doesNotMatch(publica, /N\.º de denuncia/);
-    assert.match(publica, /<strong>Denuncia policial:<\/strong> verificada por la administración \(el número no se publica\)\./);
+    // Sin el indicador, la ficha no afirma nada de la denuncia.
+    assert.doesNotMatch(publica, /Denuncia policial/);
+    // Línea corta, con el mismo formato que las demás.
+    const linea = estado => renderCaseDetailHtml({ ...caso, denunciaPolicial: estado });
+    assert.match(linea('VERIFICADA'), /<p><strong>Denuncia policial:<\/strong> Verificada<\/p>/);
+    assert.match(linea('SIN_VERIFICAR'), /<p><strong>Denuncia policial:<\/strong> Registrada, sin verificar<\/p>/);
+    assert.match(linea('NO_REGISTRADA'), /<p><strong>Denuncia policial:<\/strong> No registrada<\/p>/);
+    for (const estado of ['VERIFICADA', 'SIN_VERIFICAR', 'NO_REGISTRADA']) assert.ok(!linea(estado).includes(NUMERO));
 
     const propia = renderCaseDetailHtml(caso, { acciones: false, verDenuncia: true });
     assert.match(propia, /<strong>N\.º de denuncia:<\/strong> DEN-PRIVADA-777 <span class="muted">\(no se publica: solo lo ven vos y la administración\)<\/span>/);
-    assert.doesNotMatch(propia, /verificada por la administración/, 'un caso propio puede estar en revisión');
+    assert.doesNotMatch(propia, /Denuncia policial/, 'la ficha propia muestra el número, no el indicador');
     assert.match(renderCaseDetailHtml({ ...caso, numeroDenuncia: '' }, { verDenuncia: true }), /N\.º de denuncia:<\/strong> Sin registrar/);
   }
 });
