@@ -415,8 +415,9 @@ button { touch-action: manipulation; }
 #topHeader > div { display: flex; min-width: 0; align-items: center; gap: .3rem; }
 /* :not(.drawer-item) es necesario: sin eso esta regla gana por especificidad
    sobre .drawer-item y le borra tanto el color apagado como el resaltado de
-   la seccion activa. */
-.menu-btn, #topHeader button, .drawer button:not(.btn):not(.drawer-item) {
+   la seccion activa. Lo mismo con el interruptor "Notificaciones y alertas":
+   sin :not(.interruptor) no se vería el carril. */
+.menu-btn, #topHeader button, .drawer button:not(.btn):not(.drawer-item):not(.interruptor) {
   border: 0;
   background: transparent;
   color: var(--text);
@@ -1268,6 +1269,37 @@ table tr:hover td { background: var(--surface-2); }
 /* Botón con aspecto de enlace dentro de un texto (el de las bases en el registro) */
 .link-inline { display: inline; padding: 0; border: 0; background: none; color: var(--info); cursor: pointer; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .link-inline:focus-visible { border-radius: 2px; outline: 3px solid var(--info); outline-offset: 2px; }
+/* "Notificaciones y alertas" (js/avisos.js): interruptor del menú y tarjeta */
+.avisos-control { display: grid; gap: .45rem; padding: .75rem .8rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.avisos-fila { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.avisos-etiqueta { color: var(--text); font-size: .88rem; font-weight: 700; }
+.avisos-estado { display: grid; gap: .2rem; margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.45; }
+.avisos-control[data-estado="bloqueadas"] .avisos-estado span:first-child { color: var(--red); font-weight: 700; }
+.avisos-acciones { display: flex; flex-wrap: wrap; gap: .5rem; }
+.avisos-acciones:empty { display: none; }
+/* Interruptor: 44 px de alto tocables (la franja invisible de ::before) */
+.interruptor { position: relative; flex: 0 0 auto; width: 2.75rem; height: 1.6rem; padding: 0; border: 1px solid var(--border-strong); border-radius: var(--radius-pill); background: var(--surface-3); cursor: pointer; transition: background-color .15s ease, border-color .15s ease; }
+.interruptor::before { position: absolute; inset: -.6rem -.35rem; content: ""; }
+.interruptor-perilla { position: absolute; top: .15rem; left: .15rem; width: 1.2rem; height: 1.2rem; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s ease; }
+.interruptor[aria-checked="true"] { border-color: var(--color-primario); background: var(--color-primario); }
+.interruptor[aria-checked="true"] .interruptor-perilla { transform: translateX(1.15rem); }
+[data-theme="dark"] .interruptor[aria-checked="true"] { border-color: var(--info); background: var(--info); }
+.interruptor:disabled { cursor: not-allowed; opacity: .45; }
+.interruptor:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .interruptor, .interruptor-perilla { transition: none; } }
+.avisos-tarjeta { position: fixed; z-index: 2150; inset: 0; display: flex; align-items: center; justify-content: center; padding: 1rem; background: var(--overlay); backdrop-filter: blur(5px); }
+.avisos-tarjeta > div { display: flex; flex-direction: column; width: min(100%,460px); max-height: 85vh; overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: var(--shadow-overlay); }
+.avisos-tarjeta .modal-header { display: flex; align-items: center; gap: .5rem; padding: 1rem 1.2rem; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.avisos-tarjeta h2 { min-width: 0; flex: 1 1 auto; margin: 0; color: var(--text-strong); font: 700 1rem/1.35 Sora, Inter, sans-serif; }
+.avisos-tarjeta h2:focus { outline: none; }
+.avisos-tarjeta .modal-body { display: grid; gap: .75rem; overflow-y: auto; padding: 1rem 1.2rem; font-size: .88rem; line-height: 1.5; }
+.avisos-tarjeta .modal-body p { margin: 0; }
+.avisos-tarjeta .link-inline { justify-self: start; }
+.avisos-botones { display: flex; flex-wrap: wrap; gap: .5rem; }
+.avisos-botones .btn { flex: 1 1 9rem; justify-content: center; }
+.avisos-zona-lista { display: grid; gap: .4rem; }
+.avisos-zona-lista label { color: var(--text); font-size: .82rem; font-weight: 700; }
+.avisos-zona-lista .btn { margin-top: .35rem; justify-self: start; }
 #notifList { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; gap: .65rem; overflow: auto; padding: 1rem !important; }
 /* Aviso estándar (centro de notificaciones y "Mis casos") */
 .notif-list { display: grid; gap: .55rem; margin-bottom: .85rem; }

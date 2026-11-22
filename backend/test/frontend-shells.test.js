@@ -14,6 +14,10 @@ const read = path => readFile(new URL(path, publicDir), 'utf8');
 const ADMIN_PANEL_ONLY = ['reviewCaseDetails', 'reviewChecklistForm', 'reviewChecklistModal',
   'reviewDenuncia', 'simTimeModal', 'simulateFollowupButton'];
 
+// Solo en la app: la guía de instalación en iOS. js/avisos.js comprueba si está
+// (en la web, sin guía, ofrece "Abrir la app").
+const APP_ONLY = ['installGuideModal'];
+
 // ids que un archivo busca con getElementById('x') o querySelector('#x').
 function idsBuscados(source) {
   return [
@@ -54,7 +58,7 @@ test('web y app tienen los contenedores e ids que esperan los módulos', async (
   for (const id of ADMIN_PANEL_ONLY) assert.ok(comunes.includes(id), `${id} ya no lo usa ningún módulo: sacarlo de ADMIN_PANEL_ONLY`);
 
   for (const [pagina, { html, propios }, excepto] of [
-    ['Rastreopy.html', web, []],
+    ['Rastreopy.html', web, APP_ONLY],
     ['app/index.html', movil, ADMIN_PANEL_ONLY]
   ]) {
     const presentes = idsCreados(html);

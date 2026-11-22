@@ -3,6 +3,7 @@
 import { abrirAlerta } from './alerta.js';
 import { adminAccept, adminCloseCase, adminMarcarAntecedente, adminMarkLocated, adminRetirarAntecedente, adminModerateClue, adminOpenCase, adminReject, adminReopenCase, adminReturnToReview, closeReviewChecklist, loadAdminHistory, loadAdminHistoryPhotos, runTimeFastForward, searchAdminHistory, selectAdminTab, submitCaseReview } from './admin.js';
 import { apiRequest, avisarServidor } from './api.js';
+import { activarAvisos, ahoraNoAvisos, alternarAvisos, cambiarDepartamentoAvisos, cerrarTarjetaAvisos, elegirZonaAvisos, elegirZonaDesdeMenu, guardarZonaElegidaAvisos, iniciarAvisos, omitirZonaAvisos, usarMiUbicacionAvisos, verGuiaInstalacionAvisos } from './avisos.js';
 import { abrirBasesModal, acceptTerms, cerrarBasesModal, changeRegistrationEmail, completarRegistroDeNuevo, salirDeVerificacion, handleForgotPassword, handleLogin, handleRecoverRequest, handleRegister, logout, rejectTerms, resendVerificationCode, retryTermsAcceptance, sugerirGmail, togglePass, updatePasswordStrength, verifyEmailCode } from './auth.js';
 import { changeFeedPage, closeCaseDetail, filterFeedCases, openCaseDetail, openCaseDetailWithKeyboard, openOwnCaseDetail, setFeedView, shareCase, toggleFeedMap } from './feed.js';
 import { iniciarEventos } from './eventos.js';
@@ -51,6 +52,17 @@ export const acciones = {
   toggleNotificationsModal,
   enableSystemNotifications,
   clearNotifs,
+  alternarAvisos,
+  activarAvisos,
+  ahoraNoAvisos,
+  cerrarTarjetaAvisos,
+  usarMiUbicacionAvisos,
+  elegirZonaAvisos,
+  cambiarDepartamentoAvisos,
+  guardarZonaElegidaAvisos,
+  omitirZonaAvisos,
+  elegirZonaDesdeMenu,
+  verGuiaInstalacionAvisos,
   abrirAlerta,
   runTimeFastForward,
   closeCaseDetail,
@@ -125,6 +137,7 @@ export const acciones = {
 
 iniciarEventos(acciones);
 iniciarConexion();
+iniciarAvisos();
 
 // Con un proxy o túnel caído el pedido puede quedar colgado: se corta a los 8 s.
 const pedirUsuario = () => apiRequest('/auth/me', { signal: AbortSignal.timeout?.(8000) })

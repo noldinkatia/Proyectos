@@ -1,5 +1,6 @@
 // Alertas: centro de notificaciones, avisos del dispositivo y polling.
 import { apiRequest } from './api.js';
+import { leerEstadoAvisos } from './avisos-reglas.js';
 import { escapeHtml } from './config.js';
 import { estado } from './estado.js';
 import { prepararRespuestaSeguimiento } from './my-cases.js';
@@ -130,6 +131,18 @@ export function startNotificationPolling() {
   }, 15_000);
 }
 
+// Desde ahora: los avisos del sistema son solo para notificaciones nuevas (las
+// que ya estaban no se muestran todas juntas al activar).
+export async function iniciarAvisosDelSistema() {
+  const userId = window.backendCurrentUser?.id;
+  if (!userId) return;
+  const result = await apiRequest('/notificaciones');
+  const latestId = Math.max(0, ...result.notificaciones.map(item => Number(item.id) || 0));
+  localStorage.setItem(`rastreo_notif_last_${userId}`, String(latestId));
+}
+
+// Botón "Activar avisos del dispositivo" de la administración (los ciudadanos
+// usan el interruptor "Notificaciones y alertas", avisos.js).
 export async function enableSystemNotifications() {
   if (!('Notification' in window) || !('serviceWorker' in navigator)) {
     showToast('Avisos no disponibles', 'Este navegador no admite notificaciones del sistema.', 'error');
@@ -141,12 +154,7 @@ export async function enableSystemNotifications() {
       showToast('Permiso no concedido', 'Puede habilitar las notificaciones desde la configuración del navegador.', 'error');
       return;
     }
-    const userId = window.backendCurrentUser?.id;
-    if (userId) {
-      const result = await apiRequest('/notificaciones');
-      const latestId = Math.max(0, ...result.notificaciones.map(item => Number(item.id) || 0));
-      localStorage.setItem(`rastreo_notif_last_${userId}`, String(latestId));
-    }
+    await iniciarAvisosDelSistema();
     showToast('Avisos activados', 'Recibirá avisos del sistema mientras Rastreo PY esté activo.', 'success');
   } catch (error) {
     showToast('No se pudieron activar los avisos', error.message, 'error');
@@ -157,6 +165,8 @@ export async function deliverSystemNotifications(notifications) {
   if (!('Notification' in window) || Notification.permission !== 'granted' || !('serviceWorker' in navigator)) return;
   const userId = window.backendCurrentUser?.id;
   if (!userId) return;
+  // Interruptor apagado a propósito: el permiso del navegador sigue, pero no se avisa.
+  if (leerEstadoAvisos(globalThis.localStorage, userId).desactivadas) return;
   const key = `rastreo_notif_last_${userId}`;
   const savedId = localStorage.getItem(key);
   const unread = notifications

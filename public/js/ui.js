@@ -51,6 +51,8 @@ export function toggleDrawer(open) {
   if (open) {
     if (drawer) drawer.classList.add('open');
     if (overlay) overlay.classList.remove('hidden');
+    // avisos.js actualiza el interruptor "Notificaciones y alertas".
+    document.dispatchEvent(new Event('rastreo:menu-abierto'));
   } else {
     if (drawer) drawer.classList.remove('open');
     if (overlay) overlay.classList.add('hidden');

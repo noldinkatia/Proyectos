@@ -43,6 +43,8 @@
   <link rel="modulepreload" href="/js/api.js">
   <link rel="modulepreload" href="/js/app.js">
   <link rel="modulepreload" href="/js/auth.js">
+  <link rel="modulepreload" href="/js/avisos-reglas.js">
+  <link rel="modulepreload" href="/js/avisos.js">
   <link rel="modulepreload" href="/js/conexion.js">
   <link rel="modulepreload" href="/js/config.js">
   <link rel="modulepreload" href="/js/declaracion.js">
@@ -123,9 +125,18 @@
 
       <div class="drawer-account">
         <p class="drawer-section-label">Cuenta y avisos</p>
-        <!-- Alertas de casos a 160 km (app/zona.js): solo ciudadanos con sesión -->
-        <button type="button" data-role-nav="citizen" data-on-click="toggleDrawer(false); abrirAlertasZona()" class="btn btn-primary hidden">Activar alertas de mi zona</button>
-        <button type="button" data-role-nav="session" data-on-click="toggleDrawer(false); enableSystemNotifications()" class="btn btn-outline">Activar avisos del dispositivo</button>
+        <!-- "Notificaciones y alertas" (js/avisos.js): un solo interruptor para los
+             ciudadanos. Avisos del dispositivo, push y alertas de zona a 160 km. -->
+        <div id="avisosControl" data-role-nav="citizen" class="avisos-control hidden">
+          <div class="avisos-fila">
+            <span id="avisosEtiqueta" class="avisos-etiqueta">Notificaciones y alertas</span>
+            <button type="button" id="avisosInterruptor" class="interruptor" role="switch" aria-checked="false" aria-labelledby="avisosEtiqueta" aria-describedby="avisosEstado" data-on-click="alternarAvisos()"><span class="interruptor-perilla" aria-hidden="true"></span></button>
+          </div>
+          <p id="avisosEstado" class="avisos-estado" aria-live="polite"></p>
+          <div id="avisosAcciones" class="avisos-acciones"></div>
+        </div>
+        <!-- La administración no recibe alertas de zona ni push: solo avisos del sistema -->
+        <button type="button" data-role-nav="admin" data-on-click="toggleDrawer(false); enableSystemNotifications()" class="btn btn-outline hidden">Activar avisos del dispositivo</button>
         <!-- Visible solo si el navegador permite instalar (o en iOS, con guía) -->
         <button id="installAppButton" type="button" data-on-click="toggleDrawer(false); installApp()" class="btn btn-outline hidden">Instalar app</button>
         <!-- En una computadora cuyo navegador no permite instalar (app/pwa.js) -->
@@ -167,6 +178,19 @@
     </div>
   </section>
 
+  <!-- TARJETA "NOTIFICACIONES Y ALERTAS" (js/avisos.js): después de iniciar sesión,
+       antes del cuadro de permiso del navegador; y para elegir la zona. -->
+  <div id="avisosTarjeta" class="avisos-tarjeta hidden">
+    <div role="dialog" aria-modal="true" aria-labelledby="avisosTarjetaTitulo">
+      <div class="modal-header">
+        <h2 id="avisosTarjetaTitulo" tabindex="-1"></h2>
+        <button type="button" class="btn-close" data-on-click="cerrarTarjetaAvisos()" aria-label="Cerrar" title="Cerrar"><svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div id="avisosTarjetaContenido" class="modal-body"></div>
+    </div>
+  </div>
+  <p id="avisosAnuncio" class="sr-only" aria-live="polite"></p>
+
   <!-- NOTIFICACIÓN / TOAST -->
   <div id="toastNotification" class="hidden">
     <div>
@@ -187,17 +211,6 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-primary btn-sm" data-on-click="clearNotifs()">Marcar todas como leídas</button>
       </div>
-    </div>
-  </div>
-
-  <!-- ALERTAS DE MI ZONA (app/zona.js): consentimiento, activar y desactivar -->
-  <div id="zonaAlertasModal" class="hidden">
-    <div role="dialog" aria-modal="true" aria-labelledby="zonaAlertasTitulo">
-      <div class="modal-header">
-        <span id="zonaAlertasTitulo">Alertas de mi zona</span>
-        <button type="button" class="btn-close" data-on-click="cerrarAlertasZona()" aria-label="Cerrar" title="Cerrar"><svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-      </div>
-      <div id="zonaAlertasContenido" class="modal-body"></div>
     </div>
   </div>
 

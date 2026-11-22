@@ -1,88 +1,21 @@
-// "Alertas de mi zona" (solo en la app): con sesión de ciudadano, el usuario da su
-// consentimiento y recién al tocar el botón se piden los permisos de
-// notificaciones y de ubicación. Se guarda solo una ubicación aproximada (el
-// servidor la redondea a ≈1 km) y se puede desactivar y borrar cuando quiera.
-import { apiRequest } from '/js/api.js';
-import { escapeHtml } from '/js/config.js';
-import { RADIO_ALERTA_KM } from '/js/radio-alerta.js';
-import { showToast } from '/js/ui.js';
-import { esIos, yaInstalada } from './pwa.js';
-
-let estadoZona = null;
+// Alertas de zona y Web Push de este dispositivo: lo que habla con el navegador
+// (ubicación, suscripción push) y con el servidor (/api/alertas-zona). La
+// interfaz es el interruptor "Notificaciones y alertas" y la tarjeta posterior al
+// ingreso (/js/avisos.js), en la web y en la app.
+// Se guarda solo una ubicación aproximada (el servidor la redondea a ≈1 km) y se
+// puede desactivar y borrar cuando se quiera.
+import { apiRequest } from '../js/api.js';
 
 export function soportaPush() {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 }
 
-function modal() {
-  return document.getElementById('zonaAlertasModal');
-}
-
-function textoSinSoporte() {
-  if (esIos() && !yaInstalada()) {
-    return 'En iPhone y iPad las alertas de zona funcionan solo con la app instalada en la pantalla de inicio (iOS 16.4 o posterior). Instalala desde el menú y abrila desde su ícono.';
-  }
-  return 'Este navegador no admite notificaciones push, así que no puede recibir alertas de zona. Probá con Chrome, Edge o Firefox actualizados.';
-}
-
-function renderZona() {
-  const contenido = document.getElementById('zonaAlertasContenido');
-  if (!contenido) return;
-  const estado = estadoZona || { activa: false, push: { disponible: false } };
-  const sinPushServidor = estado.push?.disponible ? ''
-    : '<p class="notice-info">Por ahora el servidor no envía avisos al dispositivo: vas a ver las alertas en el centro de notificaciones.</p>';
-  if (!soportaPush()) {
-    contenido.innerHTML = `<p class="notice notice-warning">${escapeHtml(textoSinSoporte())}</p>
-      ${estado.activa ? '<button type="button" class="btn btn-outline" data-on-click="desactivarAlertasZona()">Desactivar y borrar mi ubicación</button>' : ''}`;
-    return;
-  }
-  if (estado.activa) {
-    const fecha = estado.actualizadaEn ? new Date(estado.actualizadaEn).toLocaleString('es-PY') : '';
-    contenido.innerHTML = `
-      <p class="notice notice-success">Alertas de tu zona activadas.${fecha ? ` Ubicación aproximada actualizada el ${escapeHtml(fecha)}.` : ''}</p>
-      <p>Recibís avisos de casos a ${RADIO_ALERTA_KM} km o menos de tu última ubicación aproximada. Los avisos son discretos: sin nombre, edad, foto ni ubicación exacta; los detalles se ven al abrir la app.</p>
-      ${sinPushServidor}
-      <div class="zona-acciones">
-        <button type="button" class="btn btn-outline" data-on-click="activarAlertasZona()">Actualizar mi ubicación</button>
-        <button type="button" class="btn btn-red" data-on-click="desactivarAlertasZona()">Desactivar y borrar mi ubicación</button>
-      </div>`;
-    return;
-  }
-  contenido.innerHTML = `
-    <p>Te avisamos de casos de personas desaparecidas a ${RADIO_ALERTA_KM} km o menos de donde estás. Algunos avisos llegan antes de que la administración verifique el caso y lo indican como <strong>Pendiente / En revisión – No verificada</strong>.</p>
-    <ul>
-      <li>Se guarda solo tu última ubicación aproximada (≈1 km), sin historial.</li>
-      <li>No se muestra a nadie ni se usa para otra cosa.</li>
-      <li>Podés desactivar las alertas cuando quieras: se borra tu ubicación y se deja de enviarte avisos.</li>
-    </ul>
-    ${sinPushServidor}
-    <label class="privacy-consent"><input type="checkbox" id="zonaConsentimiento"> Acepto que Rastreo PY guarde mi ubicación aproximada para enviarme alertas de mi zona.</label>
-    <button type="button" class="btn btn-primary" data-on-click="activarAlertasZona()">Activar alertas de mi zona</button>`;
-}
-
-export async function abrirAlertasZona() {
-  modal()?.classList.remove('hidden');
-  const contenido = document.getElementById('zonaAlertasContenido');
-  if (contenido) contenido.innerHTML = '<p class="muted">Cargando…</p>';
-  try {
-    estadoZona = await apiRequest('/alertas-zona');
-  } catch (error) {
-    estadoZona = null;
-    showToast('Alertas de zona no disponibles', error.message, 'error');
-  }
-  renderZona();
-}
-
-export function cerrarAlertasZona() {
-  modal()?.classList.add('hidden');
-}
-
-function obtenerUbicacion() {
+export function obtenerUbicacion() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error('Este dispositivo no permite obtener la ubicación.'));
     navigator.geolocation.getCurrentPosition(
       posicion => resolve({ lat: posicion.coords.latitude, lng: posicion.coords.longitude }),
-      () => reject(new Error('No se pudo obtener tu ubicación. Revisá el permiso de ubicación del navegador.')),
+      () => reject(new Error('No se pudo obtener tu ubicación. Revisá el permiso de ubicación del navegador o elegí tu zona de la lista.')),
       { enableHighAccuracy: false, maximumAge: 10 * 60 * 1000, timeout: 15000 }
     );
   });
@@ -108,44 +41,65 @@ async function suscribirDispositivo(clavePublica) {
   return registro.pushManager.subscribe(opciones);
 }
 
-export async function activarAlertasZona() {
-  const consentimiento = document.getElementById('zonaConsentimiento');
-  if (consentimiento && !consentimiento.checked) {
-    showToast('Falta tu consentimiento', 'Tildá la casilla para que se pueda guardar tu ubicación aproximada.', 'error');
-    return;
-  }
-  const pushServidor = Boolean(estadoZona?.push?.disponible && estadoZona.push.clavePublica);
+// Suscripción push de este navegador (null si no hay o no se puede saber).
+export async function suscripcionDelDispositivo() {
+  if (!soportaPush()) return null;
   try {
-    if (pushServidor) {
-      const permiso = await Notification.requestPermission();
-      if (permiso !== 'granted') {
-        showToast('Permiso no concedido', 'Sin permiso de notificaciones no podemos avisarte. Podés habilitarlo desde la configuración del navegador.', 'error');
-        return;
-      }
-    }
-    const ubicacion = await obtenerUbicacion();
-    const suscripcion = pushServidor ? await suscribirDispositivo(estadoZona.push.clavePublica) : null;
-    await apiRequest('/alertas-zona', {
-      method: 'PUT',
-      body: { consentimiento: true, ubicacion, ...(suscripcion ? { suscripcion: suscripcion.toJSON() } : {}) }
-    });
-    showToast('Alertas de tu zona activadas', `Te avisaremos de casos a ${RADIO_ALERTA_KM} km o menos.`, 'success');
-    await abrirAlertasZona();
-  } catch (error) {
-    showToast('No se pudieron activar las alertas', error.message, 'error');
+    const registro = await navigator.serviceWorker.getRegistration();
+    return (await registro?.pushManager.getSubscription()) || null;
+  } catch {
+    return null;
   }
 }
 
-export async function desactivarAlertasZona() {
+// { activa, actualizadaEn, dispositivos, push: { disponible, clavePublica } }
+export function consultarZona() {
+  return apiRequest('/alertas-zona');
+}
+
+// El servicio push del navegador puede no responder nunca (red que lo bloquea,
+// navegador con push deshabilitado): pasado este tiempo se sigue sin push.
+export const ESPERA_SUSCRIPCION_MS = 15000;
+
+function conLimite(promesa, ms) {
+  let temporizador;
+  const vencida = new Promise((_, reject) => {
+    temporizador = setTimeout(() => reject(new Error('El servicio de notificaciones del navegador no respondió.')), ms);
+  });
+  return Promise.race([promesa, vencida]).finally(() => clearTimeout(temporizador));
+}
+
+// Guarda la ubicación aproximada y, si el servidor envía push y el navegador lo
+// admite, suscribe este dispositivo (el permiso ya tiene que estar concedido).
+// Si la suscripción falla, la zona se guarda igual: las alertas se ven en el
+// centro de notificaciones. Devuelve { sinPush } para avisarlo.
+export async function guardarZona(ubicacion) {
+  const estado = await consultarZona();
+  const pushServidor = Boolean(estado?.push?.disponible && estado.push.clavePublica);
+  let suscripcion = null;
+  let sinPush = false;
+  if (pushServidor && soportaPush() && Notification.permission === 'granted') {
+    try {
+      suscripcion = await conLimite(suscribirDispositivo(estado.push.clavePublica), ESPERA_SUSCRIPCION_MS);
+    } catch (error) {
+      console.error('No se pudo suscribir el dispositivo a las notificaciones push:', error.message);
+      sinPush = true;
+    }
+  }
+  await apiRequest('/alertas-zona', {
+    method: 'PUT',
+    body: { consentimiento: true, ubicacion, ...(suscripcion ? { suscripcion: suscripcion.toJSON() } : {}) }
+  });
+  return { sinPush };
+}
+
+// Borra la ubicación y las suscripciones push de la cuenta en el servidor, y da
+// de baja la de este navegador (también si el servidor no respondió: el servicio
+// push contesta 410 al próximo envío y el servidor borra el endpoint solo).
+export async function borrarZona() {
   try {
     await apiRequest('/alertas-zona', { method: 'DELETE' });
-    if (soportaPush()) {
-      const registro = await navigator.serviceWorker.getRegistration();
-      await (await registro?.pushManager.getSubscription())?.unsubscribe();
-    }
-    showToast('Alertas desactivadas', 'Se borró tu ubicación y no vas a recibir más alertas de zona.', 'success');
-    await abrirAlertasZona();
-  } catch (error) {
-    showToast('No se pudieron desactivar las alertas', error.message, 'error');
+  } finally {
+    await (await suscripcionDelDispositivo())?.unsubscribe();
   }
 }

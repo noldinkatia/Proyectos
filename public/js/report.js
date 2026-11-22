@@ -255,21 +255,29 @@ export function setReportCoordinates({ lat, lng }) {
   registrarCambioReporte();
 }
 
-// Al elegir departamento, ciudad o barrio, el pin se mueve solo a esa zona
-// (geocodificación gratuita de OpenStreetMap). Después se puede ajustar a mano.
+// Coordenadas de una zona de la lista oficial (barrio, ciudad, departamento) con
+// la geocodificación gratuita de OpenStreetMap. null si no se encontró. La usan
+// el reporte y "Elegir zona" de las alertas (avisos.js).
+export async function ubicarZona(partes) {
+  const nombres = partes.filter(Boolean).map(value => value === 'Capital' ? 'Asunción' : value);
+  if (!nombres.length) return null;
+  const query = new URLSearchParams({ q: [...nombres, 'Paraguay'].join(', '), format: 'json', limit: '1', countrycodes: 'py' });
+  const response = await fetch(`https://nominatim.openstreetmap.org/search?${query}`, { headers: { Accept: 'application/json' } });
+  const [place] = response.ok ? await response.json() : [];
+  return place ? { lat: Number(place.lat), lng: Number(place.lon) } : null;
+}
+
+// Al elegir departamento, ciudad o barrio, el pin se mueve solo a esa zona.
+// Después se puede ajustar a mano.
 export async function centerReportMapOnSelection() {
   const parts = ['repBarrio', 'repCiudad', 'repDepartamento']
     .map(id => document.getElementById(id)?.value || '')
-    .filter(Boolean)
-    .map(value => value === 'Capital' ? 'Asunción' : value);
+    .filter(Boolean);
   if (!parts.length || !estado.activeMap || !estado.reportMarker) return;
   const token = ++estado.reportGeocodeToken;
   try {
-    const query = new URLSearchParams({ q: [...parts, 'Paraguay'].join(', '), format: 'json', limit: '1', countrycodes: 'py' });
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?${query}`, { headers: { Accept: 'application/json' } });
-    const [place] = response.ok ? await response.json() : [];
-    if (!place || token !== estado.reportGeocodeToken) return;
-    const position = { lat: Number(place.lat), lng: Number(place.lon) };
+    const position = await ubicarZona(parts);
+    if (!position || token !== estado.reportGeocodeToken) return;
     estado.reportMarker.setLatLng(position);
     estado.activeMap.setView(position, document.getElementById('repBarrio').value ? 15 : document.getElementById('repCiudad').value ? 13 : 9);
     setReportCoordinates(position);

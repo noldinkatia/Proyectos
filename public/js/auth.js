@@ -1,5 +1,6 @@
 // Sesión: ingreso, registro, código por correo, restablecer contraseña, términos y encabezado de usuario.
 import { apiRequest } from './api.js';
+import { ofrecerAvisosTrasIngreso } from './avisos.js';
 import { escapeHtml } from './config.js';
 import { estado } from './estado.js';
 import { startNotificationPolling } from './notifications.js';
@@ -137,7 +138,8 @@ export async function acceptTerms() {
     await apiRequest('/auth/terminos', { method: 'POST' });
     window.backendCurrentUser = { ...window.backendCurrentUser, acepto_terminos: true };
     recordarUsuario(window.backendCurrentUser);
-    navigateTo('home');
+    await navigateTo('home');
+    ofrecerAvisosTrasIngreso();
   } catch (error) {
     showTermsSaveError(error);
   } finally {
@@ -354,7 +356,9 @@ export async function handleLogin(e) {
     window.backendCurrentUser = result.usuario;
     recordarUsuario(result.usuario);
     const destino = consumePendingDestination();
-    navigateTo(destino ? destino.view : 'home', destino ? destino.params : {}, { replace: true });
+    await navigateTo(destino ? destino.view : 'home', destino ? destino.params : {}, { replace: true });
+    // Después del ingreso (nunca al cargar la página): "Notificaciones y alertas".
+    ofrecerAvisosTrasIngreso();
   } catch (error) {
     handleAuthError(error);
   }

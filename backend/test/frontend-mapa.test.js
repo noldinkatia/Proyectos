@@ -82,7 +82,7 @@ test('radio de alerta: una sola constante para el servidor, el círculo, la leye
   assert.match(await fuente('js/map.js'), /radius: RADIO_ALERTA_KM \* 1000/);
   assert.match(await fuente('js/feed.js'), /Círculo: zona de alerta de \$\{RADIO_ALERTA_KM\} km\./);
   // Ningún texto ni radio escrito a mano (la leyenda decía 60 km).
-  for (const archivo of ['js/map.js', 'js/feed.js', 'js/report.js', 'app/zona.js']) {
+  for (const archivo of ['js/map.js', 'js/feed.js', 'js/report.js', 'js/avisos.js']) {
     const codigo = await fuente(archivo);
     assert.match(codigo, /import \{ RADIO_ALERTA_KM \} from '(\.|\/js)\/radio-alerta\.js';/, archivo);
     assert.doesNotMatch(codigo, /\b1?60\s*km\b|160000|160_000/i, archivo);

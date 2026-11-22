@@ -6,7 +6,7 @@
 // - Bienvenida para quien llega por el QR: si la app se abre en el navegador de un
 //   celular (no instalada), una pantalla breve invita a instalarla o a continuar.
 // La franja de "Sin conexión" no está acá: es compartida (/js/conexion.js).
-import { showToast } from '/js/ui.js';
+import { showToast } from '../js/ui.js';
 
 const CLAVE_BIENVENIDA = 'rastreo_bienvenida_vista';
 let eventoInstalacion = null;
