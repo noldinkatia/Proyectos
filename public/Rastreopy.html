@@ -238,8 +238,12 @@
 
   <div id="reviewChecklistModal" class="case-detail-modal hidden" role="dialog" aria-modal="true" aria-labelledby="reviewChecklistTitle">
     <form id="reviewChecklistForm" class="card review-checklist" data-on-submit="submitCaseReview(event)">
-      <h2 id="reviewChecklistTitle">Lista de validación obligatoria</h2>
-      <p>Confirme cada punto antes de publicar el caso.</p>
+      <!-- Lo usan "Validar y publicar" y "Reabrir búsqueda" de un caso que nunca se validó (admin.js) -->
+      <div class="review-checklist-cabecera">
+        <h2 id="reviewChecklistTitle">Lista de validación obligatoria</h2>
+        <button type="button" class="btn-close" data-on-click="closeReviewChecklist()" aria-label="Cerrar" title="Cerrar"><svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <p id="reviewChecklistIntro">Confirme cada punto antes de publicar el caso.</p>
       <div id="reviewCaseDetails" class="review-case-details"></div>
       <label class="check-fila"><input type="checkbox" name="verificoDenuncia" required><span class="check-fila-texto">Verifiqué la denuncia policial y su número oficial.</span></label>
       <label class="check-fila"><input type="checkbox" name="datosCoherentes" required><span class="check-fila-texto">Revisé la coherencia y suficiencia de los datos.</span></label>
@@ -249,7 +253,7 @@
       <input id="reviewDenuncia" name="numeroDenuncia" class="form-control" required>
       <div class="case-detail-actions">
         <button type="button" class="btn btn-outline btn-sm" data-on-click="closeReviewChecklist()">Cancelar</button>
-        <button type="submit" class="btn btn-primary btn-sm">Validar y publicar</button>
+        <button id="reviewChecklistSubmit" type="submit" class="btn btn-primary btn-sm">Validar y publicar</button>
       </div>
     </form>
   </div>

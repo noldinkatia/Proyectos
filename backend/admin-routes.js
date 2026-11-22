@@ -4,6 +4,7 @@ import { asyncRoute } from './auth-routes.js';
 import {
   caseListColumns,
   casoEncontrado,
+  fueValidado,
   HORAS_PRIMER_SEGUIMIENTO,
   LOCATED_WINDOW_HOURS,
   paginatedBody,
@@ -38,6 +39,18 @@ const EDICIONES_DEL_REPORTANTE = `(
 
 // Panel de administración: listado y moderación de casos, auditoría, historial
 // de localizados y simulador de seguimiento. Todas las rutas exigen administrador.
+// Lo que exige validar y publicar (y reabrir un caso que nunca se validó): número
+// oficial de denuncia y la lista completa. null si está todo.
+function errorDeValidacion(body) {
+  if (typeof body?.numeroDenuncia !== 'string' || !body.numeroDenuncia.trim()) {
+    return 'Debe registrar el número oficial de denuncia.';
+  }
+  if (['verificoDenuncia', 'datosCoherentes', 'duplicadosVerificados', 'menorValidado'].some(key => body?.[key] !== true)) {
+    return 'Debe completar toda la lista de validación antes de publicar el caso.';
+  }
+  return null;
+}
+
 export function createAdminRouter({ db, requireAdmin, push }) {
   const router = express.Router();
 
@@ -183,17 +196,9 @@ export function createAdminRouter({ db, requireAdmin, push }) {
     if (state === 'PENDIENTE' && !motivo) {
       return res.status(400).json({ error: 'Debe indicar qué debe corregirse antes de volver a validar el caso.' });
     }
-    if (state === 'VALIDADO'
-      && (typeof req.body?.numeroDenuncia !== 'string' || !req.body.numeroDenuncia.trim())) {
-      return res.status(400).json({ error: 'Debe registrar el número oficial de denuncia.' });
-    }
-    if (state === 'VALIDADO' && [
-      'verificoDenuncia',
-      'datosCoherentes',
-      'duplicadosVerificados',
-      'menorValidado'
-    ].some(key => req.body?.[key] !== true)) {
-      return res.status(400).json({ error: 'Debe completar toda la lista de validación antes de publicar el caso.' });
+    if (state === 'VALIDADO') {
+      const error = errorDeValidacion(req.body);
+      if (error) return res.status(400).json({ error });
     }
     if (state === 'CERRADO' && !motivo) {
       return res.status(400).json({ error: 'Debe indicar la justificación para cerrar el caso.' });
@@ -208,6 +213,14 @@ export function createAdminRouter({ db, requireAdmin, push }) {
       if (!transicionPermitida(current.estado, state)) {
         return { conflicto: mensajeTransicionNoPermitida(current.estado, state) };
       }
+      // "Reabrir búsqueda" de un caso que nunca se validó: lo publica, así que
+      // exige lo mismo que validar, y guarda el número y las casillas igual.
+      const validaAhora = state === 'VALIDADO' || (state === 'EN_SEGUIMIENTO'
+        && ['CERRADO', 'LOCALIZADO'].includes(current.estado) && !fueValidado(current));
+      if (validaAhora && state !== 'VALIDADO') {
+        const error = errorDeValidacion(req.body);
+        if (error) return { invalido: `Este caso nunca fue validado: para reabrir la búsqueda complete la validación. ${error}` };
+      }
       const { rows: updatedRows } = await client.query(`
         UPDATE casos SET estado = $2,
           -- Al cerrar se conserva la fecha de localizado: sigue contando como encontrado.
@@ -215,11 +228,11 @@ export function createAdminRouter({ db, requireAdmin, push }) {
             WHEN $2 = 'CERRADO' THEN localizado_en ELSE NULL END,
           motivo_rechazo = CASE WHEN $2 = 'RECHAZADO' THEN $3 ELSE motivo_rechazo END,
           motivo_cierre = CASE WHEN $2 = 'CERRADO' THEN $3 ELSE motivo_cierre END,
-          numero_denuncia = CASE WHEN $2 = 'VALIDADO' AND $4 <> '' THEN $4 ELSE numero_denuncia END,
-          checklist_denuncia = CASE WHEN $2 = 'VALIDADO' THEN $5 ELSE checklist_denuncia END,
-          checklist_coherencia = CASE WHEN $2 = 'VALIDADO' THEN $6 ELSE checklist_coherencia END,
-          checklist_duplicados = CASE WHEN $2 = 'VALIDADO' THEN $7 ELSE checklist_duplicados END,
-          checklist_menores = CASE WHEN $2 = 'VALIDADO' THEN $8 ELSE checklist_menores END,
+          numero_denuncia = CASE WHEN $11::boolean AND $4 <> '' THEN $4 ELSE numero_denuncia END,
+          checklist_denuncia = CASE WHEN $11::boolean THEN $5 ELSE checklist_denuncia END,
+          checklist_coherencia = CASE WHEN $11::boolean THEN $6 ELSE checklist_coherencia END,
+          checklist_duplicados = CASE WHEN $11::boolean THEN $7 ELSE checklist_duplicados END,
+          checklist_menores = CASE WHEN $11::boolean THEN $8 ELSE checklist_menores END,
           proximo_seguimiento = CASE
             WHEN $2 IN ('VALIDADO', 'EN_SEGUIMIENTO')
               AND $9 NOT IN ('VALIDADO', 'EN_SEGUIMIENTO')
@@ -245,7 +258,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
         req.params.id, state, motivo || null, req.body?.numeroDenuncia || '',
         req.body?.verificoDenuncia === true, req.body?.datosCoherentes === true,
         req.body?.duplicadosVerificados === true, req.body?.menorValidado === true,
-        current.estado, HORAS_PRIMER_SEGUIMIENTO
+        current.estado, HORAS_PRIMER_SEGUIMIENTO, validaAhora
       ]);
       await client.query(`
         INSERT INTO cambios_estado_caso (caso_id, estado_anterior, estado_nuevo, cambiado_por)
@@ -285,6 +298,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
     });
     if (!updated) return res.status(404).json({ error: 'Caso no disponible' });
     if (updated.conflicto) return res.status(409).json({ error: updated.conflicto });
+    if (updated.invalido) return res.status(400).json({ error: updated.invalido });
     push.programar(db, alertasPush);
     res.json({ caso: toAdminCase(updated) });
   }));

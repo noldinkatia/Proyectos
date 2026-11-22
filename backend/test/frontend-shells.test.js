@@ -12,6 +12,7 @@ const read = path => readFile(new URL(path, publicDir), 'utf8');
 // Del panel de administración: solo en la web. La app no duplica el panel
 // (router.js lleva al admin a /#/panel), así que no los tiene.
 const ADMIN_PANEL_ONLY = ['reviewCaseDetails', 'reviewChecklistForm', 'reviewChecklistModal',
+  'reviewChecklistIntro', 'reviewChecklistSubmit', 'reviewChecklistTitle',
   'reviewDenuncia', 'simTimeModal', 'simulateFollowupButton'];
 
 // Solo en la app: la guía de instalación en iOS. js/avisos.js comprueba si está

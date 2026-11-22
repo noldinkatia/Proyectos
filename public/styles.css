@@ -1348,6 +1348,8 @@ table tr:hover td { background: var(--surface-2); }
 #toastNotification .btn-close { flex: 0 0 auto; }
 .review-checklist { width: min(100%,560px); max-height: 85vh; overflow: auto; }
 #reviewChecklistForm { display: grid; gap: .65rem; }
+.review-checklist-cabecera { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
+.review-checklist-cabecera h2 { margin: 0; }
 #reviewCaseDetails { display: grid; gap: .28rem; padding: .75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--muted); font-size: .78rem; }
 #reviewCaseDetails strong { color: var(--text); font-size: .9rem; }
 #reviewChecklistForm .check-fila { margin: 0; }

@@ -348,7 +348,32 @@ export async function adminRetirarAntecedente(antecedenteId) {
   }
 }
 
+// Textos del modal de la lista de validación según para qué se abre.
+const LISTA_VALIDACION = {
+  validar: {
+    titulo: 'Lista de validación obligatoria',
+    intro: 'Confirme cada punto antes de publicar el caso.',
+    boton: 'Validar y publicar',
+    estado: 'VALIDADO',
+    hecho: ['Listo', 'Caso validado y publicado en el mapa.'],
+    error: 'No se pudo validar el caso'
+  },
+  reabrir: {
+    titulo: 'Validar antes de reabrir',
+    intro: 'Este caso nunca fue validado. Reabrir la búsqueda lo publica: confirme cada punto y registre el número oficial de denuncia.',
+    boton: 'Validar y reabrir búsqueda',
+    estado: 'EN_SEGUIMIENTO',
+    hecho: ['Búsqueda reabierta', 'El caso quedó validado y volvió al seguimiento activo.'],
+    error: 'No se pudo reabrir la búsqueda'
+  }
+};
+
 export function adminAccept(caseId) {
+  abrirListaValidacion(caseId, 'validar');
+}
+
+function abrirListaValidacion(caseId, modo) {
+  const textos = LISTA_VALIDACION[modo];
   const form = document.getElementById('reviewChecklistForm');
   const selectedCase = getStore().casos.find(item => item.id === caseId);
   const detail = document.getElementById('reviewCaseDetails');
@@ -370,6 +395,10 @@ export function adminAccept(caseId) {
   loadProtectedPhotos(detail);
   form.reset();
   form.dataset.caseId = caseId;
+  form.dataset.modo = modo;
+  document.getElementById('reviewChecklistTitle').textContent = textos.titulo;
+  document.getElementById('reviewChecklistIntro').textContent = textos.intro;
+  document.getElementById('reviewChecklistSubmit').textContent = textos.boton;
   document.getElementById('reviewChecklistModal').classList.remove('hidden');
   document.getElementById('reviewDenuncia').focus();
 }
@@ -383,11 +412,12 @@ export async function submitCaseReview(event) {
   const form = event.currentTarget;
   const data = new FormData(form);
   const caseId = form.dataset.caseId;
+  const textos = LISTA_VALIDACION[form.dataset.modo] || LISTA_VALIDACION.validar;
   try {
     await apiRequest(`/admin/casos/${encodeURIComponent(caseId)}/estado`, {
       method: 'POST',
       body: {
-        estado: 'VALIDADO',
+        estado: textos.estado,
         numeroDenuncia: data.get('numeroDenuncia'),
         verificoDenuncia: data.has('verificoDenuncia'),
         datosCoherentes: data.has('datosCoherentes'),
@@ -396,10 +426,10 @@ export async function submitCaseReview(event) {
       }
     });
     closeReviewChecklist();
-    showToast('Listo', 'Caso validado y publicado en el mapa.', 'success');
+    showToast(...textos.hecho, 'success');
     navigateTo('admin');
   } catch (error) {
-    showToast('No se pudo validar el caso', error.message);
+    showToast(textos.error, error.message);
   }
 }
 
@@ -478,7 +508,14 @@ export async function adminReturnToReview(caseId) {
   }
 }
 
+// Un caso que nunca se validó (validadoAlgunaVez, backend/case-shared.js) pide la
+// lista de validación: reabrirlo lo publica. El servidor también lo exige.
 export async function adminReopenCase(caseId) {
+  const caso = getStore().casos.find(item => item.id === caseId);
+  if (caso && caso.validadoAlgunaVez === false) {
+    abrirListaValidacion(caseId, 'reabrir');
+    return;
+  }
   try {
     await apiRequest(`/admin/casos/${encodeURIComponent(caseId)}/estado`, {
       method: 'POST', body: { estado: 'EN_SEGUIMIENTO' }

@@ -168,9 +168,23 @@ export function toOwnerCase(row) {
   };
 }
 
+// ¿Consta una validación de la administración? Las cuatro casillas del checklist
+// en true. Solo las escribe la validación (admin-routes.js), que exige las cuatro,
+// y no se borran al devolver a revisión; checklist_denuncia sí se borra si quien
+// reportó cambia el número (case-routes.js), porque ese número nadie lo verificó.
+// No se usa el historial (cambios_estado_caso): "Sigue activa" del reportante
+// registra un paso a VALIDADO sin intervención de la administración, y los datos
+// sembrados (seed-demo, seed-100) tienen las casillas pero no el historial.
+export function fueValidado(row) {
+  return Boolean(row.checklist_denuncia && row.checklist_coherencia
+    && row.checklist_duplicados && row.checklist_menores);
+}
+
 export function toAdminCase(row) {
   return {
     ...toOwnerCase(row),
+    // "Reabrir búsqueda" pide la lista de validación si es false (admin.js).
+    validadoAlgunaVez: fueValidado(row),
     fotoUrl: hasPhoto(row) ? `/api/admin/casos/${encodeURIComponent(row.id)}/foto` : '',
     fotoDisponible: hasPhoto(row),
     motivoRechazo: row.motivo_rechazo,
