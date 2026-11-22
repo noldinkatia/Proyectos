@@ -163,7 +163,7 @@ export function abrirBasesModal() {
       <dialog id="basesModal" class="bases-modal" aria-labelledby="basesModalTitulo">
         <div class="modal-header">
           <h2 id="basesModalTitulo">Bases y condiciones de uso</h2>
-          <button type="button" class="btn btn-outline btn-sm" data-on-click="cerrarBasesModal()">Cerrar</button>
+          <button type="button" class="btn-close" data-on-click="cerrarBasesModal()" aria-label="Cerrar" title="Cerrar"><svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         </div>
         <div class="modal-body bases-texto">${BASES_TEXTO}</div>
       </dialog>`);

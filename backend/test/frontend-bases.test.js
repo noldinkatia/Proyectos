@@ -55,7 +55,8 @@ test('modal de las bases: texto completo, se cierra con el botón o Esc y el foc
   conDocumento(({ body, nodos, foco }) => {
     abrirBasesModal();
     assert.match(body.html, /<dialog id="basesModal" class="bases-modal" aria-labelledby="basesModalTitulo">/);
-    assert.match(body.html, /data-on-click="cerrarBasesModal\(\)">Cerrar<\/button>/);
+    // La X de cierre: botón real con nombre accesible "Cerrar".
+    assert.match(body.html, /<button type="button" class="btn-close" data-on-click="cerrarBasesModal\(\)" aria-label="Cerrar" title="Cerrar"><svg class="icon-close"/);
     assert.ok(body.html.includes(BASES_TEXTO), 'el mismo texto que la pantalla obligatoria');
     assert.equal(nodos.basesModal.open, true);
     assert.equal(foco(), 'Cerrar');

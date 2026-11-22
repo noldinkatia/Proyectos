@@ -85,7 +85,7 @@
       <div class="header-actions">
         <!-- Solo en computadoras (public/js/web.js); en celulares está el aviso de abajo -->
         <a id="headerAppLink" class="header-app-link hidden" href="/app/">Descargar app</a>
-        <button type="button" class="header-notifications" data-on-click="toggleNotificationsModal()" aria-label="Abrir notificaciones">♧<span id="headerNotifBadge" class="hidden">0</span></button>
+        <button type="button" class="header-notifications" data-on-click="toggleNotificationsModal()" aria-label="Abrir notificaciones" title="Notificaciones"><svg class="icon-bell" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span id="headerNotifBadge" class="hidden">0</span></button>
         <button type="button" id="headerProfile" class="header-profile hidden" data-on-click="toggleDrawer(true)" aria-label="Abrir menú de cuenta">
           <span id="headerProfileAvatar" class="header-profile-avatar" aria-hidden="true"></span>
           <span class="header-profile-copy"><span id="headerProfileName"></span>
@@ -105,7 +105,7 @@
       <div>
         <div class="drawer-header">
           <span>Rastreo PY</span>
-          <button type="button" data-on-click="toggleDrawer(false)" aria-label="Cerrar menú">Cerrar</button>
+          <button type="button" class="btn-close" data-on-click="toggleDrawer(false)" aria-label="Cerrar" title="Cerrar"><svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         </div>
         
         <!-- Oculto hasta que haya sesión: antes mostraba "Usuario / CIUDADANO"
@@ -170,7 +170,7 @@
       <p id="toastTitle">Notificación</p>
       <p id="toastMessage">Mensaje de sistema</p>
     </div>
-    <button data-on-click="hideToast()">Cerrar</button>
+    <button type="button" class="btn-close btn-close-sm" data-on-click="hideToast()" aria-label="Cerrar" title="Cerrar"><svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
 
   <!-- MODAL DE CENTRO DE NOTIFICACIONES -->
@@ -178,8 +178,7 @@
     <div role="dialog" aria-modal="true" aria-labelledby="notifModalTitle">
       <div class="modal-header">
         <span id="notifModalTitle">Centro de notificaciones</span>
-        <button type="button" class="btn btn-outline btn-sm" data-on-click="enableSystemNotifications()">Activar avisos</button>
-        <button type="button" class="btn btn-outline btn-sm" data-on-click="toggleNotificationsModal()" aria-label="Cerrar notificaciones">Cerrar</button>
+        <button type="button" class="btn-close" data-on-click="toggleNotificationsModal()" aria-label="Cerrar" title="Cerrar"><svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div id="notifList">
         <!-- Lista de notificaciones -->
@@ -195,7 +194,7 @@
     <div role="dialog" aria-modal="true" aria-labelledby="simTimeModalTitle">
       <div class="modal-header">
         <span id="simTimeModalTitle">Simulador de seguimiento</span>
-        <button type="button" class="btn btn-outline btn-sm" data-on-click="toggleSimulateTimeModal()">Cerrar</button>
+        <button type="button" class="btn-close" data-on-click="toggleSimulateTimeModal()" aria-label="Cerrar" title="Cerrar"><svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <p class="modal-body">Acción de demostración para administradores: fuerza el vencimiento del seguimiento de todos los casos activos y puede generar avisos y cambios de estado. No la use con registros reales.</p>
       <div class="modal-footer"><button type="button" data-on-click="runTimeFastForward()" class="btn btn-primary btn-sm">Simular avance de 48 horas</button></div>
@@ -204,7 +203,7 @@
 
   <div id="caseDetailModal" class="case-detail-modal hidden" role="dialog" aria-modal="true" aria-labelledby="caseDetailTitle">
     <section class="card">
-      <button type="button" class="btn btn-outline btn-sm" data-on-click="closeCaseDetail()">Cerrar</button>
+      <button type="button" class="btn-close case-detail-close" data-on-click="closeCaseDetail()" aria-label="Cerrar" title="Cerrar"><svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       <div id="caseDetailContent"></div>
     </section>
   </div>

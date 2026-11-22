@@ -108,7 +108,8 @@ export function addTextMapZoomControl(map) {
   controls[1]?.setAttribute('aria-label', 'Alejar mapa');
   map.on('popupopen', event => {
     const closeButton = event.popup.getElement()?.querySelector('.leaflet-popup-close-button');
-    closeButton?.setAttribute('aria-label', 'Cerrar ventana');
+    closeButton?.setAttribute('aria-label', 'Cerrar');
+    closeButton?.setAttribute('title', 'Cerrar');
   });
 }
 
