@@ -880,6 +880,14 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 .icono-accion { width: 1.3rem; height: 1.3rem; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .table-actions.acciones-pista { display: flex; flex-wrap: nowrap; gap: .5rem; max-width: none; }
 .tabla-pistas td[data-label="Estado"] .status-tag { justify-self: start; margin-bottom: .3rem; }
+/* Bandeja: triángulo "!" en el reporte que disparó "Posible reporte duplicado" (admin.js). */
+.tabla-bandeja th.celda-alerta, .tabla-bandeja td.celda-alerta { width: 3.25rem; padding-inline: .25rem; text-align: center; }
+.aviso-duplicado { position: relative; display: inline-grid; width: 2.75rem; height: 2.75rem; place-items: center; padding: 0; border: 1px solid var(--red-border); border-radius: var(--radius-sm); background: var(--red-soft); color: var(--red); cursor: help; }
+.aviso-duplicado:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.aviso-duplicado-icono { width: 1.35rem; height: 1.35rem; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.aviso-duplicado-globo { position: absolute; z-index: 20; bottom: 50%; left: calc(100% + .45rem); padding: .3rem .55rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); box-shadow: var(--shadow-overlay); color: var(--text-strong); font-size: .75rem; font-weight: 700; white-space: nowrap; opacity: 0; pointer-events: none; transform: translateY(50%); transition: opacity .12s ease; }
+.aviso-duplicado:hover .aviso-duplicado-globo, .aviso-duplicado:focus-visible .aviso-duplicado-globo, .aviso-duplicado.abierto .aviso-duplicado-globo { opacity: 1; }
+.fila-resaltada td { background: var(--amber-soft); transition: background-color .3s ease; }
 
 .grid-2, .grid-3 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .85rem; }
 .grid-3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
@@ -1378,6 +1386,10 @@ table tr:hover td { background: var(--surface-2); }
    13. Responsive
    ========================================================================== */
 @media (max-width: 780px) {
+  /* En celular la fila es una tarjeta: sin icono, la celda vacía no ocupa lugar. */
+  .tabla-bandeja td.celda-alerta { width: auto; text-align: start; }
+  .tabla-bandeja td.celda-alerta:empty { display: none; }
+  .aviso-duplicado { justify-self: start; }
   #mainContent > div, #mainContent > section { width: min(100% - 1.5rem, var(--maxw)); }
   #topHeader { gap: .25rem .6rem; }
   #topHeader > .header-brand { flex: 1 1 auto; }

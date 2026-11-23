@@ -228,6 +228,8 @@ export function toAdminCase(row) {
     contactoReportante: row.contacto_reportante,
     // Antecedentes activos del reportante (migración 008): solo en respuestas de administración.
     antecedentesReportante: Array.isArray(row.antecedentes_reportante) ? row.antecedentes_reportante : [],
+    // Disparó "Posible reporte duplicado" al crearse (admin-routes.js): icono en la bandeja.
+    posibleDuplicado: row.posible_duplicado === true,
     reportanteMayorEdad: Boolean(row.reportante_mayor_edad),
     // Declaración de responsabilidad (solo administración): cuándo y qué versión.
     declaracionAceptadaEn: row.declaracion_aceptada_en || null,

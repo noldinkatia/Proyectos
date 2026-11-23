@@ -44,6 +44,16 @@ function alertaZonaHtml(n) {
     </div>`;
 }
 
+// Avisos de la administración sobre un reporte nuevo (los recibe solo la
+// administración): botón para abrir ese caso en el panel (admin.js).
+const AVISOS_DE_PANEL = ['CASO_PENDIENTE', 'CASO_POSIBLE_DUPLICADO'];
+export function casoEnPanelHtml(n) {
+  if (!AVISOS_DE_PANEL.includes(n.tipo) || !n.casoId) return '';
+  return `<div class="table-actions">
+      <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(n.casoId)}" data-on-click="abrirCasoDesdeAviso(this.dataset.caseId)">Abrir en el panel</button>
+    </div>`;
+}
+
 // No salen como aviso del sistema por el polling: lo que ya llegó por push (no se
 // repite) y lo que va solo al centro de notificaciones (retractación, cierre, y la
 // localización y el cierre automático avisados al reportante).
@@ -90,7 +100,7 @@ export async function renderNotifList() {
     container.innerHTML = '<div class="notif-empty"><strong>Todo al día</strong><p>No tenés notificaciones por ahora.</p></div>';
     return;
   }
-  container.innerHTML = store.notificaciones.map(n => renderNoticeItem(n, alertaZonaHtml(n) || seguimientoHtml(n))).join('');
+  container.innerHTML = store.notificaciones.map(n => renderNoticeItem(n, alertaZonaHtml(n) || seguimientoHtml(n) || casoEnPanelHtml(n))).join('');
 }
 
 // Opciones de la consulta de seguimiento (la primera, la segunda y el aviso de

@@ -21,7 +21,7 @@ export function normalizarNombre(nombre) {
 // año, a 160 km o menos y creado en los últimos 30 días.
 async function buscarDuplicadoCritico(client, caso) {
   const { rows } = await client.query(`
-    SELECT c.id, c.nombre_completo FROM casos c
+    SELECT c.id, c.nombre_completo, c.edad, c.ciudad, c.creado_en FROM casos c
     WHERE c.id <> $1
       AND c.estado IN ('PENDIENTE', 'VALIDADO', 'EN_SEGUIMIENTO')
       AND c.creado_en >= CURRENT_TIMESTAMP - INTERVAL '30 days'
@@ -30,6 +30,26 @@ async function buscarDuplicadoCritico(client, caso) {
   `, [caso.id, caso.edad, caso.latitud, caso.longitud]);
   const nombre = normalizarNombre(caso.nombre_completo);
   return rows.find(row => normalizarNombre(row.nombre_completo) === nombre) || null;
+}
+
+// "Nombre (25 años, Asunción)" de un caso, para los avisos de la administración.
+function descripcionCaso(caso) {
+  const datos = [Number.isFinite(Number(caso.edad)) && caso.edad !== null ? `${Number(caso.edad)} años` : '', caso.ciudad || '']
+    .filter(Boolean).join(', ');
+  return `${caso.nombre_completo}${datos ? ` (${datos})` : ''}`;
+}
+
+// Fecha corta (22/11) en hora de Paraguay.
+function fechaCorta(valor) {
+  const fecha = new Date(valor);
+  if (Number.isNaN(fecha.getTime())) return '';
+  return new Intl.DateTimeFormat('es-PY', { day: '2-digit', month: '2-digit', timeZone: 'America/Asuncion' }).format(fecha);
+}
+
+// Aviso de posible duplicado, legible y sin IDs (solo lo ve la administración).
+export function mensajePosibleDuplicado(caso, duplicado) {
+  const cuando = fechaCorta(duplicado.creado_en);
+  return `El reporte de ${descripcionCaso(caso)} se parece al caso de ${descripcionCaso(duplicado)}${cuando ? ` reportado el ${cuando}` : ''}. No se envió alerta temprana a la zona.`;
 }
 
 async function superaLimitePorReportante(client, caso) {
@@ -88,7 +108,7 @@ export async function enviarAlertaTemprana(client, caso, { push } = {}) {
       INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo)
       SELECT id, $1, 'Posible reporte duplicado', $2, 'CASO_POSIBLE_DUPLICADO'
       FROM usuarios WHERE rol = 'administrador'
-    `, [caso.id, `El reporte se parece a otro caso activo (${duplicado.id}): no se envió alerta temprana a la zona.`]);
+    `, [caso.id, mensajePosibleDuplicado(caso, duplicado)]);
     return { enviada: false, motivo: 'duplicado', notificaciones: [] };
   }
   if (await superaLimitePorReportante(client, caso)) {

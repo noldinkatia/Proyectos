@@ -28,6 +28,14 @@ const ANTECEDENTES_ACTIVOS_DEL_REPORTANTE = `(
   WHERE ant.usuario_id = c.reportado_por_usr_id AND ant.retirado_en IS NULL
 )`;
 
+// El caso c disparó el aviso "Posible reporte duplicado" al crearse (alertas.js,
+// buscarDuplicadoCritico): se lee del aviso guardado, así la bandeja muestra
+// exactamente lo que se detectó para ese caso (solo el más reciente, nunca el
+// original) y no hace falta migración.
+const POSIBLE_DUPLICADO = `EXISTS (
+  SELECT 1 FROM notificaciones dup WHERE dup.caso_id = c.id AND dup.tipo = 'CASO_POSIBLE_DUPLICADO'
+)`;
+
 // Ediciones del reportante sobre el caso c, de la más reciente a la más vieja:
 // fecha, campos con su antes y después, y la declaración que volvió a aceptar.
 const EDICIONES_DEL_REPORTANTE = `(
@@ -61,6 +69,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
       SELECT ${caseListColumns('c')}, u.correo AS contacto_reportante,
         ${ANTECEDENTES_ACTIVOS_DEL_REPORTANTE} AS antecedentes_reportante,
         ${EDICIONES_DEL_REPORTANTE} AS ediciones,
+        ${POSIBLE_DUPLICADO} AS posible_duplicado,
         COUNT(*) OVER() AS total_registros
       FROM casos c LEFT JOIN usuarios u ON u.id = c.reportado_por_usr_id
       ORDER BY c.creado_en DESC

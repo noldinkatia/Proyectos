@@ -63,9 +63,10 @@ export function renderAdminView(history, clues = [], audit = []) {
       <section class="admin-tab-panel card hidden" data-admin-panel="validation">
         <h2>Bandeja de validación</h2>
         <p class="workflow-guidance"><strong>Flujo seguro:</strong> 1. Validar con la lista de control → 2. Aprobar y publicar. También podés rechazar con motivo; los cambios quedan registrados.</p>
-        ${pending.length ? `<div class="table-scroll"><table><thead><tr><th>Caso</th><th>Estado</th><th>Validación</th><th>Reportado</th><th>Acciones</th></tr></thead><tbody>
-          ${pending.map(c => `<tr>
+        ${pending.length ? `<div class="table-scroll"><table class="tabla-bandeja"><thead><tr><th>Caso</th><th class="celda-alerta"><span class="sr-only">Alerta</span></th><th>Estado</th><th>Validación</th><th>Reportado</th><th>Acciones</th></tr></thead><tbody>
+          ${pending.map(c => `<tr id="validation-case-${escapeHtml(c.id)}">
             <td data-label="Caso"><strong>${escapeHtml(c.nombreCompleto)}</strong><br><span class="muted">${escapeHtml(c.ciudad)}, ${Number(c.edad)} años</span>${avisoAntecedente(c)}${avisoModificado(c)}</td>
+            <td class="celda-alerta" data-label="Alerta">${iconoPosibleDuplicado(c)}</td>
             <td data-label="Estado"><span class="status-tag status-PENDIENTE">En revisión</span></td>
             <td data-label="Validación"><span class="validation-state">Sin validar</span></td>
             <td data-label="Reportado">${timeSince(c.fechaCreacion)}</td>
@@ -155,6 +156,40 @@ export function renderAdminView(history, clues = [], audit = []) {
       </section>
     </section>
   `;
+}
+
+// Bandeja de validación: triángulo con "!" en el reporte que disparó el aviso
+// "Posible reporte duplicado" al crearse (posibleDuplicado, del servidor); nunca
+// en el caso original. Es un botón (foco de teclado y toque en el celular) con
+// aria-label y un globo propio: con el cursor o el foco se ve; al tocarlo, se
+// alterna (alternarAvisoDuplicado), porque title solo no se ve en pantallas táctiles.
+const ICONO_DUPLICADO = '<svg class="aviso-duplicado-icono" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5 2.5 20h19L12 3.5Z"/><path d="M12 10v4.5"/><path d="M12 17.5v.01"/></svg>';
+export function iconoPosibleDuplicado(c) {
+  if (!c.posibleDuplicado) return '';
+  return `<button type="button" class="aviso-duplicado" aria-label="Posible duplicado" data-on-click="alternarAvisoDuplicado(this)">${ICONO_DUPLICADO}<span class="aviso-duplicado-globo" aria-hidden="true">Posible duplicado</span></button>`;
+}
+
+export function alternarAvisoDuplicado(boton) {
+  const abierto = boton.classList.toggle('abierto');
+  // Uno abierto a la vez.
+  document.querySelectorAll('.aviso-duplicado.abierto').forEach(otro => { if (otro !== boton) otro.classList.remove('abierto'); });
+  return abierto;
+}
+
+// Desde el aviso "Posible reporte duplicado" o "Nuevo reporte para validar":
+// lleva al caso en el panel (la bandeja si sigue en revisión; si no, Casos).
+export async function abrirCasoDesdeAviso(caseId) {
+  document.getElementById('notifModal')?.classList.add('hidden');
+  await navigateTo('admin', { tab: 'validation' });
+  let fila = document.getElementById(`validation-case-${caseId}`);
+  if (!fila) {
+    selectAdminTab('cases');
+    fila = document.getElementById(`admin-case-${caseId}`);
+  }
+  if (!fila) return;
+  fila.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  fila.classList.add('fila-resaltada');
+  window.setTimeout(() => fila.classList.remove('fila-resaltada'), 2500);
 }
 
 export function adminOpenCase(caseId, panel) {
