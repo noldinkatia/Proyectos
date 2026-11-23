@@ -32,7 +32,7 @@ import { normalizarCamposAlerta } from '../public/js/alerta-campos.js';
 import { DECLARACION_VERSION } from '../public/js/declaracion.js';
 
 // Respuesta a quien intenta marcar su caso como localizado por la API.
-export const MENSAJE_LOCALIZADO_POR_TELEFONO = 'Para indicar que la persona fue localizada, comunicate por teléfono con la administración de Rastreo PY. Con esa llamada se verifica el dato y se actualiza el caso.';
+export const MENSAJE_LOCALIZADO_POR_TELEFONO = 'Para indicar que la persona fue localizada, comunicate por teléfono con la administración. Con esa llamada se verifica el dato y se actualiza el caso.';
 
 export { processDueFollowups } from './followups.js';
 

@@ -7,7 +7,7 @@ import test from 'node:test';
 const publicDir = new URL('../../public/', import.meta.url);
 const { renderMyCasesView, contenidoIndicarLocalizado, indicarLocalizado, PUEDE_INDICAR_LOCALIZADO } =
   await import(new URL('js/my-cases.js', publicDir));
-const { CONTACTO_LOCALIZADO } = await import(new URL('js/config.js', publicDir));
+const { CONTACTO_LOCALIZADO, NUMERO_POLICIA_DEMO } = await import(new URL('js/config.js', publicDir));
 
 const caso = (id, estado) => ({
   id, estado, nombreCompleto: `Persona ${id}`, edad: 30, ciudad: 'Asunción', fechaCreacion: '2026-11-01T12:00:00Z'
@@ -37,19 +37,32 @@ test('el botón aparece solo en casos en revisión, validados o en seguimiento',
   }
 });
 
-test('el mensaje pide llamar; con número configurado, el enlace es tel:', () => {
-  const sinNumero = contenidoIndicarLocalizado({ nombre: 'la administración de Rastreo PY', telefono: '' });
-  assert.match(sinNumero, /Para confirmar que la persona fue localizada, comunicate por teléfono con la administración de Rastreo PY\./);
+test('el mensaje pide llamar; con número configurado, debajo va el botón "Llamar al …"', () => {
+  const TEXTO = 'Para confirmar que la persona fue localizada, comunicate por teléfono con la administración.';
+  const sinNumero = contenidoIndicarLocalizado({ nombre: 'la administración', telefono: '' });
+  assert.ok(sinNumero.includes(`<p>${TEXTO}</p>`));
   assert.match(sinNumero, /Con esa llamada verificamos el dato y actualizamos el caso\./);
-  assert.doesNotMatch(sinNumero, /href="tel:/, 'sin número no se inventa un enlace');
+  assert.doesNotMatch(sinNumero, /href="tel:|Llamar al|<a /, 'sin número no hay botón ni enlace');
 
   const conNumero = contenidoIndicarLocalizado({ nombre: 'la administración', telefono: '+595 (21) 123-456' });
-  assert.match(conNumero, /href="tel:\+59521123456">\+595 \(21\) 123-456<\/a>/);
+  assert.match(conNumero, /<a class="btn btn-outline btn-sm" href="tel:\+59521123456">Llamar al \+595 \(21\) 123-456<\/a>/);
   assert.match(contenidoIndicarLocalizado({ nombre: '<b>x</b>', telefono: '' }), /&lt;b&gt;x&lt;\/b&gt;/, 'escapado');
 
-  // El valor de configuración existe y hoy no tiene número (pendiente de definir).
-  assert.equal(typeof CONTACTO_LOCALIZADO.nombre, 'string');
-  assert.equal(typeof CONTACTO_LOCALIZADO.telefono, 'string');
+  // El texto visible puede ser distinto del destino.
+  assert.match(contenidoIndicarLocalizado({ nombre: 'la administración', telefono: '555', textoTelefono: '911' }), /href="tel:555">Llamar al 911<\/a>/);
+
+  // Configuración del evento: el texto termina en "la administración." (sin número
+  // pegado ni "de Rastreo PY") y, debajo del mensaje, el mismo botón que las fichas:
+  // se ve "Llamar al 911" y marca el número de prueba, nunca el 911.
+  assert.equal(CONTACTO_LOCALIZADO.nombre, 'la administración');
+  assert.equal(CONTACTO_LOCALIZADO.telefono, NUMERO_POLICIA_DEMO);
+  const porDefecto = contenidoIndicarLocalizado();
+  assert.ok(porDefecto.includes(`<p>${TEXTO}</p>`), 'texto sin "al 911"');
+  const boton = '<a class="btn btn-outline btn-sm" href="tel:12345678910">Llamar al 911</a>';
+  assert.ok(porDefecto.includes(boton));
+  assert.ok(porDefecto.indexOf(boton) > porDefecto.indexOf('Desde acá no se cambia el estado.'), 'debajo del mensaje');
+  assert.equal((porDefecto.match(/<a /g) || []).length, 1, 'un solo enlace');
+  assert.doesNotMatch(porDefecto, /tel:911|de Rastreo PY|administración al/);
 });
 
 // <dialog> mínimo: guarda los listeners por selector y dispara "close" al cerrar.
@@ -105,7 +118,10 @@ test('abrir la ventana no hace ninguna petición; la X o "Entendido" la cierran'
       assert.match(dialogo.innerHTML, /Indicar como localizado/);
       assert.match(dialogo.innerHTML, /comunicate por teléfono con/);
       assert.match(dialogo.innerHTML, /class="btn-close dialogo-x" aria-label="Cerrar"/, 'X para cerrar');
-      assert.equal((dialogo.innerHTML.match(/class="btn [^"]*"/g) || []).length, 1, 'un solo botón de cierre además de la X');
+      assert.equal((dialogo.innerHTML.match(/<button type="button" class="btn [^"]*"/g) || []).length, 1, 'un solo botón de cierre además de la X');
+      assert.match(dialogo.innerHTML, /dialogo-cancelar">Entendido<\/button>/);
+      // El enlace de llamada no es un botón del cuadro: solo abre el marcador.
+      assert.match(dialogo.innerHTML, /<a class="btn btn-outline btn-sm" href="tel:12345678910">Llamar al 911<\/a>/);
       assert.doesNotMatch(dialogo.innerHTML, /type="submit"|dialogo-confirmar/, 'nada que confirme o envíe');
       assert.doesNotMatch(dialogo.innerHTML, /\sonclick=/i);
       dialogo.clic(cerrarCon);

@@ -61,11 +61,15 @@ export const PUEDE_INDICAR_LOCALIZADO = ['PENDIENTE', 'VALIDADO', 'EN_SEGUIMIENT
 
 export function contenidoIndicarLocalizado(contacto = CONTACTO_LOCALIZADO) {
   const telefono = String(contacto.telefono || '').trim();
-  const destino = telefono
-    ? `${escapeHtml(contacto.nombre)} al <a class="dialogo-telefono" href="tel:${escapeHtml(telefono.replace(/[^\d+]/g, ''))}">${escapeHtml(telefono)}</a>`
-    : escapeHtml(contacto.nombre);
-  return `<p>Para confirmar que la persona fue localizada, comunicate por teléfono con ${destino}.</p>
-    <p>Con esa llamada verificamos el dato y actualizamos el caso. Desde acá no se cambia el estado.</p>`;
+  // Debajo del mensaje, el mismo botón de llamada que las fichas. El texto puede
+  // ser distinto del destino (evento: se ve "911" y marca el número de prueba,
+  // config.js). Sin teléfono, no hay botón.
+  const visible = String(contacto.textoTelefono || '').trim() || telefono;
+  const llamar = telefono
+    ? `<div class="case-detail-actions dialogo-llamar"><a class="btn btn-outline btn-sm" href="tel:${escapeHtml(telefono.replace(/[^\d+]/g, ''))}">Llamar al ${escapeHtml(visible)}</a></div>`
+    : '';
+  return `<p>Para confirmar que la persona fue localizada, comunicate por teléfono con ${escapeHtml(contacto.nombre)}.</p>
+    <p>Con esa llamada verificamos el dato y actualizamos el caso. Desde acá no se cambia el estado.</p>${llamar}`;
 }
 
 export function indicarLocalizado() {

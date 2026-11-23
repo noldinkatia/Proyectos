@@ -212,7 +212,8 @@ test('reportante y procesos automáticos: sus saltos están en la tabla y usan l
     const rechazo = await pedir(`/api/casos/${id}/seguimiento`, tokens.citizen, { accion: 'LOCALIZADO' });
     assert.equal(rechazo.status, 403, desde);
     assert.equal(rechazo.data.error, MENSAJE_LOCALIZADO_POR_TELEFONO);
-    assert.match(rechazo.data.error, /comunicate por teléfono con la administración/);
+    assert.match(rechazo.data.error, /comunicate por teléfono con la administración\. /);
+    assert.doesNotMatch(rechazo.data.error, /de Rastreo PY/);
     assert.deepEqual(await caso(id), antes, `${desde}: el caso no cambia`);
     assert.deepEqual(await historial(id), [], `${desde}: sin historial`);
   }

@@ -1,6 +1,6 @@
 // Inicio: listado de casos, filtros, paginación y ficha del caso.
 import { cuandoEsteCerca, loadProtectedPhotos } from './api.js';
-import { escapeHtml } from './config.js';
+import { escapeHtml, NUMERO_POLICIA_DEMO } from './config.js';
 import { estado } from './estado.js';
 import { RADIO_ALERTA_KM } from './radio-alerta.js';
 import { buildRoute, syncUrl } from './router.js';
@@ -388,7 +388,7 @@ export function renderCaseDetailHtml(c, { pistas = [], fotoUrl = c.fotoUrl, foto
     : DENUNCIA_PUBLICA[c.denunciaPolicial] ? `<p><strong>Denuncia policial:</strong> ${DENUNCIA_PUBLICA[c.denunciaPolicial]}</p>` : ''}
     ${pistas.length ? `<section class="public-clues"><h3>Pistas ciudadanas validadas</h3>${pistas.map(pista => `<article><p>${escapeHtml(pista.descripcion)}</p><small>${escapeHtml(new Date(pista.fechaHoraAvistamiento || pista.fechaEnvio).toLocaleString('es-PY'))}</small></article>`).join('')}${clueGallery ? `<div class="public-clue-photos">${clueGallery}</div>` : ''}</section>` : ''}
     ${acciones ? `<div class="case-detail-actions">
-      <a class="btn btn-outline btn-sm" href="tel:911">Llamar al 911</a>
+      <a class="btn btn-outline btn-sm" href="tel:${NUMERO_POLICIA_DEMO}">Llamar al 911</a>
       <button type="button" class="btn btn-outline btn-sm" data-on-click="shareCase('${escapeHtml(c.id)}')">Compartir ficha</button>
       ${c.estado !== 'LOCALIZADO' && c.estado !== 'CERRADO' && c.estado !== 'RECHAZADO' ? `<button type="button" class="btn btn-primary btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="closeCaseDetail({silent:true}); navigateTo('lead', {caseId:this.dataset.caseId}, {replace:true})">Enviar pista</button>` : ''}
     </div>` : ''}

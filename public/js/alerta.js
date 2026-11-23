@@ -1,7 +1,7 @@
 // Vista de una alerta de zona (#/alerta/<caso>), web y app. Mientras el caso está
 // en revisión muestra solo la vista mínima que devuelve el servidor; cuando ya es
 // público, el router abre la ficha completa.
-import { escapeHtml } from './config.js';
+import { escapeHtml, NUMERO_POLICIA_DEMO } from './config.js';
 import { navigateTo } from './router.js';
 
 export function abrirAlerta(caseId) {
@@ -35,7 +35,7 @@ export function renderAlertaView(alerta) {
       ${filas}
       <p class="notice notice-warning">El caso todavía no fue verificado por la administración. Si ves algo, avisá al 911; cuando se valide vas a ver la ficha completa.</p>
       <div class="case-detail-actions">
-        <a class="btn btn-outline btn-sm" href="tel:911">Llamar al 911</a>
+        <a class="btn btn-outline btn-sm" href="tel:${NUMERO_POLICIA_DEMO}">Llamar al 911</a>
         <button type="button" class="btn btn-outline btn-sm" data-on-click="navigateTo('home')">Volver al inicio</button>
       </div>
     </section>`;
