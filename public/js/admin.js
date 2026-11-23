@@ -133,7 +133,7 @@ export function renderAdminView(history, clues = [], audit = []) {
 
       <section class="admin-tab-panel card hidden" data-admin-panel="clues">
         <h2>Moderación de pistas ciudadanas</h2>
-        ${clues.length ? `<div class="table-scroll"><table><thead><tr><th>Persona</th><th>Avistamiento y ubicación</th><th>Fotografías</th><th>Estado y acciones</th></tr></thead><tbody>
+        ${clues.length ? `<div class="table-scroll"><table class="tabla-pistas"><thead><tr><th>Persona</th><th>Avistamiento y ubicación</th><th>Fotografías</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>
           ${clues.map(clue => `<tr>
             <td data-label="Persona">${escapeHtml(clue.nombreCompleto)}</td>
             <td data-label="Avistamiento y ubicación">
@@ -145,14 +145,11 @@ export function renderAdminView(history, clues = [], audit = []) {
             <td data-label="Fotografías"><div class="moderation-photos">
               ${(clue.fotosUrl || []).map((url, index) => `<img class="history-photo" src="data:," data-photo-url="${escapeHtml(url)}" alt="Fotografía ${index + 1} de la pista" data-protected-photo>`).join('') || 'Sin fotografías'}
             </div></td>
-            <td data-label="Estado y acciones">
-              <span class="status-tag status-${escapeHtml(clue.estado)}">${escapeHtml(clue.estado)}</span>
-              ${(clue.cambiosEstado || []).map(change => `<p class="muted">${escapeHtml(change.estadoAnterior || 'Nueva')} → ${escapeHtml(change.estadoNuevo)} · ${escapeHtml(change.administrador || 'Administrador')} · ${new Date(change.cambiadoEn).toLocaleString('es-PY')}${change.motivo ? ` · ${escapeHtml(change.motivo)}` : ''}</p>`).join('')}
-              ${clue.estado === 'PENDIENTE' ? `<div class="table-actions">
-                <button type="button" data-clue-id="${escapeHtml(clue.id)}" data-on-click="adminModerateClue(this.dataset.clueId, 'VALIDADA')" class="btn btn-success btn-sm">Aprobar pista</button>
-                <button type="button" data-clue-id="${escapeHtml(clue.id)}" data-on-click="adminModerateClue(this.dataset.clueId, 'RECHAZADA')" class="btn btn-danger btn-sm">Rechazar pista</button>
-              </div>` : ''}
+            <td data-label="Estado">
+              <span class="status-tag status-${escapeHtml(clue.estado)}">${escapeHtml(etiquetaEstadoPista(clue.estado))}</span>
+              ${(clue.cambiosEstado || []).map(change => `<p class="muted">${escapeHtml(change.estadoAnterior ? etiquetaEstadoPista(change.estadoAnterior) : 'Nueva')} → ${escapeHtml(etiquetaEstadoPista(change.estadoNuevo))} · ${escapeHtml(change.administrador || 'Administrador')} · ${new Date(change.cambiadoEn).toLocaleString('es-PY')}${change.motivo ? ` · ${escapeHtml(change.motivo)}` : ''}</p>`).join('')}
             </td>
+            <td data-label="Acciones">${accionesPistaHtml(clue)}</td>
           </tr>`).join('')}
         </tbody></table></div>` : '<div class="empty-state"><h3>Sin pistas</h3><p>Aún no hay pistas ciudadanas para moderar.</p></div>'}
       </section>
@@ -525,6 +522,27 @@ export async function adminReopenCase(caseId) {
   } catch (error) {
     showToast('No se pudo reabrir la búsqueda', error.message);
   }
+}
+
+// Estados de una pista (backend/clue-routes.js): PENDIENTE, VALIDADA o RECHAZADA.
+const ETIQUETAS_PISTA = { PENDIENTE: 'Pendiente', VALIDADA: 'Aprobada', RECHAZADA: 'Rechazada' };
+export function etiquetaEstadoPista(estadoPista) {
+  return ETIQUETAS_PISTA[estadoPista] || String(estadoPista || '');
+}
+
+const ICONO_APROBAR = '<svg class="icono-accion" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const ICONO_RECHAZAR = '<svg class="icono-accion" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+// Columna "Acciones": aprobar (✓) y rechazar (✗) solo mientras está pendiente,
+// como antes; una pista ya moderada no ofrece acciones. Rechazar sigue pidiendo
+// el motivo (adminModerateClue).
+export function accionesPistaHtml(clue) {
+  if (clue.estado !== 'PENDIENTE') return '<span class="muted acciones-pista-resuelta">Ya moderada</span>';
+  const id = escapeHtml(clue.id);
+  return `<div class="table-actions acciones-pista">
+                <button type="button" class="btn btn-success btn-accion" data-clue-id="${id}" data-on-click="adminModerateClue(this.dataset.clueId, 'VALIDADA')" aria-label="Aprobar pista" title="Aprobar pista">${ICONO_APROBAR}</button>
+                <button type="button" class="btn btn-danger btn-accion" data-clue-id="${id}" data-on-click="adminModerateClue(this.dataset.clueId, 'RECHAZADA')" aria-label="Rechazar pista" title="Rechazar pista">${ICONO_RECHAZAR}</button>
+              </div>`;
 }
 
 export async function adminModerateClue(clueId, state) {

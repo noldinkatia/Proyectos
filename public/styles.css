@@ -872,6 +872,14 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 .status-CERRADO,
 .status-RECHAZADO,
 .status-ARCHIVADO { border-color: var(--border-strong); background: var(--surface-3); color: var(--muted); }
+/* Pistas (admin.js): Aprobada en verde como Localizado; Rechazada gris como Rechazado. */
+.status-VALIDADA { border-color: var(--green-border); background: var(--green-soft); color: var(--green); }
+.status-RECHAZADA { border-color: var(--border-strong); background: var(--surface-3); color: var(--muted); }
+/* Acciones de moderación de pistas: ✓ y ✗ de 44 px (táctil), color del tema + icono. */
+.btn-accion, .table-actions.acciones-pista .btn-accion { display: inline-grid; width: 2.75rem; min-width: 2.75rem; height: 2.75rem; min-height: 2.75rem; place-items: center; padding: 0; }
+.icono-accion { width: 1.3rem; height: 1.3rem; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.table-actions.acciones-pista { display: flex; flex-wrap: nowrap; gap: .5rem; max-width: none; }
+.tabla-pistas td[data-label="Estado"] .status-tag { justify-self: start; margin-bottom: .3rem; }
 
 .grid-2, .grid-3 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .85rem; }
 .grid-3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
@@ -927,6 +935,11 @@ form.card { width: 100%; }
 .notice-success { border-color: var(--green-border); background: var(--green-soft); }
 .notice-success::before { color: var(--green); content: "Listo"; }
 .notice-info { padding: .8rem .9rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-info); color: var(--text-2); font-size: .74rem; }
+/* Aviso "Primero hacé la denuncia" (report.js): borde grueso, icono y título; no solo color. */
+.aviso-denuncia { display: flex; align-items: flex-start; gap: .8rem; margin: 0 0 1rem; padding: 1rem 1.1rem; border: 1px solid var(--amber-border); border-left: 6px solid var(--amber); border-radius: var(--radius-sm); background: var(--amber-soft); color: var(--text); }
+.aviso-denuncia-icono { flex: 0 0 auto; width: 1.6rem; height: 1.6rem; fill: none; stroke: var(--amber); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.aviso-denuncia h2 { margin: .1rem 0 .3rem; color: var(--text-strong); font: 700 1.02rem/1.3 Sora, Inter, sans-serif; }
+.aviso-denuncia p { margin: 0; color: var(--text); font-size: .86rem; line-height: 1.5; }
 /* Recuperación (#/recuperar) */
 .auth-form-title { margin: 0 0 .35rem; color: var(--text-strong); font: 700 1.05rem/1.3 Sora, Inter, sans-serif; }
 .auth-form-help { margin: 0 0 1rem; color: var(--muted); font-size: .85rem; }

@@ -31,6 +31,27 @@ const AYUDA_AUTORIZACION = {
 
 // edicion: el caso propio en revisión que se edita (Mis casos → "Editar reporte").
 // El formulario es el mismo; precargarReporte lo completa con los datos guardados.
+// Aviso destacado arriba del formulario: lo obligatorio es hacer la denuncia en la
+// policía; el número es opcional para quien reporta (la administración lo carga
+// al verificarla, y recién ahí puede validar). No cambia ninguna validación.
+export const AVISO_DENUNCIA = {
+  titulo: 'Primero hacé la denuncia',
+  cuerpo: 'Para que tu reporte pueda ser validado, tenés que hacer la denuncia en la policía, por llamada o en persona. Con los datos que brindes, la administración carga el número de denuncia y valida el reporte. Mientras tanto queda \'En revisión\' y no se publica en el sitio (la alerta a tu zona sale igual, como no verificada).'
+};
+export const NOTA_NUMERO_DENUNCIA = 'No hace falta que cargues el número: si ya hiciste la denuncia, la administración lo agrega al verificarla. Si lo tenés, podés ponerlo acá o agregarlo después con \'Editar reporte\'.';
+
+// role="note": información importante y fija (no interrumpe como un alert). Se
+// distingue por el icono, el título y el borde, no solo por el color.
+function avisoDenunciaHtml() {
+  return `<section class="aviso-denuncia" role="note" aria-labelledby="avisoDenunciaTitulo">
+        <svg class="aviso-denuncia-icono" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4"/><path d="M12 17.5v.01"/></svg>
+        <div>
+          <h2 id="avisoDenunciaTitulo">${escapeHtml(AVISO_DENUNCIA.titulo)}</h2>
+          <p>${escapeHtml(AVISO_DENUNCIA.cuerpo)}</p>
+        </div>
+      </section>`;
+}
+
 export function renderReportView(edicion = null) {
   return `
     <div>
@@ -42,6 +63,8 @@ export function renderReportView(edicion = null) {
     : `<h1>Reportar persona desaparecida</h1>
         <p>Completá los datos de la persona. El reporte pasa por validación antes de publicarse.</p>`}
       </header>
+
+      ${avisoDenunciaHtml()}
 
       <!-- novalidate: la validación la hace validarFormularioReporte, con un mensaje
            visible y foco en el campo. La del navegador frena el envío sin avisar si
@@ -142,9 +165,9 @@ export function renderReportView(edicion = null) {
 
         <div class="form-group">
           <label for="repDenuncia">N.º de denuncia (si ya la hiciste)</label>
-          <input type="text" id="repDenuncia" placeholder="Ej: DEN-2026-XXXX" class="form-control">
-          <p class="notice notice-warning">
-            No es obligatorio: sin número el caso queda como Pendiente / En revisión y la administración lo verificará con la Policía. La alerta temprana a tu zona se envía igual.
+          <input type="text" id="repDenuncia" placeholder="Ej: DEN-2026-XXXX" class="form-control" aria-describedby="repDenunciaAyuda">
+          <p id="repDenunciaAyuda" class="notice notice-info">
+            ${escapeHtml(NOTA_NUMERO_DENUNCIA)}
           </p>
         </div>
 
