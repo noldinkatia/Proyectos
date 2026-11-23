@@ -1,6 +1,6 @@
 // Mis casos del ciudadano. En revisión, validado o en seguimiento: "Indicar como
-// localizado" (solo pide llamar; no cambia el estado). Cada caso activo ofrece
-// además "Persona localizada" y
+// localizado" (solo pide llamar a la administración, que verifica el dato y
+// actualiza el caso; no cambia el estado). Cada caso activo ofrece además
 // "Cerrar caso"; las consultas de seguimiento (con "Sigue activo") se responden
 // desde su notificación (notifications.js).
 import { apiRequest } from './api.js';
@@ -40,11 +40,8 @@ export function renderMyCasesView(cases, notifications) {
               ${c.estado === 'LOCALIZADO' ? `<p class="my-case-notice">La persona fue localizada.${fechaCierre(c.cierreAutomaticoEn)}</p>` : ''}
               ${c.estado === 'RECHAZADO' ? `<p class="my-case-notice">${c.motivoRechazo ? `<strong>Motivo del rechazo:</strong> ${escapeHtml(c.motivoRechazo)}` : 'El reporte no fue aprobado. Contactá a soporte para más información.'}</p>` : ''}
               ${PUEDE_INDICAR_LOCALIZADO.includes(c.estado) ? `<div class="my-case-actions table-actions">
-                <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="indicarLocalizado(this.dataset.caseId)">Indicar como localizado</button>
-              </div>` : ''}
-              ${activo ? `<div class="my-case-actions table-actions">
-                <button type="button" class="btn btn-success btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="respondToFollowup(this.dataset.caseId, 'LOCALIZADO')">Persona localizada</button>
-                <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="respondToFollowup(this.dataset.caseId, 'CERRAR')">Cerrar caso</button>
+                <button type="button" class="btn btn-success btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="indicarLocalizado(this.dataset.caseId)">Indicar como localizado</button>
+                ${activo ? `<button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="respondToFollowup(this.dataset.caseId, 'CERRAR')">Cerrar caso</button>` : ''}
               </div>` : ''}
             </article>`;
           }).join('') : '<div class="empty-state"><h3>Aún no registraste casos</h3><p>Tus reportes aparecerán aquí para que puedas consultar su estado.</p></div>'}

@@ -102,7 +102,7 @@ export function seguimientoHtml(n) {
   return `
         <div class="table-actions">
           <button type="button" class="btn btn-outline btn-sm" data-case-id="${caso}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'SIGUE_ACTIVA')">Sigue activo</button>
-          <button type="button" class="btn btn-success btn-sm" data-case-id="${caso}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'LOCALIZADO')">Persona localizada</button>
+          <button type="button" class="btn btn-success btn-sm" data-case-id="${caso}" data-on-click="indicarLocalizado(this.dataset.caseId)">Indicar como localizado</button>
           <button type="button" class="btn btn-outline btn-sm" data-case-id="${caso}" data-on-click="respondToCaseFollowup(this.dataset.caseId, 'CERRAR')">Cerrar caso</button>
         </div>`;
 }

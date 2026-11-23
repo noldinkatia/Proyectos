@@ -9,15 +9,17 @@ const { seguimientoHtml } = await import(new URL('js/notifications.js', publicDi
 const botones = html => [...html.matchAll(/<button[^>]*data-on-click="([^"]+)"[^>]*>([^<]+)<\/button>/g)]
   .map(([, accion, texto]) => [texto.trim(), accion]);
 
-test('notificación de seguimiento: un único "Sigue activo", localizado y cerrar; sin prórroga', () => {
+test('notificación de seguimiento: un único "Sigue activo", "Indicar como localizado" y cerrar; sin prórroga', () => {
   for (const tipo of ['SEGUIMIENTO', 'SEGUIMIENTO_VENCIDO']) {
     const html = seguimientoHtml({ tipo, casoId: 'c1' });
     assert.deepEqual(botones(html), [
       ['Sigue activo', "respondToCaseFollowup(this.dataset.caseId, 'SIGUE_ACTIVA')"],
-      ['Persona localizada', "respondToCaseFollowup(this.dataset.caseId, 'LOCALIZADO')"],
+      // Solo abre la ventana que pide llamar: ya no marca LOCALIZADO desde acá.
+      ['Indicar como localizado', 'indicarLocalizado(this.dataset.caseId)'],
       ['Cerrar caso', "respondToCaseFollowup(this.dataset.caseId, 'CERRAR')"]
     ], tipo);
     assert.doesNotMatch(html, /PRORROGA|prórroga/i);
+    assert.doesNotMatch(html, /'LOCALIZADO'|Persona localizada/, 'sin el botón directo');
   }
 });
 
@@ -44,7 +46,7 @@ function accionesPorCaso(html) {
   }));
 }
 
-test('"Mis casos": "Indicar como localizado" en revisión y activos; los activos además "Persona localizada" y "Cerrar caso"', () => {
+test('"Mis casos": "Indicar como localizado" en revisión y activos; los activos además "Cerrar caso"; sin "Persona localizada"', () => {
   const html = renderMyCasesView([
     caso('activo', 'VALIDADO'), caso('seguimiento', 'EN_SEGUIMIENTO'), caso('localizado', 'LOCALIZADO'),
     caso('pendiente', 'PENDIENTE'), caso('cerrado', 'CERRADO')
@@ -53,13 +55,14 @@ test('"Mis casos": "Indicar como localizado" en revisión y activos; los activos
   const indicar = ['Indicar como localizado', 'indicarLocalizado(this.dataset.caseId)'];
   const activos = [
     indicar,
-    ['Persona localizada', "respondToFollowup(this.dataset.caseId, 'LOCALIZADO')"],
     ['Cerrar caso', "respondToFollowup(this.dataset.caseId, 'CERRAR')"]
   ];
   assert.deepEqual(accionesPorCaso(html), { activo: activos, seguimiento: activos, localizado: [], pendiente: [indicar], cerrado: [] });
   // Ni prórroga ni respuestas de seguimiento en ninguna parte de la vista, tampoco
   // en el panel de avisos aunque haya una consulta pendiente.
   assert.doesNotMatch(html, /SIGUE_ACTIVA|Sigue activ|PRORROGA|prórroga|respondToCaseFollowup/i);
+  // La llamada es la verificación: ningún botón de la vista marca LOCALIZADO.
+  assert.doesNotMatch(html, /'LOCALIZADO'|Persona localizada/);
 });
 
 test('"Mis casos": un caso localizado avisa cuándo se cierra automáticamente, sin botones', () => {
