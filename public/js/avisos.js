@@ -363,12 +363,21 @@ export function elegirZonaDesdeMenu() {
 // Después de iniciar sesión (y de aceptar las bases, si faltaba): la tarjeta, si
 // corresponde. Nunca pide el permiso del navegador por sí sola.
 // puestaAlDia: alertas tempranas nuevas del inicio de sesión. Su aviso va después
-// de la tarjeta (si se abrió) o enseguida (si no), nunca detrás de ella.
-export async function ofrecerAvisosTrasIngreso({ puestaAlDia = 0 } = {}) {
+// de la tarjeta (si se abrió) o enseguida (si no), nunca detrás de ella. Si falta
+// aceptar las bases, espera a esa pantalla: acceptTerms vuelve a llamar sin
+// cantidad y se usa la que quedó pendiente.
+export async function ofrecerAvisosTrasIngreso({ puestaAlDia } = {}) {
   const actual = usuario();
   let abierta = false;
-  puestaAlDiaPendiente = 0; // nada de un ingreso anterior
-  if (actual && !debeAceptarBases(actual)) {
+  // Con cantidad (inicio de sesión) reemplaza lo de un ingreso anterior; sin ella
+  // (después de aceptar las bases) usa la pendiente.
+  const cantidad = puestaAlDia === undefined ? puestaAlDiaPendiente : Number(puestaAlDia) || 0;
+  puestaAlDiaPendiente = 0;
+  if (actual && debeAceptarBases(actual)) {
+    puestaAlDiaPendiente = cantidad;
+    return;
+  }
+  if (actual) {
     zonaActiva = null;
     try {
       const disp = disponibilidad();
@@ -382,8 +391,8 @@ export async function ofrecerAvisosTrasIngreso({ puestaAlDia = 0 } = {}) {
       console.error('No se pudo ofrecer la activación de notificaciones:', error.message);
     }
   }
-  if (abierta) puestaAlDiaPendiente = Number(puestaAlDia) || 0;
-  else await avisarPuestaAlDia(puestaAlDia);
+  if (abierta) puestaAlDiaPendiente = cantidad;
+  else await avisarPuestaAlDia(cantidad);
 }
 
 export function iniciarAvisos() {

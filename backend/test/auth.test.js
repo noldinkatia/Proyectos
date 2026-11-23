@@ -216,6 +216,8 @@ test('registro, verificación, login persistente y autorización por rol', {
     )).rows[0];
     assert.equal(aceptado.acepto_terminos, true);
     assert.ok(Date.now() - new Date(aceptado.fecha_aceptacion_terminos).getTime() < 60_000, 'fecha de aceptación actual');
+    // La respuesta trae esa fecha: la interfaz la usa para no volver a pedir las bases vigentes.
+    assert.equal(new Date(citizenTerms.data.fecha_aceptacion_terminos).getTime(), new Date(aceptado.fecha_aceptacion_terminos).getTime());
 
     const pending = await post('/api/auth/registro', {
       nombre_completo: 'Otra Persona',

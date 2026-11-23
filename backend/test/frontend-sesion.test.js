@@ -5,9 +5,10 @@ import test from 'node:test';
 // restaurarSesion (public/js/sesion.js). Solo un 401/403 del servidor puede borrar la
 // sesión; un corte de red, un timeout o un 5xx (proxy/túnel caído) la conservan.
 const publicDir = new URL('../../public/', import.meta.url);
-const { debeAceptarBases, restaurarSesion, recordarUsuario } = await import(new URL('js/sesion.js', publicDir));
+const { aceptoBasesVigentes, BASES_VIGENTES_DESDE, debeAceptarBases, instanteAceptacion, restaurarSesion, recordarUsuario } =
+  await import(new URL('js/sesion.js', publicDir));
 
-const USUARIO = { id: 7, nombre: 'Ana', rol: 'ciudadano', acepto_terminos: true };
+const USUARIO = { id: 7, nombre: 'Ana', rol: 'ciudadano', acepto_terminos: true, fecha_aceptacion_terminos: '2026-11-23T12:00:00Z' };
 
 function almacenCon(datos = {}) {
   const mapa = new Map(Object.entries(datos));
@@ -107,9 +108,29 @@ test('con el apiRequest real: el status del error decide y se avisa a la franja'
   }
 });
 
-test('bases y condiciones: la pantalla obligatoria es solo para ciudadanos que no las aceptaron', () => {
+test('bases y condiciones: la pantalla obligatoria es solo para ciudadanos que no aceptaron la versión vigente', () => {
+  assert.equal(BASES_VIGENTES_DESDE, '2026-11-23');
+  const ciudadano = fecha => ({ rol: 'ciudadano', acepto_terminos: true, fecha_aceptacion_terminos: fecha });
+  // Nunca las aceptó (con o sin fecha).
   assert.equal(debeAceptarBases({ rol: 'ciudadano', acepto_terminos: false }), true);
-  assert.equal(debeAceptarBases({ rol: 'ciudadano', acepto_terminos: true }), false);
+  assert.equal(debeAceptarBases({ rol: 'ciudadano', acepto_terminos: false, fecha_aceptacion_terminos: '2026-12-01T10:00:00Z' }), true);
+  // Aceptada pero sin fecha: no se sabe qué versión aceptó.
+  for (const vacia of [null, undefined, '', 'no es una fecha']) {
+    assert.equal(debeAceptarBases(ciudadano(vacia)), true, JSON.stringify(vacia));
+  }
+  // Aceptó una versión anterior: se vuelve a pedir.
+  for (const anterior of ['2026-10-18T12:00:00Z', '2026-11-22 23:59:59+00', '2026-11-23T02:59:59.999Z',
+    '2026-11-22T23:59:59-03:00', new Date('2026-11-01T00:00:00Z'), Date.parse('2026-11-20T00:00:00Z')]) {
+    assert.equal(debeAceptarBases(ciudadano(anterior)), true, String(anterior));
+  }
+  // Aceptó la vigente: desde el 23/11/2026 a las 00:00 de Paraguay (03:00 UTC), en cualquier formato.
+  for (const vigente of ['2026-11-23T03:00:00Z', '2026-11-23T00:00:00-03:00', '2026-11-23 10:00:00+00',
+    '2026-11-23 10:00:00.123456+00', '2026-12-05T08:30:00.000Z', new Date('2027-01-01T00:00:00Z'), Date.parse('2026-11-24T00:00:00Z')]) {
+    assert.equal(debeAceptarBases(ciudadano(vigente)), false, String(vigente));
+  }
+  assert.equal(instanteAceptacion('2026-11-23 10:00:00+00'), Date.parse('2026-11-23T10:00:00Z'));
+  assert.equal(instanteAceptacion('2026-11-23'), Date.parse('2026-11-23'), 'una fecha sola no se confunde con una zona');
+  assert.equal(aceptoBasesVigentes(ciudadano('2026-11-23T03:00:00Z')), true);
   // Nunca a un administrador, aunque no figure la aceptación (las cuentas de crear-admin.js).
   assert.equal(debeAceptarBases({ rol: 'administrador', acepto_terminos: false }), false);
   assert.equal(debeAceptarBases({ rol: 'ADMINISTRADOR' }), false);

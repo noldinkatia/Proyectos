@@ -6,7 +6,7 @@ import { estado } from './estado.js';
 import { startNotificationPolling } from './notifications.js';
 import { darDeBajaEsteDispositivo } from './push-dispositivo.js';
 import { consumePendingDestination, navigateTo } from './router.js';
-import { olvidarSesion, recordarUsuario } from './sesion.js';
+import { aceptoBasesVigentes, instanteAceptacion, olvidarSesion, recordarUsuario } from './sesion.js';
 import { borrarVerificacion, guardarVerificacion, leerVerificacion, segundosParaReenviar, textoEspera } from './verificacion.js';
 import { getStore } from './store.js';
 import { showToast } from './ui.js';
@@ -58,11 +58,17 @@ export function updateHeaderUser() {
 // página de consulta #/bases.
 export const BASES_TEXTO = `
           <p><strong>1. Alcance del Servicio:</strong> La plataforma Rastreo PY es un canal de difusión colaborativa y centralización de reportes. No constituye un organismo de seguridad, investigación ni administración de justicia, ni reemplaza las actuaciones de la Policía Nacional de Paraguay o del Ministerio Público.</p>
-          <p><strong>2. Obligatoriedad de Denuncia Oficial:</strong> El uso de esta plataforma no sustituye la radicación formal de la denuncia. Se exige al usuario realizar la denuncia correspondiente ante las instituciones públicas oficiales de manera prioritaria y previa a la carga de datos en la plataforma.</p>
-          <p><strong>3. Deslinde de Responsabilidad:</strong> La plataforma, sus desarrolladores y administradores quedan totalmente eximidos de cualquier responsabilidad legal, civil, penal o administrativa respecto a la conducción, seguimiento o resultados de las investigaciones, así como de la veracidad, exactitud o autenticidad de la información e imágenes ingresadas por terceros.</p>
+          <p><strong>2. Obligatoriedad de Denuncia Oficial:</strong> El uso de esta plataforma no sustituye la radicación formal de la denuncia ante las instituciones públicas oficiales, que debe realizarse de manera prioritaria (ver punto 12).</p>
+          <p><strong>3. Deslinde de Responsabilidad:</strong> La plataforma, sus desarrolladores y administradores quedan totalmente eximidos, en la medida permitida por la legislación vigente, de cualquier responsabilidad legal, civil, penal o administrativa respecto a la conducción, seguimiento o resultados de las investigaciones, así como de la veracidad, exactitud o autenticidad de la información e imágenes ingresadas por terceros.</p>
           <p><strong>4. Marco de referencia:</strong> Este prototipo académico toma como referencia la Ley N.º 7605/2025 (RENAPED/MAFE) y la Ley N.º 7593/2025, Art. 16, num. 7. Su aplicación y alcance deben ser validados por UNIDA y las autoridades competentes antes de un despliegue operativo. Se prohíbe el ingreso de datos crediticios, bancarios o patrimoniales (Ley N.º 6534/2020), así como datos sensibles ajenos a la finalidad del reporte.</p>
           <p><strong>5. Derecho de Supresión (Borrado de Datos):</strong> Una vez que la persona reportada sea localizada o el caso sea cerrado por la autoridad competente, la ficha de búsqueda permanecerá visible por un máximo de 24 horas con el estado 'Localizado', a fin de informar a la ciudadanía. Transcurrido ese plazo, la plataforma procederá al retiro y desindexación pública de la ficha. Los datos solo se conservarán, de forma restringida, para el historial interno de la autoridad administradora y como cifras estadísticas agregadas.</p>
-          <p><strong>6. Uso Aceptable:</strong> Queda estrictamente prohibido el ingreso de reportes falsos, difamatorios o el uso de la plataforma para cometer extorsiones, estafas o cobro indebido de recompensas.</p>`;
+          <p><strong>6. Uso Aceptable:</strong> Queda estrictamente prohibido el ingreso de reportes falsos, difamatorios o el uso de la plataforma para cometer extorsiones, estafas o cobro indebido de recompensas.</p>
+          <p><strong>7. Responsabilidad del Usuario:</strong> El usuario es responsable de los datos, declaraciones, fotografías y demás contenidos que proporcione mediante Rastreo PY. Al realizar un reporte o enviar una pista, declara que actúa de buena fe y que la información es auténtica según su leal saber y entender. Si luego advierte que algún dato es incorrecto o inexacto, se compromete a rectificarlo: mientras el reporte esté 'En revisión', desde 'Editar reporte'; después, comunicándose con la administración. Las consecuencias jurídicas de sus propias acciones, declaraciones u omisiones son de su exclusiva responsabilidad, conforme a la legislación vigente.</p>
+          <p><strong>8. Legitimidad de la Información Proporcionada:</strong> El usuario declara contar con los derechos, autorizaciones o fundamentos legítimos para proporcionar la información y las fotografías que incorpora a la plataforma, y responde por su procedencia y por cualquier vulneración de derechos de terceros derivada de su uso o divulgación no autorizada. Quien reporta declara ser mayor de edad y, cuando la persona reportada es menor, contar con la autorización de sus padres o tutores legales, como se solicita al cargar el reporte; en ese caso, su fotografía no se muestra en la alerta temprana. La recepción de información por parte de Rastreo PY no constituye una certificación de su autenticidad, titularidad o legitimidad.</p>
+          <p><strong>9. Compromiso de Indemnidad:</strong> El usuario se compromete a mantener indemnes a Rastreo PY, sus desarrolladores, administradores y colaboradores frente a reclamaciones, daños, perjuicios, procedimientos y gastos razonables que deriven directamente de sus acciones, ya sean actos ilícitos, declaraciones deliberadamente falsas, incumplimientos de estas condiciones o vulneraciones de derechos de terceros. Esta obligación comprenderá las responsabilidades legalmente atribuibles al usuario, sin extenderse a aquellas que correspondan a actuaciones u omisiones propias de Rastreo PY ni a las que legalmente no puedan excluirse o trasladarse.</p>
+          <p><strong>10. Conservación de Registros y Evidencias:</strong> Rastreo PY conserva, de forma restringida, los registros necesarios para la prevención de abusos, la atención de reclamaciones, la seguridad del servicio o el cumplimiento de obligaciones legales: el historial de cambios de estado de reportes y pistas, la aceptación de la declaración de responsabilidad (fecha y versión), las ediciones realizadas por el reportante y los antecedentes por reportes falsos o abusivos. Estos registros son distintos de la ficha pública, que se retira según el punto 5, y se conservan durante los plazos que establezca la autoridad administradora conforme a la legislación vigente. El retiro de una ficha o el cierre de un caso no implica la supresión inmediata de los registros vinculados a incidentes, reclamaciones o procedimientos pendientes.</p>
+          <p><strong>11. Medidas ante Incumplimientos:</strong> Ante indicios razonables de incumplimiento de estas condiciones, uso indebido de la plataforma o vulneración de derechos de terceros, la administración de Rastreo PY podrá rechazar reportes y pistas, devolverlos a revisión, cerrar casos y registrar antecedentes en la cuenta del usuario. Asimismo, podrá conservar los antecedentes correspondientes y ponerlos a disposición de las autoridades competentes cuando exista un requerimiento legal válido o corresponda conforme a la legislación vigente.</p>
+          <p><strong>12. Denuncia ante la Policía Nacional:</strong> Además de completar el reporte en Rastreo PY, el usuario debe realizar la denuncia correspondiente ante la Policía Nacional, de manera presencial o por llamada telefónica. No necesita cargar el número de denuncia: la administración lo registra al verificarla con los datos brindados. Ambos procedimientos son requisito indispensable para que el reporte sea validado y publicado en la plataforma; mientras no se haya hecho la denuncia, el reporte queda 'En revisión' y no se publica en el sitio (la alerta temprana a la zona se envía igual, como no verificada).</p>`;
 
 export function renderLegalTerms() {
   return `
@@ -100,9 +106,9 @@ export function renderLegalTerms() {
 // aceptarlas es renderLegalTerms, solo para ciudadanos que no las aceptaron).
 export function renderBasesView() {
   const usuario = getStore().currentUser;
-  const fecha = usuario?.acepto_terminos && usuario.fecha_aceptacion_terminos
-    ? new Date(usuario.fecha_aceptacion_terminos) : null;
-  const aceptadas = fecha && !Number.isNaN(fecha.getTime())
+  // Solo si aceptó la versión vigente: una aceptación anterior era de otro texto.
+  const fecha = aceptoBasesVigentes(usuario) ? new Date(instanteAceptacion(usuario.fecha_aceptacion_terminos)) : null;
+  const aceptadas = fecha
     ? `<p class="notice">Aceptaste estas bases el ${escapeHtml(fecha.toLocaleDateString('es-PY', { day: 'numeric', month: 'long', year: 'numeric' }))}.</p>`
     : '';
   return `
@@ -135,8 +141,14 @@ export async function acceptTerms() {
   const button = document.getElementById('acceptTermsButton');
   button.disabled = true;
   try {
-    await apiRequest('/auth/terminos', { method: 'POST' });
-    window.backendCurrentUser = { ...window.backendCurrentUser, acepto_terminos: true };
+    const respuesta = await apiRequest('/auth/terminos', { method: 'POST' });
+    // Con la fecha nueva (la del servidor; si no vino, la de ahora): si quedara la
+    // anterior, debeAceptarBases volvería a pedir la aceptación.
+    window.backendCurrentUser = {
+      ...window.backendCurrentUser,
+      acepto_terminos: true,
+      fecha_aceptacion_terminos: respuesta?.fecha_aceptacion_terminos || new Date().toISOString()
+    };
     recordarUsuario(window.backendCurrentUser);
     await navigateTo('home');
     ofrecerAvisosTrasIngreso();

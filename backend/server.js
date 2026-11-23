@@ -100,11 +100,14 @@ export function createApp({ db, mailer, jwtSecret, appUrl = process.env.APP_URL,
       SET acepto_terminos = TRUE, fecha_aceptacion_terminos = CURRENT_TIMESTAMP,
           actualizado_en = CURRENT_TIMESTAMP
       WHERE id = $1 AND rol = 'ciudadano'
+      RETURNING fecha_aceptacion_terminos
     `, [req.auth.id]);
     if (!result.rowCount) {
       return res.status(404).json({ error: 'No se encontró el usuario autenticado.' });
     }
-    res.json({ mensaje: 'Aceptación guardada.' });
+    // La fecha del servidor: la interfaz la usa para saber que aceptó la versión
+    // vigente de las bases (public/js/sesion.js, BASES_VIGENTES_DESDE).
+    res.json({ mensaje: 'Aceptación guardada.', fecha_aceptacion_terminos: result.rows[0]?.fecha_aceptacion_terminos ?? null });
   }));
 
   app.get('/api/admin/health', authenticate(jwtSecret, db), requireAdministrator, (_req, res) => {

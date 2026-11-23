@@ -74,9 +74,35 @@ test('modal de las bases: texto completo, se cierra con el botón o Esc y el foc
   });
 });
 
-test('las seis cláusulas están en un solo texto, compartido con la pantalla obligatoria', () => {
-  assert.equal((BASES_TEXTO.match(/<p><strong>\d\./g) || []).length, 6);
+test('las doce cláusulas, numeradas del 1 al 12 sin saltos, en un solo texto compartido con la pantalla obligatoria', () => {
+  const numeros = [...BASES_TEXTO.matchAll(/<p><strong>(\d+)\. /g)].map(([, n]) => Number(n));
+  assert.deepEqual(numeros, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   assert.ok(renderLegalTerms().includes(BASES_TEXTO));
+});
+
+// El texto de una cláusula (sin etiquetas), por número.
+const clausula = n => BASES_TEXTO.match(new RegExp(`<p><strong>${n}\\. ([^<]+):</strong> ([^<]+)</p>`))?.slice(1);
+
+test('punto 12: denuncia ante la Policía Nacional y no hace falta cargar el número', () => {
+  const [titulo, texto] = clausula(12);
+  assert.equal(titulo, 'Denuncia ante la Policía Nacional');
+  assert.match(texto, /de manera presencial o por llamada telefónica/);
+  assert.match(texto, /No necesita cargar el número de denuncia: la administración lo registra al verificarla con los datos brindados\./);
+  assert.match(texto, /mientras no se haya hecho la denuncia, el reporte queda 'En revisión'/);
+  assert.match(texto, /la alerta temprana a la zona se envía igual, como no verificada/);
+});
+
+test('puntos 2, 3, 10 y 11: ajustes acordados', () => {
+  // 2: ya no exige la denuncia antes de cargar el reporte (contradecía al 12).
+  assert.doesNotMatch(clausula(2)[1], /previa a la carga/);
+  assert.match(clausula(2)[1], /de manera prioritaria \(ver punto 12\)\./);
+  assert.match(clausula(3)[1], /en la medida permitida por la legislación vigente/);
+  // 10: sin plazos inventados; los fija la autoridad administradora.
+  assert.match(clausula(10)[1], /durante los plazos que establezca la autoridad administradora conforme a la legislación vigente/);
+  assert.doesNotMatch(clausula(10)[1], /\d+ (días|meses|años)/);
+  // 11: solo medidas que existen en la plataforma (no hay suspensión de cuentas).
+  assert.match(clausula(11)[1], /rechazar reportes y pistas, devolverlos a revisión, cerrar casos y registrar antecedentes/);
+  assert.doesNotMatch(clausula(11)[1], /suspend|restring/i);
 });
 
 const { PUBLIC_VIEWS, buildRoute, parseRoute } = await import(new URL('js/router.js', publicDir));
@@ -109,8 +135,14 @@ test('#/bases: página de solo lectura, sin casilla ni botones de aceptar', () =
     assert.match(html, /<h1>Bases y condiciones de uso<\/h1>/);
     assert.doesNotMatch(html, /checkTerms|acceptTerms|rejectTerms|Aceptaste/);
   }
-  const ciudadano = conUsuario({ rol: 'ciudadano', acepto_terminos: true, fecha_aceptacion_terminos: '2026-10-18T12:00:00Z' }, renderBasesView);
-  assert.match(ciudadano, /Aceptaste estas bases el 18 de octubre de 2026\./);
+  // Aceptó la versión vigente: se muestra la fecha.
+  const vigente = conUsuario({ rol: 'ciudadano', acepto_terminos: true, fecha_aceptacion_terminos: '2026-11-23T15:00:00Z' }, renderBasesView);
+  assert.match(vigente, /Aceptaste estas bases el 23 de noviembre de 2026\./);
+  // Aceptó una versión anterior o no hay fecha: no dice que aceptó este texto.
+  for (const fecha of ['2026-10-18T12:00:00Z', null]) {
+    const html = conUsuario({ rol: 'ciudadano', acepto_terminos: true, fecha_aceptacion_terminos: fecha }, renderBasesView);
+    assert.doesNotMatch(html, /Aceptaste/, String(fecha));
+  }
 });
 
 test('router: #/bases ya no redirige al inicio y la pantalla obligatoria depende de debeAceptarBases', async () => {

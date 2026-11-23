@@ -313,7 +313,8 @@ async function interfazAvisos({ conTarjeta }) {
   if (conTarjeta) navegador.serviceWorker = { getRegistration: async () => undefined };
   Object.defineProperty(globalThis, 'navigator', { value: navegador, configurable: true });
   Object.assign(globalThis.window, {
-    backendCurrentUser: { id: 7, rol: 'ciudadano', acepto_terminos: true },
+    // Con la aceptación de las bases vigentes (si no, la tarjeta no se ofrece).
+    backendCurrentUser: { id: 7, rol: 'ciudadano', acepto_terminos: true, fecha_aceptacion_terminos: '2026-11-23T12:00:00Z' },
     matchMedia: () => ({ matches: false }),
     setTimeout: () => 0,
     ...(conTarjeta ? { Notification: { permission: 'default' }, PushManager: function PushManager() {} } : {})
@@ -374,6 +375,22 @@ test('interfaz: sin tarjeta, el aviso sale enseguida', async () => {
     await ui.avisos.ofrecerAvisosTrasIngreso({ puestaAlDia: 3 });
     assert.equal(ui.tarjetaAbierta(), false);
     assert.equal(ui.aviso(), 'Hay 3 casos en revisión cerca de tu zona. Revisalos en el centro de notificaciones.');
+  } finally {
+    ui.restaurar();
+  }
+});
+
+test('interfaz: con las bases por aceptar, el aviso espera; sale al aceptarlas (acceptTerms vuelve a llamar)', async () => {
+  const ui = await interfazAvisos({ conTarjeta: false });
+  try {
+    // Aceptó una versión anterior de las bases: primero va la pantalla obligatoria.
+    globalThis.window.backendCurrentUser = { id: 7, rol: 'ciudadano', acepto_terminos: true, fecha_aceptacion_terminos: '2026-10-18T12:00:00Z' };
+    await ui.avisos.ofrecerAvisosTrasIngreso({ puestaAlDia: 2 });
+    assert.equal(ui.aviso(), null, 'no sale encima de la pantalla de las bases');
+    // Las acepta (auth.js, acceptTerms): misma llamada, sin cantidad.
+    globalThis.window.backendCurrentUser = { ...globalThis.window.backendCurrentUser, fecha_aceptacion_terminos: '2026-11-23T12:00:00Z' };
+    await ui.avisos.ofrecerAvisosTrasIngreso();
+    assert.equal(ui.aviso(), 'Hay 2 casos en revisión cerca de tu zona. Revisalos en el centro de notificaciones.');
   } finally {
     ui.restaurar();
   }
