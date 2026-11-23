@@ -139,10 +139,15 @@ async function escenario(fn) {
 }
 
 // Lo que pide cada estado de destino además del estado (motivo, lista de validación).
-const cuerpo = hacia => ({
+const LISTA_DE_VALIDACION = { numeroDenuncia: 'DEN-TRANSICION', verificoDenuncia: true, datosCoherentes: true, duplicadosVerificados: true, menorValidado: true };
+// "Reabrir búsqueda" (LOCALIZADO o CERRADO → EN_SEGUIMIENTO) de un caso que nunca
+// se validó lo publica, así que pide la misma lista que validar (b43a1da). Los
+// casos de crearCaso nunca se validaron. La regla en sí: reabrir-validacion.test.js.
+const reabreSinValidar = (desde, hacia) => hacia === 'EN_SEGUIMIENTO' && ['LOCALIZADO', 'CERRADO'].includes(desde);
+const cuerpo = (hacia, desde = null) => ({
   estado: hacia,
   ...(['RECHAZADO', 'PENDIENTE', 'CERRADO'].includes(hacia) ? { motivo: 'Motivo de prueba' } : {}),
-  ...(hacia === 'VALIDADO' ? { numeroDenuncia: 'DEN-TRANSICION', verificoDenuncia: true, datosCoherentes: true, duplicadosVerificados: true, menorValidado: true } : {})
+  ...(hacia === 'VALIDADO' || reabreSinValidar(desde, hacia) ? LISTA_DE_VALIDACION : {})
 });
 
 const cercaDe = (fecha, horas) => Math.abs(new Date(fecha).getTime() - (Date.now() + horas * 3600 * 1000)) < 5 * 60 * 1000;
@@ -150,10 +155,16 @@ const cercaDe = (fecha, horas) => Math.abs(new Date(fecha).getTime() - (Date.now
 test('administración: cada salto permitido funciona y queda en el historial', conPostgres, () => escenario(async ({ pedir, tokens, crearCaso, caso, historial }) => {
   for (const [desde, hacia] of PERMITIDAS) {
     const id = await crearCaso(desde);
-    const respuesta = await pedir(`/api/admin/casos/${id}/estado`, tokens.admin, cuerpo(hacia));
+    const respuesta = await pedir(`/api/admin/casos/${id}/estado`, tokens.admin, cuerpo(hacia, desde));
     assert.equal(respuesta.status, 200, `${desde} → ${hacia}: ${JSON.stringify(respuesta.data)}`);
     const guardado = await caso(id);
     assert.equal(guardado.estado, hacia, `${desde} → ${hacia}`);
+    // Al reabrir sin validación previa, la lista y el número quedan guardados.
+    if (reabreSinValidar(desde, hacia)) {
+      assert.equal(guardado.numero_denuncia, LISTA_DE_VALIDACION.numeroDenuncia, `${desde} → ${hacia}: número de denuncia`);
+      assert.ok(guardado.checklist_denuncia && guardado.checklist_coherencia && guardado.checklist_duplicados && guardado.checklist_menores,
+        `${desde} → ${hacia}: lista de validación completa`);
+    }
     assert.deepEqual(await historial(id), [{ estado_anterior: desde, estado_nuevo: hacia }]);
     // Validar o reabrir la búsqueda programa la primera consulta a las 48 h.
     if (['VALIDADO', 'EN_SEGUIMIENTO'].includes(hacia) && !['VALIDADO', 'EN_SEGUIMIENTO'].includes(desde)) {
