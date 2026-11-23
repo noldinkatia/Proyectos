@@ -6,7 +6,7 @@ import { DECLARACION_CASILLA, DECLARACION_PUNTOS, DECLARACION_TITULO, DECLARACIO
 import { confirmar } from './dialogo.js';
 import { estado } from './estado.js';
 import { renderCaseDetailHtml } from './feed.js';
-import { addBaseTiles, addTextMapZoomControl } from './map.js';
+import { addBaseTiles, addTextMapZoomControl, REFERRER_OSM } from './map.js';
 import { RADIO_ALERTA_KM } from './radio-alerta.js';
 import { navigateTo } from './router.js';
 import { CLAVE_BORRADOR_REPORTE } from './sesion.js';
@@ -285,7 +285,11 @@ export async function ubicarZona(partes) {
   const nombres = partes.filter(Boolean).map(value => value === 'Capital' ? 'Asunción' : value);
   if (!nombres.length) return null;
   const query = new URLSearchParams({ q: [...nombres, 'Paraguay'].join(', '), format: 'json', limit: '1', countrycodes: 'py' });
-  const response = await fetch(`https://nominatim.openstreetmap.org/search?${query}`, { headers: { Accept: 'application/json' } });
+  // Nominatim, como los mosaicos, recibe solo el origen como Referer (map.js).
+  const response = await fetch(`https://nominatim.openstreetmap.org/search?${query}`, {
+    headers: { Accept: 'application/json' },
+    referrerPolicy: REFERRER_OSM
+  });
   const [place] = response.ok ? await response.json() : [];
   return place ? { lat: Number(place.lat), lng: Number(place.lon) } : null;
 }

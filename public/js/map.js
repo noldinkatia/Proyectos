@@ -87,10 +87,19 @@ export function showMapLoadError(mapEl) {
   mapEl.appendChild(notice);
 }
 
+// Política de referrer solo para OpenStreetMap (mosaicos y Nominatim). El sitio
+// entero va con "no-referrer" (helmet), pero la política de uso de OpenStreetMap
+// pide un Referer válido: sin él puede responder 403 ("Access blocked") y sus
+// mosaicos llegan sin caché. Así va solo el origen (https://dominio/), nunca la
+// ruta ni el #. Se aplica en cada pedido, no en la página: el resto no cambia.
+export const REFERRER_OSM = 'strict-origin-when-cross-origin';
+
 // Mapa base de OpenStreetMap: no requiere API key (CARTO empezó a pedirla).
 export function addBaseTiles(map, mapEl) {
   return L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
+    // Leaflet 1.9 lo pone en cada <img> de mosaico (referrerpolicy del elemento).
+    referrerPolicy: REFERRER_OSM,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
   }).addTo(map).on('tileerror', () => showMapLoadError(mapEl));
 }
