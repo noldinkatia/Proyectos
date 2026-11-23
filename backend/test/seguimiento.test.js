@@ -4,6 +4,7 @@ import test from 'node:test';
 import jwt from 'jsonwebtoken';
 import { createDatabase, initializeDatabase, seedAdministrator } from '../db.js';
 import { execFileSync } from 'node:child_process';
+import { MENSAJE_LOCALIZADO_POR_TELEFONO } from '../case-routes.js';
 import { leerLimiteCierreLocalizado } from '../case-shared.js';
 import { processDueFollowups, processLocatedClosures } from '../followups.js';
 import { createApp } from '../server.js';
@@ -306,35 +307,40 @@ function pushDePrueba() {
   return { enviadas, push: { disponible: true, programar: (_db, notificaciones) => enviadas.push(...notificaciones) } };
 }
 
-test('avisos al reportante: localizado (por la administración o por el reportante) y cierre automático, solo en el centro de notificaciones', conPostgres, () => {
+test('avisos al reportante: localizado por la administración y cierre automático, solo en el centro de notificaciones', conPostgres, () => {
   const { enviadas, push } = pushDePrueba();
-  return escenario(async ({ db, pedir, tokens, crearCaso, avisos, citizenId }) => {
+  return escenario(async ({ db, pedir, tokens, crearCaso, caso, avisos, citizenId }) => {
     const porAdmin = await crearCaso();
-    const porReportante = await crearCaso();
     assert.equal((await pedir('POST', `/api/admin/casos/${porAdmin}/estado`, { token: tokens.admin, body: { estado: 'LOCALIZADO' } })).status, 200);
-    assert.equal((await pedir('POST', `/api/casos/${porReportante}/seguimiento`, { token: tokens.citizen, body: { accion: 'LOCALIZADO' } })).status, 200);
-    for (const id of [porAdmin, porReportante]) {
-      const aviso = (await avisos(id)).find(a => a.tipo === 'LOCALIZADO_REGISTRADO');
-      assert.ok(aviso, id);
-      assert.equal(aviso.titulo, 'Persona localizada');
-      assert.match(aviso.mensaje, /figura como localizada. El caso se cerrará automáticamente en 7 días./);
-      assert.equal(aviso.canal, 'app', 'sin push');
-    }
+    const aviso = (await avisos(porAdmin)).find(a => a.tipo === 'LOCALIZADO_REGISTRADO');
+    assert.ok(aviso);
+    assert.equal(aviso.titulo, 'Persona localizada');
+    assert.match(aviso.mensaje, /figura como localizada. El caso se cerrará automáticamente en 7 días./);
+    assert.equal(aviso.canal, 'app', 'sin push');
 
-    await db.query("UPDATE casos SET localizado_en = CURRENT_TIMESTAMP - INTERVAL '8 days' WHERE id = ANY($1)", [[porAdmin, porReportante]]);
+    // El reportante ya no puede marcarlo por la API: se indica por teléfono.
+    const porReportante = await crearCaso();
+    const antes = await caso(porReportante);
+    const rechazo = await pedir('POST', `/api/casos/${porReportante}/seguimiento`, { token: tokens.citizen, body: { accion: 'LOCALIZADO' } });
+    assert.equal(rechazo.status, 403);
+    assert.equal(rechazo.data.error, MENSAJE_LOCALIZADO_POR_TELEFONO);
+    assert.deepEqual(await caso(porReportante), antes, 'el caso no cambia');
+    assert.equal(Number((await db.query('SELECT COUNT(*) FROM cambios_estado_caso WHERE caso_id = $1', [porReportante])).rows[0].count), 0, 'sin historial');
+    assert.deepEqual(await avisos(porReportante), [], 'sin avisos');
+
+    await db.query("UPDATE casos SET localizado_en = CURRENT_TIMESTAMP - INTERVAL '8 days' WHERE id = $1", [porAdmin]);
     await processLocatedClosures(db);
-    for (const id of [porAdmin, porReportante]) {
-      const cierre = (await avisos(id)).find(a => a.tipo === 'CIERRE_AUTOMATICO');
-      assert.ok(cierre, id);
-      assert.equal(cierre.titulo, 'Caso cerrado automáticamente');
-      assert.match(cierre.mensaje, /se cerró 7 días después de la localización/);
-      assert.equal(cierre.canal, 'app', 'sin push');
-    }
+    const cierre = (await avisos(porAdmin)).find(a => a.tipo === 'CIERRE_AUTOMATICO');
+    assert.ok(cierre);
+    assert.equal(cierre.titulo, 'Caso cerrado automáticamente');
+    assert.match(cierre.mensaje, /se cerró 7 días después de la localización/);
+    assert.equal(cierre.canal, 'app', 'sin push');
+    assert.equal((await caso(porReportante)).estado, 'VALIDADO', 'el cierre automático no toca el caso rechazado');
     // Nada de esto pasó por el push (que estaba disponible).
     const propias = (await db.query(
       "SELECT id FROM notificaciones WHERE usuario_id = $1 AND tipo IN ('LOCALIZADO_REGISTRADO', 'CIERRE_AUTOMATICO')", [citizenId]
     )).rows.map(fila => String(fila.id));
-    assert.equal(propias.length, 4);
+    assert.equal(propias.length, 2);
     assert.deepEqual(enviadas.filter(n => propias.includes(String(n.id))), []);
   }, { push });
 });

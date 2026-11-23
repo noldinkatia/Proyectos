@@ -31,7 +31,8 @@ import { ubicacionValida } from './ubicaciones.js';
 import { normalizarCamposAlerta } from '../public/js/alerta-campos.js';
 import { DECLARACION_VERSION } from '../public/js/declaracion.js';
 
-import { avisoLocalizadoAlReportante } from './followups.js';
+// Respuesta a quien intenta marcar su caso como localizado por la API.
+export const MENSAJE_LOCALIZADO_POR_TELEFONO = 'Para indicar que la persona fue localizada, comunicate por teléfono con la administración de Rastreo PY. Con esa llamada se verifica el dato y se actualiza el caso.';
 
 export { processDueFollowups } from './followups.js';
 
@@ -347,9 +348,15 @@ export function createCaseRouter({ db, jwtSecret, push }) {
   router.post('/casos/:id/seguimiento', ...requireCitizen, asyncRoute(async (req, res) => {
     const action = req.body?.accion;
     const reason = typeof req.body?.motivo === 'string' ? req.body.motivo.trim() : '';
-    // Respuestas posibles (consulta de seguimiento o "Mis casos"): sigue activo,
-    // persona localizada o cerrar. No hay prórroga.
-    if (!['SIGUE_ACTIVA', 'LOCALIZADO', 'CERRAR'].includes(action)) {
+    // "Persona localizada" no se marca desde acá: quien reportó llama a la
+    // administración ("Indicar como localizado"), que verifica el dato y cambia el
+    // estado desde el panel. Esa llamada es la única forma de indicarlo.
+    if (action === 'LOCALIZADO') {
+      return res.status(403).json({ error: MENSAJE_LOCALIZADO_POR_TELEFONO });
+    }
+    // Respuestas posibles (consulta de seguimiento o "Mis casos"): sigue activo o
+    // cerrar. No hay prórroga.
+    if (!['SIGUE_ACTIVA', 'CERRAR'].includes(action)) {
       return res.status(400).json({ error: 'La respuesta de seguimiento no es válida.' });
     }
     if (action === 'CERRAR' && !reason) {
@@ -366,8 +373,7 @@ export function createCaseRouter({ db, jwtSecret, push }) {
       const current = rows[0];
       if (!current || !['VALIDADO', 'EN_SEGUIMIENTO'].includes(current.estado)) return null;
 
-      const state = action === 'LOCALIZADO' ? 'LOCALIZADO'
-        : action === 'CERRAR' ? 'CERRADO' : 'VALIDADO';
+      const state = action === 'CERRAR' ? 'CERRADO' : 'VALIDADO';
       const { rows: updatedRows } = await client.query(`
         UPDATE casos SET estado = $2,
           localizado_en = CASE WHEN $2 = 'LOCALIZADO' THEN CURRENT_TIMESTAMP
@@ -388,14 +394,6 @@ export function createCaseRouter({ db, jwtSecret, push }) {
           VALUES ($1, $2, $3, $4)
         `, [req.params.id, current.estado, state, req.auth.id]);
         alertasPush = await alertasPorCambioDeEstado(client, current, state, { push });
-      }
-      if (state === 'LOCALIZADO') {
-        await client.query(`
-          INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo)
-          SELECT usuario_id, $1, 'Caso resuelto', $2, 'CASO_LOCALIZADO'
-          FROM suscripciones_caso WHERE caso_id = $1
-        `, [req.params.id, `El familiar informó que ${current.nombre_completo} fue localizado.`]);
-        await avisoLocalizadoAlReportante(client, current);
       }
       return updatedRows[0];
     });

@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import jwt from 'jsonwebtoken';
 import { borrarUsuariosDePrueba } from '../ayuda-tests/limpieza.js';
+import { MENSAJE_LOCALIZADO_POR_TELEFONO } from '../case-routes.js';
 import { HORAS_ENTRE_CONSULTAS, HORAS_PRIMER_SEGUIMIENTO } from '../case-shared.js';
 import { createDatabase, initializeDatabase, seedAdministrator } from '../db.js';
 import { ESTADOS_CASO, TRANSICIONES_PERMITIDAS, mensajeTransicionNoPermitida, transicionPermitida } from '../estados-caso.js';
@@ -199,10 +200,21 @@ test('reportante y procesos automáticos: sus saltos están en la tabla y usan l
   assert.equal((await pedir(`/api/casos/${sigue}/seguimiento`, tokens.citizen, { accion: 'SIGUE_ACTIVA' })).status, 200);
   assert.equal((await caso(sigue)).estado, 'VALIDADO');
   assert.ok(cercaDe((await caso(sigue)).proximo_seguimiento, HORAS_PRIMER_SEGUIMIENTO));
-  for (const [accion, hacia] of [['LOCALIZADO', 'LOCALIZADO'], ['CERRAR', 'CERRADO']]) {
-    const id = await crearCaso('VALIDADO');
-    assert.equal((await pedir(`/api/casos/${id}/seguimiento`, tokens.citizen, { accion, motivo: 'Motivo de prueba' })).status, 200);
-    assert.equal((await caso(id)).estado, hacia);
+  const cerrar = await crearCaso('VALIDADO');
+  assert.equal((await pedir(`/api/casos/${cerrar}/seguimiento`, tokens.citizen, { accion: 'CERRAR', motivo: 'Motivo de prueba' })).status, 200);
+  assert.equal((await caso(cerrar)).estado, 'CERRADO');
+  assert.deepEqual(await historial(cerrar), [{ estado_anterior: 'VALIDADO', estado_nuevo: 'CERRADO' }]);
+  // "Localizado" no es una respuesta del reportante: se indica por teléfono y lo
+  // cambia la administración. La ruta lo rechaza y el caso queda igual, sin historial.
+  for (const desde of ['VALIDADO', 'EN_SEGUIMIENTO']) {
+    const id = await crearCaso(desde);
+    const antes = await caso(id);
+    const rechazo = await pedir(`/api/casos/${id}/seguimiento`, tokens.citizen, { accion: 'LOCALIZADO' });
+    assert.equal(rechazo.status, 403, desde);
+    assert.equal(rechazo.data.error, MENSAJE_LOCALIZADO_POR_TELEFONO);
+    assert.match(rechazo.data.error, /comunicate por teléfono con la administración/);
+    assert.deepEqual(await caso(id), antes, `${desde}: el caso no cambia`);
+    assert.deepEqual(await historial(id), [], `${desde}: sin historial`);
   }
 
   // Primera consulta vencida: la segunda llega a las 24 h.

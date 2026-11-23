@@ -5,7 +5,7 @@
 // desde su notificación (notifications.js).
 import { apiRequest } from './api.js';
 import { CONTACTO_LOCALIZADO, escapeHtml } from './config.js';
-import { confirmar, informar, pedirMotivo } from './dialogo.js';
+import { informar, pedirMotivo } from './dialogo.js';
 import { estado } from './estado.js';
 import { renderNoticeItem } from './notifications.js';
 import { navigateTo } from './router.js';
@@ -121,13 +121,10 @@ export function timeSince(value) {
   return `Hace ${days} ${days === 1 ? 'día' : 'días'}`;
 }
 
-// Confirmación o motivo de una respuesta de seguimiento ("Mis casos" y la
-// notificación de seguimiento usan la misma). null si se canceló.
+// Motivo de una respuesta de seguimiento ("Mis casos" y la notificación de
+// seguimiento usan la misma). null si se canceló. "Localizado" no es una
+// respuesta: se indica por teléfono (indicarLocalizado).
 export async function prepararRespuestaSeguimiento(action) {
-  if (action === 'LOCALIZADO') {
-    const ok = await confirmar({ titulo: 'Persona localizada', mensaje: '¿Confirmás que la persona fue localizada?', textoConfirmar: 'Sí, fue localizada' });
-    return ok ? {} : null;
-  }
   if (action === 'CERRAR') {
     const motivo = await pedirMotivo({ titulo: 'Cerrar caso', etiqueta: '¿Por qué cerrás el caso?', textoConfirmar: 'Cerrar caso', peligro: true });
     return motivo === null ? null : { motivo };
