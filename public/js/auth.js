@@ -358,7 +358,9 @@ export async function handleLogin(e) {
     const destino = consumePendingDestination();
     await navigateTo(destino ? destino.view : 'home', destino ? destino.params : {}, { replace: true });
     // Después del ingreso (nunca al cargar la página): "Notificaciones y alertas".
-    ofrecerAvisosTrasIngreso();
+    // También el aviso de las alertas tempranas de la zona que salieron mientras no
+    // estaba (servidor): después de esa tarjeta, para que no quede detrás.
+    ofrecerAvisosTrasIngreso({ puestaAlDia: result.puestaAlDia?.nuevas });
   } catch (error) {
     handleAuthError(error);
   }

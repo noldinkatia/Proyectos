@@ -1197,6 +1197,7 @@ table tr:hover td { background: var(--surface-2); }
 .my-case-card p { margin: .3rem 0; color: var(--muted); font-size: .82rem; }
 .my-case-meta { font-size: .74rem !important; }
 .my-case-notice { padding: .6rem .7rem; border-left: 3px solid var(--accent); border-radius: 4px; background: var(--surface-2); }
+.my-case-observacion { border-left-color: var(--amber-border); background: var(--amber-soft); color: var(--text) !important; }
 .my-case-actions { max-width: 40rem; margin-top: .7rem; }
 .admin-dashboard-heading { margin-bottom: .85rem; }
 .admin-overview-panel { display: grid; gap: 1rem; }

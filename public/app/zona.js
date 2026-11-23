@@ -86,11 +86,12 @@ export async function guardarZona(ubicacion) {
       sinPush = true;
     }
   }
-  await apiRequest('/alertas-zona', {
+  const respuesta = await apiRequest('/alertas-zona', {
     method: 'PUT',
     body: { consentimiento: true, ubicacion, ...(suscripcion ? { suscripcion: suscripcion.toJSON() } : {}) }
   });
-  return { sinPush };
+  // nuevas: alertas tempranas de casos cercanos ya existentes (puesta al día).
+  return { sinPush, nuevas: Number(respuesta?.puestaAlDia?.nuevas) || 0 };
 }
 
 // Borra la ubicación y las suscripciones push de la cuenta en el servidor, y da

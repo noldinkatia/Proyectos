@@ -7,6 +7,7 @@ import {
   fueValidado,
   HORAS_PRIMER_SEGUIMIENTO,
   LOCATED_WINDOW_HOURS,
+  mensajeRevision,
   paginatedBody,
   paginationFromQuery,
   sendStoredPhoto,
@@ -271,7 +272,7 @@ export function createAdminRouter({ db, requireAdmin, push }) {
         const transition = state === 'VALIDADO'
           ? ['Reporte aprobado', `El reporte de ${caseName} fue aprobado y publicado.`, 'CASO_VALIDADO']
           : state === 'PENDIENTE'
-            ? ['Reporte devuelto a revisión', `El reporte de ${caseName} volvió a revisión.${reason ? ` Observación: ${reason}` : ''}`, 'CASO_REVISION']
+            ? ['Reporte devuelto a revisión', mensajeRevision(caseName, reason), 'CASO_REVISION']
             : state === 'RECHAZADO'
               ? ['Reporte rechazado', `El reporte de ${caseName} fue rechazado: ${reason}`, 'CASO_RECHAZADO']
               : state === 'EN_SEGUIMIENTO'

@@ -108,6 +108,63 @@ export async function enviarAlertaTemprana(client, caso, { push } = {}) {
   return { enviada: true, motivo: null, notificaciones: rows };
 }
 
+// Puesta al día: la alerta temprana se arma al crear el reporte, con las zonas
+// activas en ese momento. Quien activa o cambia su zona, o inicia sesión, después
+// recibe las que le faltan: casos en revisión de las últimas horas, a 160 km o
+// menos, a los que sí les salió la alerta temprana (no un duplicado ni uno
+// frenado por el límite por reportante), que no son suyos y de los que todavía no
+// tiene ninguna notificación. Solo al centro de notificaciones (canal 'app'):
+// nunca push. Repetirla no duplica nada (índice uq_notificaciones_alerta_zona).
+export const HORAS_PUESTA_AL_DIA = 24;
+export const MAXIMO_PUESTA_AL_DIA = 5;
+
+// db: el pool o el cliente de una transacción abierta. Devuelve { nuevas }.
+export async function ponerAlDiaAlertasTempranas(db, usuarioId) {
+  const { rows: casos } = await db.query(`
+    SELECT d.*, ROUND(d.distancia::numeric, 1) AS distancia_km FROM (
+      SELECT c.id, c.creado_en, c.nombre_completo, c.edad, c.sexo, c.departamento, c.ciudad, c.barrio,
+        c.descripcion_fisica, c.vestimenta, c.alerta_campos,
+        ${distanciaSql('a', 'c.latitud', 'c.longitud')} AS distancia
+      FROM alertas_zona a
+      JOIN usuarios u ON u.id = a.usuario_id AND u.rol = 'ciudadano' AND u.verificado
+      JOIN casos c ON c.estado = 'PENDIENTE'
+        AND c.creado_en >= CURRENT_TIMESTAMP - ($2 * INTERVAL '1 hour')
+        AND c.alerta_temprana_en IS NOT NULL
+        AND c.reportado_por_usr_id IS DISTINCT FROM a.usuario_id
+      WHERE a.usuario_id = $1
+        AND NOT EXISTS (SELECT 1 FROM notificaciones n WHERE n.usuario_id = a.usuario_id AND n.caso_id = c.id)
+    ) d
+    WHERE ${dentroDelRadioSql('d.distancia')}
+    ORDER BY d.creado_en DESC, d.id
+    LIMIT $3
+  `, [usuarioId, HORAS_PUESTA_AL_DIA, MAXIMO_PUESTA_AL_DIA]);
+  if (!casos.length) return { nuevas: 0 };
+  const { rows } = await db.query(`
+    INSERT INTO notificaciones (usuario_id, caso_id, titulo, mensaje, tipo, distancia_km, canal)
+    SELECT $1, d.caso_id, 'Alerta en tu zona: caso en revisión', d.mensaje, 'ALERTA_TEMPRANA', d.distancia_km, 'app'
+    FROM unnest($2::text[], $3::text[], $4::numeric[]) AS d(caso_id, mensaje, distancia_km)
+    ON CONFLICT DO NOTHING
+    RETURNING id
+  `, [
+    usuarioId,
+    casos.map(caso => caso.id),
+    casos.map(caso => textoAlertaTemprana(casoParaAlerta(caso), camposDeAlerta(caso))),
+    casos.map(caso => caso.distancia_km)
+  ]);
+  return { nuevas: rows.length };
+}
+
+// Para el inicio de sesión y PUT /alertas-zona: un error en la puesta al día no
+// tiene que impedir entrar ni guardar la zona.
+export async function ponerAlDiaSinFallar(db, usuarioId) {
+  try {
+    return await ponerAlDiaAlertasTempranas(db, usuarioId);
+  } catch (error) {
+    console.error('No se pudieron poner al día las alertas de zona:', error.message);
+    return { nuevas: 0 };
+  }
+}
+
 // Quienes recibieron una alerta (temprana u oficial) de este caso y siguen con las
 // alertas de zona activas: si las desactivaron, no se les manda nada más.
 const ALERTADOS_ACTIVOS = `

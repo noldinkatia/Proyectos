@@ -1,6 +1,6 @@
 import express from 'express';
 import { datosAlerta, fotoPermitida } from '../public/js/alerta-campos.js';
-import { camposDeAlerta, casoParaAlerta, ETIQUETA_NO_VERIFICADA } from './alertas.js';
+import { camposDeAlerta, casoParaAlerta, ETIQUETA_NO_VERIFICADA, ponerAlDiaSinFallar } from './alertas.js';
 import { asyncRoute } from './auth-routes.js';
 import { caseVisibilityParameters, IMAGE_DATA_URL, PUBLIC_CASE_FILTER_JOINED, validCoordinates } from './case-shared.js';
 import { withTransaction } from './db.js';
@@ -70,7 +70,15 @@ export function createAlertRouter({ db, requireCitizen, requireUser, push }) {
         `, [req.auth.id, suscripcion.endpoint, suscripcion.p256dh, suscripcion.auth]);
       }
     });
-    res.json({ activa: true, push: Boolean(suscripcion) && push.disponible, mensaje: 'Alertas de tu zona activadas.' });
+    // Casos en revisión cercanos que salieron antes de activar o cambiar la zona.
+    // Después del commit: si falla, la zona queda guardada igual.
+    const { nuevas } = await ponerAlDiaSinFallar(db, req.auth.id);
+    res.json({
+      activa: true,
+      push: Boolean(suscripcion) && push.disponible,
+      mensaje: 'Alertas de tu zona activadas.',
+      puestaAlDia: { nuevas }
+    });
   }));
 
   // Al cerrar sesión: borra solo la suscripción de ese dispositivo, y solo si es de

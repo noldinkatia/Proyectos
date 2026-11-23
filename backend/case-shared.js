@@ -149,6 +149,42 @@ export function toPublicCase(row) {
 // Lo que ve quien reportó el caso (y el administrador): además de lo público, el
 // número de denuncia y la fecha del próximo seguimiento. Nunca va en respuestas
 // públicas: GET /casos y /casos/:id se leen sin sesión (ROLES_Y_PERMISOS.txt).
+// "Devolver a revisión": el motivo no tiene columna propia (cambios_estado_caso
+// no lo guarda) y queda solo en el texto de la notificación CASO_REVISION que
+// recibe quien reportó. El texto se arma acá y se lee de vuelta con el mismo
+// formato, para mostrarlo en "Mis casos".
+const SEPARADOR_REVISION = ' volvió a revisión. Observación: ';
+
+export function mensajeRevision(nombreCaso, motivo) {
+  return motivo
+    ? `El reporte de ${nombreCaso}${SEPARADOR_REVISION}${motivo}`
+    : `El reporte de ${nombreCaso} volvió a revisión.`;
+}
+
+export function motivoDeRevision(mensaje) {
+  const texto = typeof mensaje === 'string' ? mensaje : '';
+  const posicion = texto.indexOf(SEPARADOR_REVISION);
+  const motivo = posicion < 0 ? '' : texto.slice(posicion + SEPARADOR_REVISION.length).trim();
+  return motivo || null;
+}
+
+// Motivo de la última devolución a revisión de cada caso (Map caso → motivo),
+// solo de las notificaciones de ese reportante. Nunca va en respuestas públicas.
+export async function motivosDeRevision(db, usuarioId, casoIds) {
+  const motivos = new Map();
+  if (!casoIds.length) return motivos;
+  const { rows } = await db.query(`
+    SELECT DISTINCT ON (caso_id) caso_id, mensaje FROM notificaciones
+    WHERE usuario_id = $1 AND tipo = 'CASO_REVISION' AND caso_id = ANY($2::text[])
+    ORDER BY caso_id, creada_en DESC, id DESC
+  `, [usuarioId, casoIds]);
+  for (const row of rows || []) {
+    const motivo = motivoDeRevision(row.mensaje);
+    if (motivo) motivos.set(row.caso_id, motivo);
+  }
+  return motivos;
+}
+
 export function toOwnerCase(row) {
   const localizado = row.estado === 'LOCALIZADO' && row.localizado_en ? new Date(row.localizado_en) : null;
   return {

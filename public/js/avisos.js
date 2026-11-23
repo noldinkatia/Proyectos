@@ -9,7 +9,7 @@ import { esIos, yaInstalada } from '../app/pwa.js';
 import { borrarZona, consultarZona, guardarZona, obtenerUbicacion, soportaPush, suscripcionDelDispositivo } from '../app/zona.js';
 import { disponibilidadAvisos, estadoInterruptor, guardarEstadoAvisos, leerEstadoAvisos, registrarAhoraNo, tarjetaAMostrar } from './avisos-reglas.js';
 import { escapeHtml } from './config.js';
-import { iniciarAvisosDelSistema } from './notifications.js';
+import { avisarPuestaAlDia, iniciarAvisosDelSistema, textoPuestaAlDia, updateNotifBadge } from './notifications.js';
 import { RADIO_ALERTA_KM } from './radio-alerta.js';
 import { fillSelect, loadParaguayLocations, ubicarZona } from './report.js';
 import { debeAceptarBases } from './sesion.js';
@@ -18,6 +18,25 @@ import { showToast } from './ui.js';
 let pasoTarjeta = null;
 let focoPrevio = null;
 let zonaActiva = null;
+// Puesta al día del inicio de sesión (alertas tempranas que salieron mientras no
+// estaba): mientras la tarjeta está abierta, el aviso espera; al cerrarla se
+// muestra, o se suma al aviso que ya da ese cierre, para que sea uno solo.
+let puestaAlDiaPendiente = 0;
+
+function tomarPuestaAlDia() {
+  const cantidad = puestaAlDiaPendiente;
+  puestaAlDiaPendiente = 0;
+  return cantidad;
+}
+
+// " Hay N casos en revisión…" para agregar a otro aviso ('' si no hay), y la
+// campana al día.
+function sufijoPuestaAlDia(cantidad) {
+  const texto = textoPuestaAlDia(cantidad);
+  if (!texto) return '';
+  updateNotifBadge().catch(error => console.error('No se pudo actualizar el contador de notificaciones:', error.message));
+  return ` ${texto}`;
+}
 
 const usuario = () => window.backendCurrentUser || null;
 const almacen = () => {
@@ -145,8 +164,9 @@ export async function activarAvisos() {
     cerrarTarjeta();
     await actualizarInterruptor();
     const bloqueadas = permiso === 'denied';
+    const extra = sufijoPuestaAlDia(tomarPuestaAlDia());
     showToast(bloqueadas ? 'Notificaciones bloqueadas' : 'Notificaciones sin activar',
-      bloqueadas ? 'Las bloqueaste en el navegador. Podés habilitarlas desde la configuración del sitio.' : 'Podés activarlas cuando quieras desde el menú.', 'error');
+      `${bloqueadas ? 'Las bloqueaste en el navegador. Podés habilitarlas desde la configuración del sitio.' : 'Podés activarlas cuando quieras desde el menú.'}${extra}`, 'error');
     anunciar(bloqueadas ? 'Notificaciones bloqueadas por el navegador.' : 'Notificaciones sin activar.');
     return;
   }
@@ -203,9 +223,10 @@ function contenidoTarjeta(paso) {
   };
 }
 
+// Devuelve si la tarjeta quedó abierta.
 function abrirTarjeta(paso) {
   const tarjeta = document.getElementById('avisosTarjeta');
-  if (!tarjeta) return;
+  if (!tarjeta) return false;
   if (tarjeta.classList.contains('hidden')) focoPrevio = document.activeElement;
   pasoTarjeta = paso;
   const { titulo, html } = contenidoTarjeta(paso);
@@ -213,6 +234,7 @@ function abrirTarjeta(paso) {
   document.getElementById('avisosTarjetaContenido').innerHTML = html;
   tarjeta.classList.remove('hidden');
   document.getElementById('avisosTarjetaTitulo').focus();
+  return true;
 }
 
 function cerrarTarjeta() {
@@ -232,14 +254,18 @@ export function cerrarTarjetaAvisos() {
   return ahoraNoAvisos();
 }
 
+// Estos cierres no dan aviso propio: si había puesta al día, se muestra ahora.
 export function ahoraNoAvisos() {
   guardar(registrarAhoraNo(leer(), Date.now()));
   cerrarTarjeta();
+  return avisarPuestaAlDia(tomarPuestaAlDia());
 }
 
 export function verGuiaInstalacionAvisos() {
   cerrarTarjeta();
   document.getElementById('installGuideModal')?.classList.remove('hidden');
+  // El aviso queda por encima de la guía (styles.css: z-index 2100 frente a 2000).
+  return avisarPuestaAlDia(tomarPuestaAlDia());
 }
 
 function mostrarError(texto) {
@@ -263,17 +289,20 @@ async function guardarUbicacion(obtener) {
   try {
     const ubicacion = await obtener();
     if (!ubicacion) throw new Error('No encontramos esa ciudad en el mapa. Probá con otra cercana o usá tu ubicación.');
-    const { sinPush } = await guardarZona(ubicacion);
+    const { sinPush, nuevas } = await guardarZona(ubicacion);
     zonaActiva = true;
     cerrarTarjeta();
     await actualizarInterruptor();
+    // Casos en revisión cercanos que ya existían (los de este guardado y los del
+    // inicio de sesión que esperaban a la tarjeta): en el mismo aviso, uno solo.
+    const extra = sufijoPuestaAlDia(nuevas + tomarPuestaAlDia());
     if (sinPush) {
       showToast('Zona guardada, sin avisos en el dispositivo',
-        'Este navegador no pudo activar los avisos push: vas a ver las alertas de tu zona en el centro de notificaciones. Podés reintentarlo desde el menú, con "Cambiar mi zona".');
-      anunciar('Zona guardada. Las alertas se verán en el centro de notificaciones.');
+        `Este navegador no pudo activar los avisos push: vas a ver las alertas de tu zona en el centro de notificaciones. Podés reintentarlo desde el menú, con "Cambiar mi zona".${extra}`);
+      anunciar(`Zona guardada. Las alertas se verán en el centro de notificaciones.${extra}`);
     } else {
-      showToast('Alertas de tu zona activadas', `Te avisaremos de casos a ${RADIO_ALERTA_KM} km o menos.`, 'success');
-      anunciar('Alertas de tu zona activadas.');
+      showToast('Alertas de tu zona activadas', `Te avisaremos de casos a ${RADIO_ALERTA_KM} km o menos.${extra}`, 'success');
+      anunciar(`Alertas de tu zona activadas.${extra}`);
     }
   } catch (error) {
     ocupada(false);
@@ -318,8 +347,9 @@ export async function guardarZonaElegidaAvisos() {
 
 export function omitirZonaAvisos() {
   cerrarTarjeta();
+  const extra = sufijoPuestaAlDia(tomarPuestaAlDia());
   showToast('Notificaciones activadas, sin alertas de zona',
-    'Te avisamos de novedades de tus casos y pistas. Para recibir alertas de casos cercanos, agregá tu zona desde el menú, en "Notificaciones y alertas".');
+    `Te avisamos de novedades de tus casos y pistas. Para recibir alertas de casos cercanos, agregá tu zona desde el menú, en "Notificaciones y alertas".${extra}`);
   anunciar('Notificaciones activadas, sin alertas de zona.');
 }
 
@@ -332,21 +362,28 @@ export function elegirZonaDesdeMenu() {
 
 // Después de iniciar sesión (y de aceptar las bases, si faltaba): la tarjeta, si
 // corresponde. Nunca pide el permiso del navegador por sí sola.
-export async function ofrecerAvisosTrasIngreso() {
+// puestaAlDia: alertas tempranas nuevas del inicio de sesión. Su aviso va después
+// de la tarjeta (si se abrió) o enseguida (si no), nunca detrás de ella.
+export async function ofrecerAvisosTrasIngreso({ puestaAlDia = 0 } = {}) {
   const actual = usuario();
-  if (!actual || debeAceptarBases(actual)) return;
-  zonaActiva = null;
-  try {
-    const disp = disponibilidad();
-    const suscripcionActiva = disp === 'ok' && Boolean(await suscripcionDelDispositivo());
-    const tipo = tarjetaAMostrar({
-      rol: actual.rol, permiso: permisoActual(), disponibilidad: disp, suscripcionActiva, estado: leer(), ahora: Date.now()
-    });
-    if (tipo) abrirTarjeta(tipo === 'activar' ? 'pedir' : 'instalar');
-  } catch (error) {
-    // Nunca bloquea el ingreso: la persona puede activarlas desde el menú.
-    console.error('No se pudo ofrecer la activación de notificaciones:', error.message);
+  let abierta = false;
+  puestaAlDiaPendiente = 0; // nada de un ingreso anterior
+  if (actual && !debeAceptarBases(actual)) {
+    zonaActiva = null;
+    try {
+      const disp = disponibilidad();
+      const suscripcionActiva = disp === 'ok' && Boolean(await suscripcionDelDispositivo());
+      const tipo = tarjetaAMostrar({
+        rol: actual.rol, permiso: permisoActual(), disponibilidad: disp, suscripcionActiva, estado: leer(), ahora: Date.now()
+      });
+      if (tipo) abierta = abrirTarjeta(tipo === 'activar' ? 'pedir' : 'instalar');
+    } catch (error) {
+      // Nunca bloquea el ingreso: la persona puede activarlas desde el menú.
+      console.error('No se pudo ofrecer la activación de notificaciones:', error.message);
+    }
   }
+  if (abierta) puestaAlDiaPendiente = Number(puestaAlDia) || 0;
+  else await avisarPuestaAlDia(puestaAlDia);
 }
 
 export function iniciarAvisos() {

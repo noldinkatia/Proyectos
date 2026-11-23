@@ -38,7 +38,7 @@ function prepararEntorno(port) {
 // connect() -> cliente con query/release (transacciones de db.js) y end().
 // PGlite tiene una sola conexión: un candado evita que otro pedido se meta en
 // medio de una transacción abierta.
-function comoPool(pg) {
+export function comoPool(pg) {
   let cola = Promise.resolve();
   const turno = () => {
     let liberar;
@@ -207,7 +207,7 @@ async function cargarDatos(db) {
   }
 }
 
-// Arranca la demo. Devuelve { url, server, cerrar }.
+// Arranca la demo. Devuelve { url, server, db, cerrar }.
 export async function iniciarDemo({ port = Number(process.env.PORT) || 3100, silencioso = false } = {}) {
   if (process.env.NODE_ENV === 'production') {
     throw new Error('demo-visual.js es solo para desarrollo y no arranca con NODE_ENV=production.');
@@ -249,6 +249,8 @@ export async function iniciarDemo({ port = Number(process.env.PORT) || 3100, sil
   return {
     url,
     server,
+    // La base en memoria, para tests y scripts de revisión visual.
+    db,
     cerrar: async () => {
       await new Promise(resolve => server.close(resolve));
       await db.end();

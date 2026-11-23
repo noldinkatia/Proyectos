@@ -48,8 +48,31 @@ function alertaZonaHtml(n) {
 // repite) y lo que va solo al centro de notificaciones (retractación, cierre, y la
 // localización y el cierre automático avisados al reportante).
 const SOLO_CENTRO = ['ALERTA_RETRACTADA', 'ALERTA_CERRADO', 'LOCALIZADO_REGISTRADO', 'CIERRE_AUTOMATICO'];
+// Tampoco la puesta al día de alertas tempranas (al iniciar sesión o guardar la
+// zona): ya se avisa con un único mensaje en pantalla, sin sonido.
 export function mostrarComoAvisoDelSistema(item) {
-  return item.canal !== 'push' && !SOLO_CENTRO.includes(item.tipo);
+  return item.canal !== 'push' && !item.puestaAlDia && !SOLO_CENTRO.includes(item.tipo);
+}
+
+// Texto del único aviso de la puesta al día ('' si no hubo alertas nuevas).
+export function textoPuestaAlDia(nuevas) {
+  const cantidad = Math.max(0, Math.floor(Number(nuevas) || 0));
+  if (!cantidad) return '';
+  return cantidad === 1
+    ? 'Hay 1 caso en revisión cerca de tu zona. Revisalo en el centro de notificaciones.'
+    : `Hay ${cantidad} casos en revisión cerca de tu zona. Revisalos en el centro de notificaciones.`;
+}
+
+// Tras iniciar sesión: un solo aviso en pantalla y la campana al día.
+export async function avisarPuestaAlDia(nuevas) {
+  const texto = textoPuestaAlDia(nuevas);
+  if (!texto) return;
+  showToast('Casos en revisión cerca de tu zona', texto, 'info');
+  try {
+    await updateNotifBadge();
+  } catch (error) {
+    console.error('No se pudo actualizar el contador de notificaciones:', error.message);
+  }
 }
 
 export async function renderNotifList() {

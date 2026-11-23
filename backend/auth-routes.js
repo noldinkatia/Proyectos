@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { rateLimit } from 'express-rate-limit';
+import { ponerAlDiaSinFallar } from './alertas.js';
 import { isGmail, normalizeEmail, withTransaction } from './db.js';
 
 const CODE_LIFETIME_MS = 10 * 60 * 1000;
@@ -453,7 +454,9 @@ export function createAuthRouter({ db, mailer, jwtSecret }) {
         return res.status(401).json({ error: 'Correo o contraseña incorrectos' });
       }
 
-      res.json({ token: createJwt(user, jwtSecret), usuario: publicUser(user) });
+      // Alertas tempranas de la zona que salieron mientras no estaba (solo ciudadanos).
+      const puestaAlDia = user.rol === 'ciudadano' ? await ponerAlDiaSinFallar(db, user.id) : { nuevas: 0 };
+      res.json({ token: createJwt(user, jwtSecret), usuario: publicUser(user), puestaAlDia });
     } catch (err) {
       console.error('Error detallado durante el inicio de sesión:', err);
       res.status(500).json({ error: 'Ocurrió un error interno. Intente nuevamente.' });

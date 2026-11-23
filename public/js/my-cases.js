@@ -34,9 +34,9 @@ export function renderMyCasesView(cases, notifications) {
                 <span class="status-tag status-${escapeHtml(c.estado)}">${escapeHtml(statusLabel(c.estado))}</span></div>
               <p class="my-case-meta">Reportado ${new Date(c.fechaCreacion).toLocaleString('es-PY')}</p>
               <button type="button" class="btn btn-outline btn-sm my-case-ficha" data-case-id="${escapeHtml(c.id)}" data-on-click="openOwnCaseDetail(this.dataset.caseId)">Ver ficha</button>
-              ${c.estado === 'PENDIENTE' ? `<p class="my-case-notice">Tu reporte está en revisión. Recibirás un aviso cuando se actualice.</p>${edicionDelReporte(c)}` : ''}
+              ${c.estado === 'PENDIENTE' ? `<p class="my-case-notice">Tu reporte está en revisión. Recibirás un aviso cuando se actualice.</p>${observacionRevision(c)}${edicionDelReporte(c)}` : ''}
               ${c.estado === 'LOCALIZADO' ? `<p class="my-case-notice">La persona fue localizada.${fechaCierre(c.cierreAutomaticoEn)}</p>` : ''}
-              ${c.estado === 'RECHAZADO' ? `<p class="my-case-notice">${escapeHtml(c.motivoRechazo || 'El reporte no fue aprobado. Contactá a soporte para más información.')}</p>` : ''}
+              ${c.estado === 'RECHAZADO' ? `<p class="my-case-notice">${c.motivoRechazo ? `<strong>Motivo del rechazo:</strong> ${escapeHtml(c.motivoRechazo)}` : 'El reporte no fue aprobado. Contactá a soporte para más información.'}</p>` : ''}
               ${activo ? `<div class="my-case-actions table-actions">
                 <button type="button" class="btn btn-success btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="respondToFollowup(this.dataset.caseId, 'LOCALIZADO')">Persona localizada</button>
                 <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="respondToFollowup(this.dataset.caseId, 'CERRAR')">Cerrar caso</button>
@@ -51,6 +51,13 @@ export function renderMyCasesView(cases, notifications) {
         </aside>
       </div>
     </section>`;
+}
+
+// Devuelto a revisión por la administración: qué hay que corregir (el servidor
+// lo manda solo a quien reportó, en motivoRevision).
+function observacionRevision(c) {
+  if (!c.motivoRevision) return '';
+  return `<p class="my-case-notice my-case-observacion"><strong>Observación de la administración:</strong> ${escapeHtml(c.motivoRevision)}</p>`;
 }
 
 // Mientras está en revisión, quien lo reportó puede corregirlo (hasta el tope que

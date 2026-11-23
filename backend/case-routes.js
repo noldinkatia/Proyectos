@@ -14,6 +14,7 @@ import {
   HORAS_PRIMER_SEGUIMIENTO,
   IMAGE_DATA_URL,
   LIMITE_EDICIONES_REPORTE,
+  motivosDeRevision,
   paginatedBody,
   paginationFromQuery,
   PUBLIC_CASE_FILTER,
@@ -192,12 +193,16 @@ export function createCaseRouter({ db, jwtSecret, push }) {
       WHERE reportado_por_usr_id = $1
       ORDER BY creado_en DESC
     `, [req.auth.id]);
+    const revisiones = await motivosDeRevision(db, req.auth.id,
+      rows.filter(row => row.estado === 'PENDIENTE').map(row => row.id));
     res.json({ casos: rows.map(row => ({
       ...toOwnerCase(row),
       // La foto de un caso propio se pide con sesión: la pública (/casos/:id/foto)
       // da 404 mientras el caso está en revisión.
       fotoUrl: hasPhoto(row) ? `/api/mis-casos/${encodeURIComponent(row.id)}/foto` : '',
-      motivoRechazo: row.motivo_rechazo
+      motivoRechazo: row.motivo_rechazo,
+      // Solo si la administración lo devolvió a revisión (no en un reporte nuevo).
+      motivoRevision: row.estado === 'PENDIENTE' ? revisiones.get(row.id) || null : null
     })) });
   }));
 
