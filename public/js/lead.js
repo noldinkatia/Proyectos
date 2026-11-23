@@ -2,6 +2,7 @@
 import { apiRequest } from './api.js';
 import { escapeHtml } from './config.js';
 import { estado } from './estado.js';
+import { dentroDeParaguay, MENSAJE_PISTA_FUERA_DE_PARAGUAY } from './limites-paraguay.js';
 import { addBaseTiles, addTextMapZoomControl } from './map.js';
 import { MAX_PHOTO_BYTES, compressReportPhoto } from './report.js';
 import { navigateTo } from './router.js';
@@ -214,6 +215,12 @@ export async function handleLeadSubmit(e) {
   e.preventDefault();
   const caseId = document.getElementById('leadCaseId').value;
   const desc = document.getElementById('leadDesc').value.trim();
+  // La misma regla que el reporte (y que el servidor): el punto, en Paraguay.
+  if (!dentroDeParaguay(document.getElementById('leadlat').value, document.getElementById('leadlng').value)) {
+    showToast('Revisá el punto del mapa', MENSAJE_PISTA_FUERA_DE_PARAGUAY, 'error');
+    document.getElementById('leadMap')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
   try {
     const photos = await Promise.all(estado.selectedLeadPhotos.map(compressReportPhoto));
     await apiRequest(`/casos/${encodeURIComponent(caseId)}/pistas`, {

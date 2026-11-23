@@ -888,6 +888,12 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 .aviso-duplicado-globo { position: absolute; z-index: 20; bottom: 50%; left: calc(100% + .45rem); padding: .3rem .55rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); box-shadow: var(--shadow-overlay); color: var(--text-strong); font-size: .75rem; font-weight: 700; white-space: nowrap; opacity: 0; pointer-events: none; transform: translateY(50%); transition: opacity .12s ease; }
 .aviso-duplicado:hover .aviso-duplicado-globo, .aviso-duplicado:focus-visible .aviso-duplicado-globo, .aviso-duplicado.abierto .aviso-duplicado-globo { opacity: 1; }
 .fila-resaltada td { background: var(--amber-soft); transition: background-color .3s ease; }
+/* Punto del mapa fuera de Paraguay (admin.js): icono, borde y texto; no solo color. */
+.aviso-ubicacion { display: flex; align-items: flex-start; gap: .55rem; margin: .45rem 0 0; padding: .6rem .75rem; border: 1px solid var(--red-border); border-left: 5px solid var(--red); border-radius: var(--radius-sm); background: var(--red-soft); color: var(--text-strong); font-size: .84rem; line-height: 1.45; }
+.aviso-ubicacion strong { color: var(--red); }
+.aviso-ubicacion-icono { flex: 0 0 auto; width: 1.25rem; height: 1.25rem; fill: none; stroke: var(--red); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.aviso-ubicacion-corto { display: inline-flex; align-items: center; width: fit-content; padding: .25rem .5rem; border-left-width: 3px; font-size: .74rem; font-weight: 700; }
+.aviso-ubicacion-corto .aviso-ubicacion-icono { width: 1rem; height: 1rem; }
 
 .grid-2, .grid-3 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .85rem; }
 .grid-3 { grid-template-columns: repeat(3, minmax(0,1fr)); }

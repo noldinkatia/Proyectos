@@ -6,6 +6,7 @@ import { DECLARACION_CASILLA, DECLARACION_PUNTOS, DECLARACION_TITULO, DECLARACIO
 import { confirmar } from './dialogo.js';
 import { estado } from './estado.js';
 import { renderCaseDetailHtml } from './feed.js';
+import { dentroDeParaguay, distanciaEntreKm, MENSAJE_FUERA_DE_PARAGUAY, MENSAJE_UBICACION_FUERA_DE_PARAGUAY } from './limites-paraguay.js';
 import { addBaseTiles, addTextMapZoomControl, REFERRER_OSM } from './map.js';
 import { RADIO_ALERTA_KM } from './radio-alerta.js';
 import { navigateTo } from './router.js';
@@ -300,17 +301,66 @@ export async function centerReportMapOnSelection() {
   const parts = ['repBarrio', 'repCiudad', 'repDepartamento']
     .map(id => document.getElementById(id)?.value || '')
     .filter(Boolean);
+  // La referencia anterior ya no vale para la nueva selección (si Nominatim falla,
+  // no queda ninguna y no se avisa la distancia).
+  estado.reportReferencia = null;
   if (!parts.length || !estado.activeMap || !estado.reportMarker) return;
   const token = ++estado.reportGeocodeToken;
   try {
     const position = await ubicarZona(parts);
     if (!position || token !== estado.reportGeocodeToken) return;
+    estado.reportReferencia = referenciaDeSeleccion(position);
     estado.reportMarker.setLatLng(position);
     estado.activeMap.setView(position, document.getElementById('repBarrio').value ? 15 : document.getElementById('repCiudad').value ? 13 : 9);
     setReportCoordinates(position);
   } catch (error) {
     console.error('No se pudo ubicar la zona elegida en el mapa:', error.message);
   }
+}
+
+// Departamento, ciudad y barrio elegidos (para saber si la referencia sigue valiendo).
+function claveSeleccion() {
+  return ['repDepartamento', 'repCiudad', 'repBarrio'].map(id => document.getElementById(id)?.value || '').join('|');
+}
+
+// Punto de la ciudad (o del departamento, si no hay ciudad) según Nominatim, con
+// el umbral para el aviso de distancia: ~30 km de la ciudad, ~100 km del departamento.
+export const UMBRAL_CIUDAD_KM = 30;
+export const UMBRAL_DEPARTAMENTO_KM = 100;
+function referenciaDeSeleccion({ lat, lng }) {
+  const ciudad = document.getElementById('repCiudad')?.value || '';
+  const departamento = document.getElementById('repDepartamento')?.value || '';
+  return ciudad
+    ? { lat, lng, nombre: ciudad, umbralKm: UMBRAL_CIUDAD_KM, clave: claveSeleccion() }
+    : { lat, lng, nombre: departamento, umbralKm: UMBRAL_DEPARTAMENTO_KM, clave: claveSeleccion() };
+}
+
+// Pregunta antes de enviar si el pin quedó lejos de la ciudad elegida. No bloquea:
+// "Dejarlo así" sigue (y no vuelve a preguntar por ese mismo punto). Sin referencia
+// (Nominatim falló o no respondió) no pregunta nada.
+export function textoDistanciaACiudad(km, nombre) {
+  return `El punto del mapa está a ${Math.round(km).toLocaleString('es-PY')} km de ${nombre}. ¿Lo corregís o lo dejás así?`;
+}
+
+export async function confirmarDistanciaACiudad(pin) {
+  const ref = estado.reportReferencia;
+  if (!ref || ref.clave !== claveSeleccion()) return true;
+  const km = distanciaEntreKm(ref, pin);
+  if (km <= ref.umbralKm) return true;
+  const aceptado = `${ref.clave}|${pin.lat}|${pin.lng}`;
+  if (estado.reportDistanciaAceptada === aceptado) return true;
+  const dejar = await confirmar({
+    titulo: 'Revisá el punto del mapa',
+    mensaje: textoDistanciaACiudad(km, ref.nombre),
+    textoConfirmar: 'Dejarlo así',
+    textoCancelar: 'Corregir el punto'
+  });
+  if (dejar) {
+    estado.reportDistanciaAceptada = aceptado;
+    return true;
+  }
+  document.getElementById('reportMap')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  return false;
 }
 
 export const AVISO_UBICACION_NO_DISPONIBLE = 'No pudimos obtener tu ubicación. Permití el acceso a la ubicación en el navegador o marcá el punto en el mapa.';
@@ -324,6 +374,12 @@ export function useBrowserLocation(latId, lngId, markerObj, coordsTextId) {
   navigator.geolocation.getCurrentPosition(pos => {
     const lat = pos.coords.latitude;
     const lng = pos.coords.longitude;
+    // Fuera de Paraguay (en una PC el navegador suele ubicar por la IP): no se usa
+    // ese punto y se avisa enseguida. Vale para el reporte y para las pistas.
+    if (!dentroDeParaguay(lat, lng)) {
+      showToast('Ubicación fuera de Paraguay', MENSAJE_UBICACION_FUERA_DE_PARAGUAY, 'error');
+      return;
+    }
     document.getElementById(latId).value = lat.toFixed(5);
     document.getElementById(lngId).value = lng.toFixed(5);
     if (coordsTextId) document.getElementById(coordsTextId).innerText = `Coordenadas aproximadas: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
@@ -651,9 +707,25 @@ export function revisarDatosFinancieros() {
   return true;
 }
 
+// El punto del mapa, en Paraguay. Si no, error visible y la vista al mapa; el
+// formulario y su borrador quedan como estaban.
+export function revisarPuntoEnParaguay() {
+  const lat = Number(document.getElementById('replat')?.value);
+  const lng = Number(document.getElementById('replng')?.value);
+  if (dentroDeParaguay(lat, lng)) return true;
+  mostrarErrorReporte(MENSAJE_FUERA_DE_PARAGUAY);
+  document.getElementById('reportMap')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  return false;
+}
+
 export async function handleReportSubmit(e) {
   e.preventDefault();
   if (!validarFormularioReporte(e.currentTarget)) return;
+  if (!revisarPuntoEnParaguay()) return;
+  if (!await confirmarDistanciaACiudad({
+    lat: Number(document.getElementById('replat')?.value),
+    lng: Number(document.getElementById('replng')?.value)
+  })) return;
   if (!revisarDatosFinancieros()) return;
   // Primer paso: se muestra la vista previa de la alerta temprana para revisarla.
   const previewSection = document.getElementById('alertPreviewSection');

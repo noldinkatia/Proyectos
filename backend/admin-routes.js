@@ -1,5 +1,5 @@
 import express from 'express';
-import { alertasPorCambioDeEstado } from './alertas.js';
+import { alertasPorCambioDeEstado, LIMITE_ALERTA_TEMPRANA_HORAS } from './alertas.js';
 import { asyncRoute } from './auth-routes.js';
 import {
   caseListColumns,
@@ -28,12 +28,32 @@ const ANTECEDENTES_ACTIVOS_DEL_REPORTANTE = `(
   WHERE ant.usuario_id = c.reportado_por_usr_id AND ant.retirado_en IS NULL
 )`;
 
-// El caso c disparó el aviso "Posible reporte duplicado" al crearse (alertas.js,
-// buscarDuplicadoCritico): se lee del aviso guardado, así la bandeja muestra
-// exactamente lo que se detectó para ese caso (solo el más reciente, nunca el
-// original) y no hace falta migración.
-const POSIBLE_DUPLICADO = `EXISTS (
-  SELECT 1 FROM notificaciones dup WHERE dup.caso_id = c.id AND dup.tipo = 'CASO_POSIBLE_DUPLICADO'
+// Texto del aviso "Posible reporte duplicado" que disparó el caso c al crearse
+// (alertas.js, buscarDuplicadoCritico); null si no lo disparó. Se lee del aviso
+// guardado, así el panel muestra exactamente lo que se detectó para ese caso (solo
+// el más reciente, nunca el original) y no hace falta migración.
+const AVISO_DUPLICADO = `(
+  SELECT dup.mensaje FROM notificaciones dup
+  WHERE dup.caso_id = c.id AND dup.tipo = 'CASO_POSIBLE_DUPLICADO'
+  ORDER BY dup.id LIMIT 1
+)`;
+
+// Sin alerta temprana y sin aviso de duplicado: la otra alerta del mismo
+// reportante dentro del límite de horas antes de crear c (alertas.js,
+// superaLimitePorReportante). null si no hubo: entonces el motivo no se registró.
+// Las horas van en el texto (no como parámetro) porque son una constante del
+// servidor ya validada como número al arrancar (alertas.js), no un dato del pedido.
+const ALERTA_DEL_LIMITE = `(
+  SELECT MAX(o.alerta_temprana_en) FROM casos o
+  WHERE c.alerta_temprana_en IS NULL AND o.reportado_por_usr_id = c.reportado_por_usr_id AND o.id <> c.id
+    AND o.alerta_temprana_en <= c.creado_en
+    AND o.alerta_temprana_en > c.creado_en - (${Number(LIMITE_ALERTA_TEMPRANA_HORAS)} * INTERVAL '1 hour')
+)`;
+
+// A cuántas personas les llegó la alerta temprana de c (avisos guardados,
+// incluidos los de la puesta al día).
+const DESTINATARIOS_ALERTA = `(
+  SELECT COUNT(*)::integer FROM notificaciones na WHERE na.caso_id = c.id AND na.tipo = 'ALERTA_TEMPRANA'
 )`;
 
 // Ediciones del reportante sobre el caso c, de la más reciente a la más vieja:
@@ -69,7 +89,9 @@ export function createAdminRouter({ db, requireAdmin, push }) {
       SELECT ${caseListColumns('c')}, u.correo AS contacto_reportante,
         ${ANTECEDENTES_ACTIVOS_DEL_REPORTANTE} AS antecedentes_reportante,
         ${EDICIONES_DEL_REPORTANTE} AS ediciones,
-        ${POSIBLE_DUPLICADO} AS posible_duplicado,
+        ${AVISO_DUPLICADO} AS aviso_duplicado,
+        ${ALERTA_DEL_LIMITE} AS alerta_del_limite_en,
+        ${DESTINATARIOS_ALERTA} AS alerta_destinatarios,
         COUNT(*) OVER() AS total_registros
       FROM casos c LEFT JOIN usuarios u ON u.id = c.reportado_por_usr_id
       ORDER BY c.creado_en DESC

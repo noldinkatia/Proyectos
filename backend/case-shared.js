@@ -229,7 +229,15 @@ export function toAdminCase(row) {
     // Antecedentes activos del reportante (migración 008): solo en respuestas de administración.
     antecedentesReportante: Array.isArray(row.antecedentes_reportante) ? row.antecedentes_reportante : [],
     // Disparó "Posible reporte duplicado" al crearse (admin-routes.js): icono en la bandeja.
-    posibleDuplicado: row.posible_duplicado === true,
+    posibleDuplicado: typeof row.aviso_duplicado === 'string' && row.aviso_duplicado !== '',
+    // Por qué salió o no la alerta temprana (ficha de validación, admin.js), sin migración:
+    // el aviso de duplicado guardado, la otra alerta del límite por reportante y
+    // cuántas personas la recibieron.
+    alertaTemprana: {
+      avisoDuplicado: row.aviso_duplicado || null,
+      otraAlertaEn: row.alerta_del_limite_en || null,
+      destinatarios: Number(row.alerta_destinatarios) || 0
+    },
     reportanteMayorEdad: Boolean(row.reportante_mayor_edad),
     // Declaración de responsabilidad (solo administración): cuándo y qué versión.
     declaracionAceptadaEn: row.declaracion_aceptada_en || null,

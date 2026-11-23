@@ -4,6 +4,7 @@ import { apiRequest, loadProtectedPhotos } from './api.js';
 import { escapeHtml } from './config.js';
 import { confirmar, pedirMotivo } from './dialogo.js';
 import { estado } from './estado.js';
+import { ACCION_ADMIN_FUERA_OTRO_ESTADO, ACCION_ADMIN_FUERA_PENDIENTE, dentroDeParaguay, MENSAJE_ADMIN_FUERA_DE_PARAGUAY } from './limites-paraguay.js';
 import { statusLabel, timeSince } from './my-cases.js';
 import { navigateTo, syncUrl } from './router.js';
 import { getStore } from './store.js';
@@ -65,7 +66,7 @@ export function renderAdminView(history, clues = [], audit = []) {
         <p class="workflow-guidance"><strong>Flujo seguro:</strong> 1. Validar con la lista de control → 2. Aprobar y publicar. También podés rechazar con motivo; los cambios quedan registrados.</p>
         ${pending.length ? `<div class="table-scroll"><table class="tabla-bandeja"><thead><tr><th>Caso</th><th class="celda-alerta"><span class="sr-only">Alerta</span></th><th>Estado</th><th>Validación</th><th>Reportado</th><th>Acciones</th></tr></thead><tbody>
           ${pending.map(c => `<tr id="validation-case-${escapeHtml(c.id)}">
-            <td data-label="Caso"><strong>${escapeHtml(c.nombreCompleto)}</strong><br><span class="muted">${escapeHtml(c.ciudad)}, ${Number(c.edad)} años</span>${avisoAntecedente(c)}${avisoModificado(c)}</td>
+            <td data-label="Caso"><strong>${escapeHtml(c.nombreCompleto)}</strong><br><span class="muted">${escapeHtml(c.ciudad)}, ${Number(c.edad)} años</span>${avisoFueraDeParaguay(c)}${avisoAntecedente(c)}${avisoModificado(c)}</td>
             <td class="celda-alerta" data-label="Alerta">${iconoPosibleDuplicado(c)}</td>
             <td data-label="Estado"><span class="status-tag status-PENDIENTE">En revisión</span></td>
             <td data-label="Validación"><span class="validation-state">Sin validar</span></td>
@@ -83,7 +84,7 @@ export function renderAdminView(history, clues = [], audit = []) {
         <h2>Gestión de casos</h2>
         ${store.casos.length ? `<div class="table-scroll"><table><thead><tr><th>Persona</th><th>Ciudad</th><th>Denuncia</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>
           ${store.casos.map(c => `<tr id="admin-case-${escapeHtml(c.id)}">
-            <td data-label="Persona">${escapeHtml(c.nombreCompleto)}${avisoModificado(c)}</td>
+            <td data-label="Persona">${escapeHtml(c.nombreCompleto)}${avisoFueraDeParaguay(c)}${avisoModificado(c)}</td>
             <td data-label="Ciudad">${escapeHtml(c.ciudad)}</td>
             <td data-label="Denuncia">${escapeHtml(c.numeroDenuncia || 'Sin registrar')}</td>
             <td data-label="Estado"><span class="status-tag status-${escapeHtml(c.estado)}">${escapeHtml(statusLabel(c.estado))}</span></td>
@@ -178,6 +179,40 @@ export function alternarAvisoDuplicado(boton) {
 
 // Desde el aviso "Posible reporte duplicado" o "Nuevo reporte para validar":
 // lleva al caso en el panel (la bandeja si sigue en revisión; si no, Casos).
+// Ficha de validación: por qué salió o no la alerta temprana, sin adivinar. Los
+// datos vienen del servidor (alertaTemprana, case-shared.js): el aviso de
+// duplicado guardado, la otra alerta del límite por reportante y los destinatarios.
+const fechaHoraPanel = valor => new Date(valor).toLocaleString('es-PY');
+export function textoAlertaTemprana(c) {
+  const datos = c.alertaTemprana || {};
+  if (c.alertaTempranaEn) {
+    const n = Number(datos.destinatarios) || 0;
+    return `enviada el ${fechaHoraPanel(c.alertaTempranaEn)} a ${n} ${n === 1 ? 'persona' : 'personas'}`;
+  }
+  if (datos.avisoDuplicado) {
+    // El aviso ya dice "No se envió alerta temprana a la zona.": acá sobra.
+    return `no enviada por posible duplicado. ${String(datos.avisoDuplicado).replace(/\s*No se envió alerta temprana a la zona\.\s*$/, '')}`;
+  }
+  if (datos.otraAlertaEn) {
+    // La hora en es-PY puede terminar en punto ("a. m."): sin punto doble.
+    const cuando = fechaHoraPanel(datos.otraAlertaEn);
+    return `no enviada por el límite por reportante: ya había enviado otra alerta el ${cuando}${cuando.endsWith('.') ? '' : '.'}`;
+  }
+  return 'no enviada (motivo no registrado)';
+}
+
+// Punto del mapa fuera de Paraguay (limites-paraguay.js): aviso destacado con
+// icono y texto, sin bloquear la validación. En la ficha va el pedido completo;
+// en la bandeja y en Casos, la versión corta.
+const ICONO_UBICACION = '<svg class="aviso-ubicacion-icono" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-6.1-6.5-11a6.5 6.5 0 0 1 13 0c0 4.9-6.5 11-6.5 11Z"/><path d="M12 7v3.5"/><path d="M12 13.2v.01"/></svg>';
+export function avisoFueraDeParaguay(c, { detalle = false } = {}) {
+  const { lat, lng } = c.ubicacion || {};
+  if (lat === undefined || lat === null || dentroDeParaguay(lat, lng)) return '';
+  return detalle
+    ? `<p class="aviso-ubicacion" role="note">${ICONO_UBICACION}<span><strong>Ubicación fuera de Paraguay.</strong> ${escapeHtml(MENSAJE_ADMIN_FUERA_DE_PARAGUAY)} ${escapeHtml(c.estado === 'PENDIENTE' ? ACCION_ADMIN_FUERA_PENDIENTE : ACCION_ADMIN_FUERA_OTRO_ESTADO)}</span></p>`
+    : `<span class="aviso-ubicacion aviso-ubicacion-corto">${ICONO_UBICACION}<span>Punto del mapa fuera de Paraguay</span></span>`;
+}
+
 export async function abrirCasoDesdeAviso(caseId) {
   document.getElementById('notifModal')?.classList.add('hidden');
   await navigateTo('admin', { tab: 'validation' });
@@ -411,6 +446,7 @@ function abrirListaValidacion(caseId, modo) {
   const detail = document.getElementById('reviewCaseDetails');
   detail.innerHTML = selectedCase ? `
     <strong>${escapeHtml(selectedCase.nombreCompleto)}</strong>
+    ${avisoFueraDeParaguay(selectedCase, { detalle: true })}
     ${selectedCase.fotoUrl ? `<img class="case-detail-photo" src="data:," data-photo-url="${escapeHtml(selectedCase.fotoUrl)}" alt="Fotografía de ${escapeHtml(selectedCase.nombreCompleto)}" data-protected-photo>` : '<span>Sin fotografía.</span>'}
     <span>${Number(selectedCase.edad)} años · ${escapeHtml(selectedCase.ciudad)}, ${escapeHtml(selectedCase.departamento || '')}</span>
     <span>Denuncia registrada: ${escapeHtml(selectedCase.numeroDenuncia || 'Sin registrar')}</span>
@@ -421,7 +457,7 @@ function abrirListaValidacion(caseId, modo) {
     ${avisoAntecedente(selectedCase, { detalle: true })}
     ${avisoModificado(selectedCase, { detalle: true })}
     <span>Declaración de responsabilidad: ${selectedCase.declaracionAceptadaEn ? `aceptada el ${escapeHtml(new Date(selectedCase.declaracionAceptadaEn).toLocaleString('es-PY'))} (versión ${escapeHtml(selectedCase.declaracionVersion || '')})` : 'sin registro (reporte anterior a la declaración)'}</span>
-    <span>Alerta temprana: ${selectedCase.alertaTempranaEn ? `enviada el ${escapeHtml(new Date(selectedCase.alertaTempranaEn).toLocaleString('es-PY'))}` : 'no enviada (posible duplicado o límite por reportante)'} · El reportante eligió mostrar: ${escapeHtml(alertFieldLabels(selectedCase.alertaCampos))}</span>
+    <span>Alerta temprana: ${escapeHtml(textoAlertaTemprana(selectedCase))} · El reportante eligió mostrar: ${escapeHtml(alertFieldLabels(selectedCase.alertaCampos))}</span>
   ` : '<span>No se pudo cargar el detalle del caso. Actualizá el panel e intentá otra vez.</span>';
   // La foto se pide con la sesión de administración (/api/admin/casos/:id/foto).
   loadProtectedPhotos(detail);

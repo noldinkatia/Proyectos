@@ -30,6 +30,7 @@ import { createStatsRouter } from './stats-routes.js';
 import { ubicacionValida } from './ubicaciones.js';
 import { normalizarCamposAlerta } from '../public/js/alerta-campos.js';
 import { DECLARACION_VERSION } from '../public/js/declaracion.js';
+import { dentroDeParaguay, MENSAJE_FUERA_DE_PARAGUAY } from '../public/js/limites-paraguay.js';
 
 // Respuesta a quien intenta marcar su caso como localizado por la API.
 export const MENSAJE_LOCALIZADO_POR_TELEFONO = 'Para indicar que la persona fue localizada, comunicate por teléfono con la administración. Con esa llamada se verifica el dato y se actualiza el caso.';
@@ -56,6 +57,10 @@ function errorDelReporte(body) {
   }
   if (body.declaracionVersion !== DECLARACION_VERSION) {
     return 'La declaración de responsabilidad cambió. Recargá la página para leer la versión vigente.';
+  }
+  // El punto del mapa tiene que estar en Paraguay (con margen para la frontera).
+  if (!dentroDeParaguay(body.ubicacion.lat, body.ubicacion.lng)) {
+    return MENSAJE_FUERA_DE_PARAGUAY;
   }
   const barrio = typeof body.barrio === 'string' ? body.barrio.trim() : '';
   if (!ubicacionValida(body.departamento, body.ciudad, barrio)) {

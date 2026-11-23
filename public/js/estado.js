@@ -41,6 +41,10 @@ export const estado = {
   reportCambios: false,
   reportMarker: null,
   reportGeocodeToken: 0,
+  // Punto de la ciudad elegida según Nominatim (aviso de distancia, report.js) y
+  // el punto que se aceptó lejos de ella ("Dejarlo así").
+  reportReferencia: null,
+  reportDistanciaAceptada: null,
   selectedReportPhoto: null,
   reportPhotoPreviewUrl: '',
   reportEnviando: false,

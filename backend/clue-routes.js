@@ -13,6 +13,7 @@ import {
   validCoordinates
 } from './case-shared.js';
 import { withTransaction } from './db.js';
+import { dentroDeParaguay, MENSAJE_PISTA_FUERA_DE_PARAGUAY } from '../public/js/limites-paraguay.js';
 
 // Índices (desde 0) de las fotos con formato de imagen de una pista, calculados en
 // PostgreSQL para que los listados no lean ni envíen el base64. La validación
@@ -136,6 +137,10 @@ export function createClueRouter({ db, requireUser, requireAdmin, publicReadLimi
         || Buffer.byteLength(photo, 'utf8') > 4 * 1024 * 1024)
       || Buffer.byteLength(photos.join(''), 'utf8') > 10 * 1024 * 1024) {
       return res.status(400).json({ error: 'Los datos de la pista están incompletos o no son válidos.' });
+    }
+    // La misma regla que el reporte: el punto del mapa, en Paraguay (con margen).
+    if (!dentroDeParaguay(body.ubicacion.lat, body.ubicacion.lng)) {
+      return res.status(400).json({ error: MENSAJE_PISTA_FUERA_DE_PARAGUAY });
     }
     const result = await withTransaction(db, async client => {
       const { rows: cases } = await client.query(`

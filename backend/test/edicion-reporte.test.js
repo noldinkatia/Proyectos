@@ -13,9 +13,13 @@ const secret = 'test-secret-with-at-least-thirty-two-characters';
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const conPostgres = { skip: !testDatabaseUrl && 'Defina TEST_DATABASE_URL para ejecutar la prueba de integración con PostgreSQL.' };
 
-// En el mar, lejos de cualquier usuario de la base de pruebas: la alerta temprana
-// del reporte no le llega a nadie.
-const LUGAR = { lat: -60.12345, lng: -30.54321 };
+// Un punto dentro de Paraguay (el servidor rechaza los de afuera), cerca de
+// Asunción y con decimales fáciles de reconocer en el historial de ediciones. Si
+// en la base de pruebas hay usuarios con zona cerca, la alerta temprana de la
+// creación les llega, pero el test no depende de eso: cuenta los avisos del caso
+// después de crearlo (avisosAntes) y comprueba que editar no agregue ninguno. El
+// nombre lleva un sufijo aleatorio, así que tampoco puede saltar como duplicado.
+const LUGAR = { lat: -25.12345, lng: -57.54321 };
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
 test('edición del reporte con PostgreSQL: dueño y PENDIENTE, sin alerta nueva, con historial y tope', conPostgres, async () => {
@@ -87,7 +91,7 @@ test('edición del reporte con PostgreSQL: dueño y PENDIENTE, sin alerta nueva,
 
     // Edición 1: ropa y pin.
     const antesDeEditar = Date.now();
-    const uno = await pedir('PUT', `/mis-casos/${id}`, duenio, reporte({ vestimenta: 'Campera azul', ubicacion: { lat: -60.2, lng: -30.6 } }));
+    const uno = await pedir('PUT', `/mis-casos/${id}`, duenio, reporte({ vestimenta: 'Campera azul', ubicacion: { lat: -25.2, lng: -57.6 } }));
     assert.equal(uno.status, 200, JSON.stringify(uno.data));
     assert.equal(uno.data.caso.estado, 'PENDIENTE');
     assert.equal(uno.data.caso.edicionesDisponibles, 4);
@@ -102,8 +106,8 @@ test('edición del reporte con PostgreSQL: dueño y PENDIENTE, sin alerta nueva,
     const [edicion] = (await db.query('SELECT * FROM ediciones_caso WHERE caso_id = $1', [id])).rows;
     assert.deepEqual(edicion.cambios, [
       { campo: 'vestimenta', anterior: 'Remera roja', nuevo: 'Campera azul' },
-      { campo: 'latitud', anterior: LUGAR.lat, nuevo: -60.2 },
-      { campo: 'longitud', anterior: LUGAR.lng, nuevo: -30.6 }
+      { campo: 'latitud', anterior: LUGAR.lat, nuevo: -25.2 },
+      { campo: 'longitud', anterior: LUGAR.lng, nuevo: -57.6 }
     ]);
     assert.equal(edicion.usuario_id, ciudadanos[0]);
     assert.equal(edicion.declaracion_version, DECLARACION_VERSION, 'la declaración que volvió a aceptar');
@@ -111,15 +115,15 @@ test('edición del reporte con PostgreSQL: dueño y PENDIENTE, sin alerta nueva,
 
     // Ediciones 2 y 3: adulto → menor (exige la autorización y saca la foto de la
     // alerta) y menor → adulto.
-    assert.equal((await pedir('PUT', `/mis-casos/${id}`, duenio, reporte({ vestimenta: 'Campera azul', ubicacion: { lat: -60.2, lng: -30.6 }, edad: 15 }))).status, 400, 'menor sin autorización');
-    const menor = await pedir('PUT', `/mis-casos/${id}`, duenio, reporte({ vestimenta: 'Campera azul', ubicacion: { lat: -60.2, lng: -30.6 }, edad: 15, autorizacionParental: true }));
+    assert.equal((await pedir('PUT', `/mis-casos/${id}`, duenio, reporte({ vestimenta: 'Campera azul', ubicacion: { lat: -25.2, lng: -57.6 }, edad: 15 }))).status, 400, 'menor sin autorización');
+    const menor = await pedir('PUT', `/mis-casos/${id}`, duenio, reporte({ vestimenta: 'Campera azul', ubicacion: { lat: -25.2, lng: -57.6 }, edad: 15, autorizacionParental: true }));
     assert.equal(menor.status, 200, JSON.stringify(menor.data));
     assert.deepEqual(menor.data.caso.alertaCampos, ['departamento', 'ciudad'], 'sin foto en la alerta de una persona menor');
-    const adulto = await pedir('PUT', `/mis-casos/${id}`, duenio, reporte({ vestimenta: 'Campera azul', ubicacion: { lat: -60.2, lng: -30.6 }, edad: 30 }));
+    const adulto = await pedir('PUT', `/mis-casos/${id}`, duenio, reporte({ vestimenta: 'Campera azul', ubicacion: { lat: -25.2, lng: -57.6 }, edad: 30 }));
     assert.equal(adulto.status, 200, JSON.stringify(adulto.data));
 
     // Ediciones 4 y 5: la foto se reemplaza y se quita (sin guardar su contenido).
-    const editadoBase = { vestimenta: 'Campera azul', ubicacion: { lat: -60.2, lng: -30.6 } };
+    const editadoBase = { vestimenta: 'Campera azul', ubicacion: { lat: -25.2, lng: -57.6 } };
     const reemplazo = await pedir('PUT', `/mis-casos/${id}`, duenio, reporte({ ...editadoBase, fotoAccion: 'reemplazar', foto: `data:image/png;base64,${PNG}` }));
     assert.equal(reemplazo.status, 200);
     const quitada = await pedir('PUT', `/mis-casos/${id}`, duenio, reporte({ ...editadoBase, fotoAccion: 'quitar' }));
