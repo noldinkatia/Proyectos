@@ -9,7 +9,7 @@ import { changeFeedPage, closeCaseDetail, filterFeedCases, openCaseDetail, openC
 import { iniciarEventos } from './eventos.js';
 import { clearLeadPhotoSelection, filterLeadCaseCards, filterLeadCases, handleLeadPhotoSelection, handleLeadSubmit } from './lead.js';
 import { centerMapOnParaguay, focusCaseOnMap, useMyLocationOnMap, viewCaseOnFeed } from './map.js';
-import { respondToFollowup } from './my-cases.js';
+import { indicarLocalizado, respondToFollowup } from './my-cases.js';
 import { iniciarConexion } from './conexion.js';
 import { restaurarSesion } from './sesion.js';
 import { clearNotifs, enableSystemNotifications, respondToCaseFollowup, toggleNotificationsModal } from './notifications.js';
@@ -114,6 +114,7 @@ export const acciones = {
   handleLeadSubmit,
   setStatsView,
   respondToFollowup,
+  indicarLocalizado,
   respondToCaseFollowup,
   updateMinorAuthorization,
   centerReportMapOnSelection,

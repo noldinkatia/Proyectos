@@ -44,16 +44,19 @@ function accionesPorCaso(html) {
   }));
 }
 
-test('"Mis casos": cada caso activo ofrece solo "Persona localizada" y "Cerrar caso"', () => {
+test('"Mis casos": "Indicar como localizado" en revisión y activos; los activos además "Persona localizada" y "Cerrar caso"', () => {
   const html = renderMyCasesView([
     caso('activo', 'VALIDADO'), caso('seguimiento', 'EN_SEGUIMIENTO'), caso('localizado', 'LOCALIZADO'),
     caso('pendiente', 'PENDIENTE'), caso('cerrado', 'CERRADO')
   ], [{ id: 1, tipo: 'SEGUIMIENTO', casoId: 'activo', titulo: 'Consulta de seguimiento', mensaje: '¿La búsqueda de Persona activo continúa activa?', creadaEn: '2026-10-25T12:00:00Z' }]);
-  const dos = [
+  // "Indicar como localizado" solo abre la ventana que pide llamar (no cambia el estado).
+  const indicar = ['Indicar como localizado', 'indicarLocalizado(this.dataset.caseId)'];
+  const activos = [
+    indicar,
     ['Persona localizada', "respondToFollowup(this.dataset.caseId, 'LOCALIZADO')"],
     ['Cerrar caso', "respondToFollowup(this.dataset.caseId, 'CERRAR')"]
   ];
-  assert.deepEqual(accionesPorCaso(html), { activo: dos, seguimiento: dos, localizado: [], pendiente: [], cerrado: [] });
+  assert.deepEqual(accionesPorCaso(html), { activo: activos, seguimiento: activos, localizado: [], pendiente: [indicar], cerrado: [] });
   // Ni prórroga ni respuestas de seguimiento en ninguna parte de la vista, tampoco
   // en el panel de avisos aunque haya una consulta pendiente.
   assert.doesNotMatch(html, /SIGUE_ACTIVA|Sigue activ|PRORROGA|prórroga|respondToCaseFollowup/i);

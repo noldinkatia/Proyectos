@@ -1,9 +1,11 @@
-// Mis casos del ciudadano. Cada caso activo ofrece solo "Persona localizada" y
+// Mis casos del ciudadano. En revisión, validado o en seguimiento: "Indicar como
+// localizado" (solo pide llamar; no cambia el estado). Cada caso activo ofrece
+// además "Persona localizada" y
 // "Cerrar caso"; las consultas de seguimiento (con "Sigue activo") se responden
 // desde su notificación (notifications.js).
 import { apiRequest } from './api.js';
-import { escapeHtml } from './config.js';
-import { confirmar, pedirMotivo } from './dialogo.js';
+import { CONTACTO_LOCALIZADO, escapeHtml } from './config.js';
+import { confirmar, informar, pedirMotivo } from './dialogo.js';
 import { estado } from './estado.js';
 import { renderNoticeItem } from './notifications.js';
 import { navigateTo } from './router.js';
@@ -37,6 +39,9 @@ export function renderMyCasesView(cases, notifications) {
               ${c.estado === 'PENDIENTE' ? `<p class="my-case-notice">Tu reporte está en revisión. Recibirás un aviso cuando se actualice.</p>${observacionRevision(c)}${edicionDelReporte(c)}` : ''}
               ${c.estado === 'LOCALIZADO' ? `<p class="my-case-notice">La persona fue localizada.${fechaCierre(c.cierreAutomaticoEn)}</p>` : ''}
               ${c.estado === 'RECHAZADO' ? `<p class="my-case-notice">${c.motivoRechazo ? `<strong>Motivo del rechazo:</strong> ${escapeHtml(c.motivoRechazo)}` : 'El reporte no fue aprobado. Contactá a soporte para más información.'}</p>` : ''}
+              ${PUEDE_INDICAR_LOCALIZADO.includes(c.estado) ? `<div class="my-case-actions table-actions">
+                <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="indicarLocalizado(this.dataset.caseId)">Indicar como localizado</button>
+              </div>` : ''}
               ${activo ? `<div class="my-case-actions table-actions">
                 <button type="button" class="btn btn-success btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="respondToFollowup(this.dataset.caseId, 'LOCALIZADO')">Persona localizada</button>
                 <button type="button" class="btn btn-outline btn-sm" data-case-id="${escapeHtml(c.id)}" data-on-click="respondToFollowup(this.dataset.caseId, 'CERRAR')">Cerrar caso</button>
@@ -51,6 +56,23 @@ export function renderMyCasesView(cases, notifications) {
         </aside>
       </div>
     </section>`;
+}
+
+// "Indicar como localizado": no cambia el estado. Solo pide llamar a la
+// administración, que verifica el dato por teléfono y actualiza el caso.
+export const PUEDE_INDICAR_LOCALIZADO = ['PENDIENTE', 'VALIDADO', 'EN_SEGUIMIENTO'];
+
+export function contenidoIndicarLocalizado(contacto = CONTACTO_LOCALIZADO) {
+  const telefono = String(contacto.telefono || '').trim();
+  const destino = telefono
+    ? `${escapeHtml(contacto.nombre)} al <a class="dialogo-telefono" href="tel:${escapeHtml(telefono.replace(/[^\d+]/g, ''))}">${escapeHtml(telefono)}</a>`
+    : escapeHtml(contacto.nombre);
+  return `<p>Para confirmar que la persona fue localizada, comunicate por teléfono con ${destino}.</p>
+    <p>Con esa llamada verificamos el dato y actualizamos el caso. Desde acá no se cambia el estado.</p>`;
+}
+
+export function indicarLocalizado() {
+  return informar({ titulo: 'Indicar como localizado', contenidoHtml: contenidoIndicarLocalizado(), textoCerrar: 'Entendido' });
 }
 
 // Devuelto a revisión por la administración: qué hay que corregir (el servidor

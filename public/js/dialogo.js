@@ -19,13 +19,18 @@ export function validarDialogo({ motivo, casillaMarcada } = {}, { pideMotivo = f
   return '';
 }
 
+const BOTON_X = `<button type="button" class="btn-close dialogo-x" aria-label="Cerrar" title="Cerrar"><svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+
 // Abre el cuadro y resuelve con { confirmado, motivo } al aceptar o cancelar.
 // opciones: titulo, mensaje (texto) o contenidoHtml (ya escapado), motivo:
 // { etiqueta, ayuda, minimo }, casilla (texto), textoConfirmar, textoCancelar, peligro.
+// informativo: solo informa (X arriba y un único botón, textoCerrar); resuelve
+// con confirmado false.
 export function abrirDialogo(opciones) {
   const {
     titulo, mensaje = '', contenidoHtml = '', motivo = null, casilla = '',
-    textoConfirmar = 'Confirmar', textoCancelar = 'Cancelar', peligro = false
+    textoConfirmar = 'Confirmar', textoCancelar = 'Cancelar', peligro = false,
+    informativo = false, textoCerrar = 'Entendido'
   } = opciones;
   const n = (contador += 1);
   const origen = document.activeElement;
@@ -35,7 +40,9 @@ export function abrirDialogo(opciones) {
   if (mensaje || contenidoHtml) dialogo.setAttribute('aria-describedby', `dialogo-texto-${n}`);
   dialogo.innerHTML = `
     <form method="dialog" class="dialogo-formulario" novalidate>
-      <h2 id="dialogo-titulo-${n}" class="dialogo-titulo">${escapeHtml(titulo)}</h2>
+      ${informativo
+        ? `<div class="dialogo-cabecera"><h2 id="dialogo-titulo-${n}" class="dialogo-titulo">${escapeHtml(titulo)}</h2>${BOTON_X}</div>`
+        : `<h2 id="dialogo-titulo-${n}" class="dialogo-titulo">${escapeHtml(titulo)}</h2>`}
       ${mensaje || contenidoHtml ? `<div id="dialogo-texto-${n}" class="dialogo-texto">${contenidoHtml || `<p>${escapeHtml(mensaje)}</p>`}</div>` : ''}
       ${motivo ? `
         <label for="dialogo-motivo-${n}" class="dialogo-etiqueta">${escapeHtml(motivo.etiqueta || 'Motivo')}</label>
@@ -46,8 +53,10 @@ export function abrirDialogo(opciones) {
         <label class="check-fila dialogo-casilla"><input type="checkbox" class="dialogo-check" required aria-describedby="dialogo-error-${n}"><span class="check-fila-texto">${escapeHtml(casilla)}</span></label>` : ''}
       <p id="dialogo-error-${n}" class="dialogo-error" role="alert"></p>
       <div class="dialogo-botones">
-        <button type="button" class="btn btn-outline dialogo-cancelar">${escapeHtml(textoCancelar)}</button>
-        <button type="submit" class="btn ${peligro ? 'btn-red' : 'btn-primary'} dialogo-confirmar">${escapeHtml(textoConfirmar)}</button>
+        ${informativo
+          ? `<button type="button" class="btn btn-primary dialogo-cancelar">${escapeHtml(textoCerrar)}</button>`
+          : `<button type="button" class="btn btn-outline dialogo-cancelar">${escapeHtml(textoCancelar)}</button>
+        <button type="submit" class="btn ${peligro ? 'btn-red' : 'btn-primary'} dialogo-confirmar">${escapeHtml(textoConfirmar)}</button>`}
       </div>
     </form>`;
   document.body.append(dialogo);
@@ -77,6 +86,7 @@ export function abrirDialogo(opciones) {
       elemento?.addEventListener('input', () => { elemento.removeAttribute('aria-invalid'); error.textContent = ''; });
     }
     dialogo.querySelector('.dialogo-cancelar').addEventListener('click', () => dialogo.close());
+    dialogo.querySelector('.dialogo-x')?.addEventListener('click', () => dialogo.close());
     // Esc dispara "cancel" y después "close": cuenta como cancelar.
     dialogo.addEventListener('close', () => {
       dialogo.remove();
@@ -84,8 +94,13 @@ export function abrirDialogo(opciones) {
       resolver(resultado);
     });
     dialogo.showModal();
-    (campo || check || dialogo.querySelector('.dialogo-confirmar'))?.focus();
+    (campo || check || dialogo.querySelector('.dialogo-confirmar') || dialogo.querySelector('.dialogo-cancelar'))?.focus();
   });
+}
+
+// Cuadro que solo informa: X y un único botón de cierre. Resuelve al cerrarse.
+export async function informar({ titulo, mensaje, contenidoHtml, textoCerrar = 'Entendido' }) {
+  await abrirDialogo({ titulo, mensaje, contenidoHtml, informativo: true, textoCerrar });
 }
 
 export async function pedirMotivo({ titulo, mensaje, etiqueta, ayuda, minimo, textoConfirmar = 'Confirmar', peligro = false }) {
